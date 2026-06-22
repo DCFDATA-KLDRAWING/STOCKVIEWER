@@ -2942,8 +2942,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
   // === 磁吸開關 ===
   const [isMagnetOn, setIsMagnetOn] = useState(false);
 
-  // === 畫布縮放狀態 ===
+  // === 畫布縮放狀態與雙指參數 ===
   const [pinchDist, setPinchDist] = useState(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const initialZoomScale = useRef(1);
 
   // === 畫線工具狀態 ===
   const [activeTool, setActiveTool] = useState('cursor'); 
@@ -3084,11 +3086,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       try {
         if (chartContainerRef.current.requestFullscreen) await chartContainerRef.current.requestFullscreen();
         else if (chartContainerRef.current.webkitRequestFullscreen) await chartContainerRef.current.webkitRequestFullscreen();
+        // ✨ 嘗試強制鎖定橫向螢幕
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
+        
+        setDisplayCount(9999); // ✨ 進入全螢幕時直接拉滿所有資料 (API 預設抓的一年)
+        setZoomScale(1);       // ✨ 重置縮放倍率
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
       if (document.exitFullscreen) await document.exitFullscreen();
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      
+      // ✨ 退出全螢幕時解除方向鎖定
+      if (window.screen && window.screen.orientation && window.screen.orientation.unlock) { try { window.screen.orientation.unlock(); } catch (e) {} }
     }
   };
 
@@ -3122,7 +3131,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
   if (!data || data.length === 0) return null;
 
-  const width = chartWidth; // ✨ 使用動態寬度取代原本寫死的 1200
+  // ✨ 動態計算寬度：將目前寬度乘上雙指縮放倍率
+  // 放大後，容器原生的 overflow-x-auto 就會允許左右滑動平移
+  const width = Math.max(chartWidth * zoomScale, scrollContainerRef.current?.clientWidth || 800);
+  
   const mainHeight = 400; const volHeight = 120; const padding = 30; 
   const indicatorHeight = indicatorType !== 'None' ? 120 : 0;
   const indPadding = 15;
@@ -3233,10 +3245,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setEditingPoint(null);
   };
 
-  // ✨ 手勢：按下開始 (拖曳)
+  // ✨ 手勢：按下開始 (拖曳/縮放)
   const handlePointerDown = (e) => {
     if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
-    if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
+    
+    if (e.type.startsWith('touch')) {
+        lastTouchTime.current = Date.now();
+        // ✨ 攔截雙指操作，紀錄初始距離與倍率
+        if (e.touches && e.touches.length === 2) {
+            const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            setPinchDist(dist);
+            initialZoomScale.current = zoomScale;
+            return; // 雙指操作時不觸發畫線或查價
+        }
+    }
 
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -3270,10 +3292,22 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     }
   };
 
-  // ✨ 手勢：移動 (游標或拖曳畫線)
+  // ✨ 手勢：移動 (游標/拖曳畫線/雙指縮放)
   const handlePointerMove = (e) => {
     if (e.type === 'mousemove' && (Date.now() - lastTouchTime.current < 500)) return;
-    if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
+    
+    if (e.type.startsWith('touch')) {
+        lastTouchTime.current = Date.now();
+        // ✨ 計算雙指縮放倍率
+        if (e.touches && e.touches.length === 2 && pinchDist) {
+            const currentDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            const scale = currentDist / pinchDist;
+            let newScale = initialZoomScale.current * scale;
+            newScale = Math.max(0.8, Math.min(newScale, 15)); // 限制縮放極限 (0.8x 到 15x)
+            setZoomScale(newScale);
+            return;
+        }
+    }
 
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -3782,14 +3816,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     <div ref={chartContainerRef} className={isFullscreen ? "fixed inset-0 z-[100] bg-[#020617] flex flex-col w-full h-full" : `relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col`}>
       <CustomModal modal={chartModal} />
       
-      {/* ✨ 1. 頂部資訊列 (僅在全螢幕模式下顯示，節省平常畫面空間) */}
-      {isFullscreen && (
-        <div className="flex items-center justify-center gap-3 px-3 py-2 shrink-0 bg-[#0f172a] relative z-20 min-h-[50px] border-b border-cyan-900/30 shadow-sm">
-           <img src="https://lh3.googleusercontent.com/d/1Non2p5IUFcBtKWqq0P8LulQo-Df83ivk" alt="Logo" className="h-[28px] opacity-90 drop-shadow-[0_0_8px_rgba(6,182,212,0.4)]" onError={(e) => { e.target.style.display = 'none'; }} />
-           <span className="text-cyan-400 text-xl font-extrabold tracking-widest drop-shadow-[0_0_8px_rgba(8,145,178,0.3)]">{stockName} ({tfLabel})</span>
-        </div>
-      )}
-
+      
       {/* ✨ 2. 次級功能列 (縮看全圖、放大、存圖) - 移除重複的工具箱按鈕，改為靠右對齊 */}
       <div className="flex items-center justify-end px-2 sm:px-3 py-2 shrink-0 border-b border-cyan-900/50 bg-slate-900/60 relative z-20 shadow-sm overflow-x-auto [&::-webkit-scrollbar]:hidden w-full">
          {/* 將間距從 gap-2 改為手機 gap-1.5，大螢幕維持 gap-2 */}
