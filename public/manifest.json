@@ -1,0 +1,15 @@
+{
+  "name": "策略股寶寶",
+  "short_name": "股寶寶",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "https://lh3.googleusercontent.com/d/1Non2p5IUFcBtKWqq0P8LulQo-Df83ivk",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
