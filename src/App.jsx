@@ -2140,24 +2140,59 @@ const App = () => {
   // ✨ 新增副圖指標狀態 (預設關閉 None)
   const [indicatorType, setIndicatorType] = useState('None');
   
-  // ✨ 恢復為預設值，資料改由 Firebase 統一載入與覆蓋
-  const [indicatorParams, setIndicatorParams] = useState({
-    macd: { fast: 12, slow: 26, signal: 9 },
-    kd: { rsv: 9, k: 3, d: 3 }, 
-    rsi: { p1: 6, p2: 12 }
+  // 1. 副圖指標參數記憶
+  const [indicatorParams, setIndicatorParams] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_INDICATOR_PARAMS');
+      return saved ? JSON.parse(saved) : {
+        macd: { fast: 12, slow: 26, signal: 9 },
+        kd: { rsv: 9, k: 3, d: 3 }, 
+        rsi: { p1: 6, p2: 12 }
+      };
+    } catch (e) {
+      return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 } };
+    }
   });
 
-  const [maParams, setMaParams] = useState({ 
-    ma1: { p: 10, c: '#eab308', w: 1.5 }, 
-    ma2: { p: 20, c: '#22d3ee', w: 1.5 }, 
-    ma3: { p: 60, c: '#ec4899', w: 1.5 } 
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams));
+  }, [indicatorParams]);
+
+  // 2. 主圖均線 MA 參數記憶
+  const [maParams, setMaParams] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_MA_PARAMS');
+      return saved ? JSON.parse(saved) : { 
+        ma1: { p: 10, c: '#eab308', w: 1.5 }, 
+        ma2: { p: 20, c: '#22d3ee', w: 1.5 }, 
+        ma3: { p: 60, c: '#ec4899', w: 1.5 } 
+      };
+    } catch (e) {
+      return { ma1: { p: 10, c: '#eab308', w: 1.5 }, ma2: { p: 20, c: '#22d3ee', w: 1.5 }, ma3: { p: 60, c: '#ec4899', w: 1.5 } };
+    }
   });
 
-  const [vmaParams, setVmaParams] = useState({
-    vma1: { p: 5, c: '#f59e0b', w: 1.5 },
-    vma2: { p: 13, c: '#8b5cf6', w: 1.5 },
-    vma3: { p: 20, c: '#10b981', w: 1.5 }
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_MA_PARAMS', JSON.stringify(maParams));
+  }, [maParams]);
+
+  // 3. 均量線 VMA 參數記憶
+  const [vmaParams, setVmaParams] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_VMA_PARAMS');
+      return saved ? JSON.parse(saved) : {
+        vma1: { p: 5, c: '#f59e0b', w: 1.5 },
+        vma2: { p: 13, c: '#8b5cf6', w: 1.5 },
+        vma3: { p: 34, c: '#10b981', w: 1.5 }
+      };
+    } catch (e) {
+      return { vma1: { p: 5, c: '#f59e0b', w: 1.5 }, vma2: { p: 13, c: '#8b5cf6', w: 1.5 }, vma3: { p: 20, c: '#10b981', w: 1.5 } };
+    }
   });
+
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_VMA_PARAMS', JSON.stringify(vmaParams));
+  }, [vmaParams]);
 
   // ✨ 新增雲端畫板儲存狀態
   const [savedLayouts, setSavedLayouts] = useState(() => {
@@ -2189,12 +2224,29 @@ const App = () => {
     showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false
   });
 
-  const [customStrategies, setCustomStrategies] = useState([
-    { id: 1, name: '天機K', marker: '🌟', matchType: 'AND', isActive: false, conditions: [
-      { left: { target: 'bodyRatio', scope: 'today', n: 1 }, operator: '>=', rightType: 'number', rightNumber: 3.5, rightMetric: { target: 'close', scope: 'ago', n: 1 }, rightMathOp: 'none', rightMathNum: 1 },
-      { left: { target: 'volume', scope: 'today', n: 1 }, operator: '>=', rightType: 'metric', rightMetric: { target: 'volume', scope: 'ago', n: 1 }, rightMathOp: '*', rightMathNum: 2 }
-    ]}
-  ]); 
+  // 4. 自訂策略清單記憶
+  const [customStrategies, setCustomStrategies] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_CUSTOM_STRATEGIES');
+      return saved ? JSON.parse(saved) : [
+        { id: 1, name: '天機K', marker: '🌟', matchType: 'AND', isActive: false, conditions: [
+          { left: { target: 'bodyRatio', scope: 'today', n: 1 }, operator: '>=', rightType: 'number', rightNumber: 3.5, rightMetric: { target: 'close', scope: 'ago', n: 1 }, rightMathOp: 'none', rightMathNum: 1 },
+          { left: { target: 'volume', scope: 'today', n: 1 }, operator: '>=', rightType: 'metric', rightMetric: { target: 'volume', scope: 'ago', n: 1 }, rightMathOp: '*', rightMathNum: 2 }
+        ]}
+      ];
+    } catch (e) {
+      return [
+        { id: 1, name: '天機K', marker: '🌟', matchType: 'AND', isActive: false, conditions: [
+          { left: { target: 'bodyRatio', scope: 'today', n: 1 }, operator: '>=', rightType: 'number', rightNumber: 3.5, rightMetric: { target: 'close', scope: 'ago', n: 1 }, rightMathOp: 'none', rightMathNum: 1 },
+          { left: { target: 'volume', scope: 'today', n: 1 }, operator: '>=', rightType: 'metric', rightMetric: { target: 'volume', scope: 'ago', n: 1 }, rightMathOp: '*', rightMathNum: 2 }
+        ]}
+      ];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_CUSTOM_STRATEGIES', JSON.stringify(customStrategies));
+  }, [customStrategies]); 
 
   // === ☁️ Firebase 雲端狀態管理 ===
   // 1. 初始化 Auth 登入
