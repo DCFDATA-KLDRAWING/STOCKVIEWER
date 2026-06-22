@@ -2219,9 +2219,9 @@ const App = () => {
   const activeToolTargetName = getFullName(symbolInput || currentViewedSymbol); // ✨ 新增：產業工具目標 (優先吃打字的，否則吃圖表正在看的)
 
   // ✨ 狀態改變：將工具收合狀態預設為 false (畫面乾淨)
-  const [panelsOpen, setPanelsOpen] = useState({ config: false }); 
   const [toggles, setToggles] = useState({
-    showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false
+    showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false,
+    showBBands: false, showTower: false
   });
 
   // 4. 自訂策略清單記憶
@@ -2518,6 +2518,21 @@ const App = () => {
     const rsiP1 = indParams.rsi.p1;
     const rsiP2 = indParams.rsi.p2;
 
+    // === 布林通道 (BBands) 20MA 與 標準差計算 ===
+    const bbPeriod = 20;
+    const bbStdDev = 2;
+    const bbMa = calculateSMA(closes, bbPeriod);
+    const bbStd = data.map((d, i) => {
+        if (i < bbPeriod - 1) return null;
+        const slice = closes.slice(i - bbPeriod + 1, i + 1);
+        const mean = bbMa[i];
+        const variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / bbPeriod;
+        return Math.sqrt(variance);
+    });
+
+    let obv = 0; // OBV 初始值
+    let prevTower = null; // 寶塔線狀態
+
     return data.map((current, i) => {
       let volType = null, isHeidun = false, isStartTrend = false, customMarks = [];
       
@@ -2539,7 +2554,28 @@ const App = () => {
           if (strat.matchType === 'AND' ? results.every(r => r) : results.some(r => r)) customMarks.push(strat.marker);
         });
       }
+      
+      // === OBV 計算 ===
+      if (i > 0) {
+          if (current.close > data[i-1].close) obv += current.volume;
+          else if (current.close < data[i-1].close) obv -= current.volume;
+      } else { obv = current.volume; }
 
+      // === 布林通道 (BBands) ===
+      let bbUp = null, bbMid = bbMa[i], bbDown = null;
+      if (bbStd[i] !== null) {
+          bbUp = bbMid + bbStdDev * bbStd[i];
+          bbDown = bbMid - bbStdDev * bbStd[i];
+      }
+
+      // === 寶塔線 (Tower) 基礎計算 ===
+      let tower = { top: Math.max(current.open, current.close), bottom: Math.min(current.open, current.close), color: current.close >= current.open ? '#ef4444' : '#22c55e' };
+      if (i > 0) {
+          const prevClose = data[i-1].close;
+          tower.top = Math.max(current.close, prevClose);
+          tower.bottom = Math.min(current.close, prevClose);
+          tower.color = current.close >= prevClose ? '#ef4444' : '#22c55e';
+      }
       // === MACD 計算 ===
       if (i > 0) {
         emaFast = current.close * fastW + emaFast * (1 - fastW);
@@ -2600,7 +2636,10 @@ const App = () => {
           customMarks,
           macd: { dif, macd: macdSig, osc },
           kd: { k, d },
-          rsi: { rsi1, rsi2 }
+          rsi: { rsi1, rsi2 },
+          obv: obv,
+          bbands: { up: bbUp, mid: bbMid, down: bbDown },
+          tower: tower
       };
     });
   };
@@ -2821,6 +2860,8 @@ const App = () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showTrend} onChange={() => handleToggle('showTrend')} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-emerald-400 font-bold">🔺起漲</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showHeidun} onChange={() => handleToggle('showHeidun')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-400 font-bold">黑頓</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showTower} onChange={() => handleToggle('showTower')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">寶塔線</span></label>
                 </div>
 
                 {customStrategies.length > 0 && (
@@ -2842,7 +2883,7 @@ const App = () => {
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 mt-2">副圖指標：</span>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {['None', 'MACD', 'KD', 'RSI'].map(type => (
+                  {['None', 'MACD', 'KD', 'RSI', 'OBV'].map(type => (
                     <button key={type} onClick={() => setIndicatorType(type)} className={`px-3 py-1.5 text-xs rounded font-bold transition-colors ${indicatorType === type ? 'bg-cyan-700 text-white shadow-[0_0_10px_rgba(6,182,212,0.5)] border border-cyan-500' : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-cyan-300'}`}>
                       {type === 'None' ? '關閉 (隱藏)' : type}
                     </button>
@@ -4104,6 +4145,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                 </g>
               );
             })()}
+            
+            {/* 布林通道 */}
+            {toggles.showBBands && (
+              <g opacity="0.6">
+                <path d={getLinePath(data, d => d.bbands?.up)} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={getLinePath(data, d => d.bbands?.mid)} stroke="#d8b4fe" strokeWidth="1" fill="none" />
+                <path d={getLinePath(data, d => d.bbands?.down)} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+              </g>
+            )}
+
+            {/* 寶塔線 (若開啟，會覆蓋在原本K線上) */}
+            {toggles.showTower && data.map((d, i) => {
+              const x = padding + i * spacing + spacing / 2;
+              return <rect key={`tower-${i}`} x={x - candleWidth / 1.5} y={getY(d.tower.top)} width={candleWidth * 1.33} height={Math.max(1, getY(d.tower.bottom) - getY(d.tower.top))} fill={d.tower.color} opacity="0.85" />;
+            })}
 
             {/* ✨ 修正 MA 科技色 */}
             {toggles.showMA && (
@@ -4227,6 +4283,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                             <path d={data.map((d, i) => d.rsi.rsi2 !== null ? `${i===0||data[i-1].rsi.rsi2===null?'M':'L'} ${padding + i*spacing + spacing/2} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                             <text x={padding} y={15} fill="#ec4899" fontSize="10" fontWeight="bold">RSI({indicatorParams.rsi.p1})</text>
                             <text x={padding + 55} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">RSI({indicatorParams.rsi.p2})</text>
+                        </g>
+                    );
+                })()}
+                {indicatorType === 'OBV' && (() => {
+                    let maxO = -Infinity, minO = Infinity;
+                    data.forEach(d => {
+                        if (d.obv > maxO) maxO = d.obv;
+                        if (d.obv < minO) minO = d.obv;
+                    });
+                    const range = (maxO - minO) || 1;
+                    const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - indPadding*2) - indPadding;
+                    return (
+                        <g>
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                            <text x={padding} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV (能量潮)</text>
                         </g>
                     );
                 })()}
