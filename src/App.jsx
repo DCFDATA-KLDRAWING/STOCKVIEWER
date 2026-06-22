@@ -2160,7 +2160,18 @@ const App = () => {
   });
 
   // ✨ 新增雲端畫板儲存狀態
-  const [savedLayouts, setSavedLayouts] = useState([]);
+  const [savedLayouts, setSavedLayouts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_LAYOUTS');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_LAYOUTS', JSON.stringify(savedLayouts));
+  }, [savedLayouts]);
 
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false); 
