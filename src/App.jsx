@@ -2145,54 +2145,33 @@ const App = () => {
     try {
       const saved = localStorage.getItem('MY_STOCK_INDICATOR_PARAMS');
       return saved ? JSON.parse(saved) : {
-        macd: { fast: 12, slow: 26, signal: 9 },
-        kd: { rsv: 9, k: 3, d: 3 }, 
-        rsi: { p1: 6, p2: 12 }
+        macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }
       };
-    } catch (e) {
-      return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 } };
-    }
+    } catch (e) { return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 } }; }
   });
+  useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
 
-  useEffect(() => {
-    localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams));
-  }, [indicatorParams]);
-
-  // 2. 主圖均線 MA 參數記憶
+  // 2. 主圖均線 MA 參數記憶 (加入 show 獨立開關)
   const [maParams, setMaParams] = useState(() => {
     try {
       const saved = localStorage.getItem('MY_STOCK_MA_PARAMS');
       return saved ? JSON.parse(saved) : { 
-        ma1: { p: 10, c: '#eab308', w: 1.5 }, 
-        ma2: { p: 20, c: '#22d3ee', w: 1.5 }, 
-        ma3: { p: 60, c: '#ec4899', w: 1.5 } 
+        ma1: { p: 10, c: '#eab308', w: 1.5, show: true }, ma2: { p: 20, c: '#22d3ee', w: 1.5, show: true }, ma3: { p: 60, c: '#ec4899', w: 1.5, show: true } 
       };
-    } catch (e) {
-      return { ma1: { p: 10, c: '#eab308', w: 1.5 }, ma2: { p: 20, c: '#22d3ee', w: 1.5 }, ma3: { p: 60, c: '#ec4899', w: 1.5 } };
-    }
+    } catch (e) { return { ma1: { p: 10, c: '#eab308', w: 1.5, show: true }, ma2: { p: 20, c: '#22d3ee', w: 1.5, show: true }, ma3: { p: 60, c: '#ec4899', w: 1.5, show: true } }; }
   });
+  useEffect(() => { localStorage.setItem('MY_STOCK_MA_PARAMS', JSON.stringify(maParams)); }, [maParams]);
 
-  useEffect(() => {
-    localStorage.setItem('MY_STOCK_MA_PARAMS', JSON.stringify(maParams));
-  }, [maParams]);
-
-  // 3. 均量線 VMA 參數記憶
+  // 3. 均量線 VMA 參數記憶 (加入 show 獨立開關)
   const [vmaParams, setVmaParams] = useState(() => {
     try {
       const saved = localStorage.getItem('MY_STOCK_VMA_PARAMS');
       return saved ? JSON.parse(saved) : {
-        vma1: { p: 5, c: '#f59e0b', w: 1.5 },
-        vma2: { p: 13, c: '#8b5cf6', w: 1.5 },
-        vma3: { p: 34, c: '#10b981', w: 1.5 }
+        vma1: { p: 5, c: '#f59e0b', w: 1.5, show: true }, vma2: { p: 13, c: '#8b5cf6', w: 1.5, show: true }, vma3: { p: 34, c: '#10b981', w: 1.5, show: true }
       };
-    } catch (e) {
-      return { vma1: { p: 5, c: '#f59e0b', w: 1.5 }, vma2: { p: 13, c: '#8b5cf6', w: 1.5 }, vma3: { p: 20, c: '#10b981', w: 1.5 } };
-    }
+    } catch (e) { return { vma1: { p: 5, c: '#f59e0b', w: 1.5, show: true }, vma2: { p: 13, c: '#8b5cf6', w: 1.5, show: true }, vma3: { p: 34, c: '#10b981', w: 1.5, show: true } }; }
   });
-
-  useEffect(() => {
-    localStorage.setItem('MY_STOCK_VMA_PARAMS', JSON.stringify(vmaParams));
-  }, [vmaParams]);
+  useEffect(() => { localStorage.setItem('MY_STOCK_VMA_PARAMS', JSON.stringify(vmaParams)); }, [vmaParams]);
 
   // ✨ 新增雲端畫板儲存狀態
   const [savedLayouts, setSavedLayouts] = useState(() => {
@@ -2219,10 +2198,10 @@ const App = () => {
   const activeToolTargetName = getFullName(symbolInput || currentViewedSymbol); // ✨ 新增：產業工具目標 (優先吃打字的，否則吃圖表正在看的)
 
   const [panelsOpen, setPanelsOpen] = useState({ config: false }); // ✨ 補回這行：控制面板收合狀態
-  // ✨ 狀態改變：將工具收合狀態預設為 false (畫面乾淨)
+  // ✨ 狀態開關管理
   const [toggles, setToggles] = useState({
-    showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false,
-    showBBands: false, showTower: false
+    showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
+    showTooltipDetail: false // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
   });
 
   // 4. 自訂策略清單記憶
@@ -2495,58 +2474,39 @@ const App = () => {
 
   const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams) => {
     const closes = data.map(d => d.close); const volumes = data.map(d => d.volume);
-    const ma1 = calculateSMA(closes, maParams.ma1.p); 
-    const ma2 = calculateSMA(closes, maParams.ma2.p); 
-    const ma3 = calculateSMA(closes, maParams.ma3.p); 
-    const vma1 = calculateSMA(volumes, vmaParams.vma1.p); 
-    const vma2 = calculateSMA(volumes, vmaParams.vma2.p); 
-    const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
-    const fixedMv5 = calculateSMA(volumes, 5); // 用於判斷極限大量的固定5日均量
-    const numShares = parseFloat(shares) || 0; 
+    const ma1 = calculateSMA(closes, maParams.ma1.p); const ma2 = calculateSMA(closes, maParams.ma2.p); const ma3 = calculateSMA(closes, maParams.ma3.p); 
+    const vma1 = calculateSMA(volumes, vmaParams.vma1.p); const vma2 = calculateSMA(volumes, vmaParams.vma2.p); const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
+    const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0; 
     
-    // 指標計算初始變數
-    let emaFast = closes[0], emaSlow = closes[0], macdSig = 0;
-    let prevK = 50, prevD = 50;
-    let gainSum1 = 0, lossSum1 = 0, avgGain1 = 0, avgLoss1 = 0;
-    let gainSum2 = 0, lossSum2 = 0, avgGain2 = 0, avgLoss2 = 0;
-    
-    const fastW = 2 / (indParams.macd.fast + 1);
-    const slowW = 2 / (indParams.macd.slow + 1);
-    const sigW = 2 / (indParams.macd.signal + 1);
-    const rsvP = indParams.kd.rsv;
-    const kW = indParams.kd.k;
-    const dW = indParams.kd.d;
-    const rsiP1 = indParams.rsi.p1;
-    const rsiP2 = indParams.rsi.p2;
-
-    // === 布林通道 (BBands) 20MA 與 標準差計算 ===
-    const bbPeriod = 20;
-    const bbStdDev = 2;
-    const bbMa = calculateSMA(closes, bbPeriod);
+    const bbPeriod = 20; const bbStdDev = 2; const bbMa = calculateSMA(closes, bbPeriod);
     const bbStd = data.map((d, i) => {
         if (i < bbPeriod - 1) return null;
-        const slice = closes.slice(i - bbPeriod + 1, i + 1);
-        const mean = bbMa[i];
-        const variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / bbPeriod;
-        return Math.sqrt(variance);
+        const slice = closes.slice(i - bbPeriod + 1, i + 1); const mean = bbMa[i];
+        return Math.sqrt(slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / bbPeriod);
     });
 
-    let obv = 0; // OBV 初始值
-    let prevTower = null; // 寶塔線狀態
+    // ✨ 預先計算 OBV 與 OBV MA
+    let obvArr = []; let currentObv = 0;
+    for (let i = 0; i < data.length; i++) {
+        if (i > 0) {
+            if (data[i].close > data[i-1].close) currentObv += data[i].volume;
+            else if (data[i].close < data[i-1].close) currentObv -= data[i].volume;
+        } else { currentObv = data[i].volume; }
+        obvArr.push(currentObv);
+    }
+    const obvMaArr = calculateSMA(obvArr, indParams.obv?.ma || 20);
+
+    let emaFast = closes[0], emaSlow = closes[0], macdSig = 0, prevK = 50, prevD = 50;
+    let gainSum1 = 0, lossSum1 = 0, avgGain1 = 0, avgLoss1 = 0, gainSum2 = 0, lossSum2 = 0, avgGain2 = 0, avgLoss2 = 0;
+    let prevTowerColor = '#ef4444'; // ✨ 記錄寶塔線顏色的狀態變數
 
     return data.map((current, i) => {
       let volType = null, isHeidun = false, isStartTrend = false, customMarks = [];
-      
       const turnover = numShares > 0 ? (current.volume / numShares) * 100 : 0;
       if (turnover >= 50) volType = '天量'; else if (turnover >= 10) volType = '巨量'; else if (i > 0 && fixedMv5[i-1] && current.volume >= fixedMv5[i-1] * 1.6) volType = '極限大量';
 
-      if (i >= 2 && ma1[i] !== null) {
-        const k1 = data[i-2], k2 = data[i-1], k3 = current;
-        if (k1.close > k1.open && k2.close < k2.open && k2.high > k1.high && k2.low > k1.low && k3.high < k2.high && k3.close >= Math.min(k1.low, k2.low) && k3.close > ma1[i]) isHeidun = true;
-      }
-      if (i >= 14 && ma1[i] !== null) {
-        if (current.close >= current.open && current.close > ma1[i] && current.close > data[i-1].high && current.volume > data[i-5].volume && current.volume > data[i-13].volume) isStartTrend = true;
-      }
+      if (i >= 2 && ma1[i] !== null) { const k1 = data[i-2], k2 = data[i-1], k3 = current; if (k1.close > k1.open && k2.close < k2.open && k2.high > k1.high && k2.low > k1.low && k3.high < k2.high && k3.close >= Math.min(k1.low, k2.low) && k3.close > ma1[i]) isHeidun = true; }
+      if (i >= 14 && ma1[i] !== null) { if (current.close >= current.open && current.close > ma1[i] && current.close > data[i-1].high && current.volume > data[i-5].volume && current.volume > data[i-13].volume) isStartTrend = true; }
 
       if (customStrats && Array.isArray(customStrats)) {
         customStrats.forEach(strat => {
@@ -2555,92 +2515,61 @@ const App = () => {
           if (strat.matchType === 'AND' ? results.every(r => r) : results.some(r => r)) customMarks.push(strat.marker);
         });
       }
-      
-      // === OBV 計算 ===
-      if (i > 0) {
-          if (current.close > data[i-1].close) obv += current.volume;
-          else if (current.close < data[i-1].close) obv -= current.volume;
-      } else { obv = current.volume; }
 
-      // === 布林通道 (BBands) ===
-      let bbUp = null, bbMid = bbMa[i], bbDown = null;
-      if (bbStd[i] !== null) {
-          bbUp = bbMid + bbStdDev * bbStd[i];
-          bbDown = bbMid - bbStdDev * bbStd[i];
-      }
-
-      // === 寶塔線 (Tower) 基礎計算 ===
-      let tower = { top: Math.max(current.open, current.close), bottom: Math.min(current.open, current.close), color: current.close >= current.open ? '#ef4444' : '#22c55e' };
-      if (i > 0) {
-          const prevClose = data[i-1].close;
-          tower.top = Math.max(current.close, prevClose);
-          tower.bottom = Math.min(current.close, prevClose);
-          tower.color = current.close >= prevClose ? '#ef4444' : '#22c55e';
-      }
-      // === MACD 計算 ===
-      if (i > 0) {
-        emaFast = current.close * fastW + emaFast * (1 - fastW);
-        emaSlow = current.close * slowW + emaSlow * (1 - slowW);
-      }
-      const dif = emaFast - emaSlow;
-      if (i === 0) macdSig = dif;
-      else macdSig = dif * sigW + macdSig * (1 - sigW);
+      if (i > 0) { emaFast = current.close * (2/13) + emaFast * (1 - 2/13); emaSlow = current.close * (2/27) + emaSlow * (1 - 2/27); }
+      const dif = emaFast - emaSlow; if (i === 0) macdSig = dif; else macdSig = dif * (2/10) + macdSig * (1 - 2/10);
       const osc = dif - macdSig;
 
-      // === KD 計算 ===
-      let k = 50, d = 50;
-      const kdPeriodData = data.slice(Math.max(0, i - rsvP + 1), i + 1);
-      const h9 = Math.max(...kdPeriodData.map(dx => dx.high));
-      const l9 = Math.min(...kdPeriodData.map(dx => dx.low));
-      let rsv = 50;
-      if (h9 !== l9) rsv = ((current.close - l9) / (h9 - l9)) * 100;
-      k = (prevK * (kW - 1) + rsv) / kW;
-      d = (prevD * (dW - 1) + k) / dW;
+      const kdPeriodData = data.slice(Math.max(0, i - indParams.kd.rsv + 1), i + 1);
+      const h9 = Math.max(...kdPeriodData.map(dx => dx.high)), l9 = Math.min(...kdPeriodData.map(dx => dx.low));
+      let rsv = h9 !== l9 ? ((current.close - l9) / (h9 - l9)) * 100 : 50;
+      let k = (prevK * (indParams.kd.k - 1) + rsv) / indParams.kd.k, d = (prevD * (indParams.kd.d - 1) + k) / indParams.kd.d;
       prevK = k; prevD = d;
 
-      // === RSI 計算 ===
       let rsi1 = null, rsi2 = null;
       if (i > 0) {
-        const change = current.close - closes[i - 1];
-        const gain = change > 0 ? change : 0;
-        const loss = change < 0 ? Math.abs(change) : 0;
-        
-        // 短週期 RSI
-        if (i <= rsiP1) {
-            gainSum1 += gain; lossSum1 += loss;
-            avgGain1 = gainSum1 / i;
-            avgLoss1 = lossSum1 / i;
-        } else {
-            avgGain1 = (avgGain1 * (rsiP1 - 1) + gain) / rsiP1;
-            avgLoss1 = (avgLoss1 * (rsiP1 - 1) + loss) / rsiP1;
-        }
-        let rs1 = avgLoss1 === 0 ? 100 : avgGain1 / avgLoss1;
-        rsi1 = avgLoss1 === 0 ? 100 : 100 - (100 / (1 + rs1));
-
-        // 長週期 RSI
-        if (i <= rsiP2) {
-            gainSum2 += gain; lossSum2 += loss;
-            avgGain2 = gainSum2 / i;
-            avgLoss2 = lossSum2 / i;
-        } else {
-            avgGain2 = (avgGain2 * (rsiP2 - 1) + gain) / rsiP2;
-            avgLoss2 = (avgLoss2 * (rsiP2 - 1) + loss) / rsiP2;
-        }
-        let rs2 = avgLoss2 === 0 ? 100 : avgGain2 / avgLoss2;
-        rsi2 = avgLoss2 === 0 ? 100 : 100 - (100 / (1 + rs2));
+        const gain = Math.max(0, current.close - closes[i - 1]), loss = Math.max(0, closes[i - 1] - current.close);
+        if (i <= indParams.rsi.p1) { avgGain1 = (gainSum1+=gain)/i; avgLoss1 = (lossSum1+=loss)/i; } else { avgGain1 = (avgGain1*(indParams.rsi.p1-1)+gain)/indParams.rsi.p1; avgLoss1 = (avgLoss1*(indParams.rsi.p1-1)+loss)/indParams.rsi.p1; }
+        rsi1 = avgLoss1 === 0 ? 100 : 100 - (100 / (1 + (avgGain1 / avgLoss1)));
+        if (i <= indParams.rsi.p2) { avgGain2 = (gainSum2+=gain)/i; avgLoss2 = (lossSum2+=loss)/i; } else { avgGain2 = (avgGain2*(indParams.rsi.p2-1)+gain)/indParams.rsi.p2; avgLoss2 = (avgLoss2*(indParams.rsi.p2-1)+loss)/indParams.rsi.p2; }
+        rsi2 = avgLoss2 === 0 ? 100 : 100 - (100 / (1 + (avgGain2 / avgLoss2)));
       }
 
+      let bbUp = null, bbMid = bbMa[i], bbDown = null; if (bbStd[i] !== null) { bbUp = bbMid + bbStdDev * bbStd[i]; bbDown = bbMid - bbStdDev * bbStd[i]; }
+      
+      // ✨ 寶塔線 N 日參數運算邏輯 (修正版)
+      const towerP = indParams.tower?.p || 3;
+      let tColor = prevTowerColor;
+      let tTop = current.close;
+      let tBottom = current.open; // 針對第一天的預設
+
+      if (i > 0) { 
+        const prevClose = data[i-1].close;
+        // ✨ 正確畫法：積木方塊是畫在「昨收」與「今收」之間
+        tTop = Math.max(current.close, prevClose);
+        tBottom = Math.min(current.close, prevClose);
+        
+        // 取得前 N 天的最高/最低收盤價
+        const lookbackData = data.slice(Math.max(0, i - towerP), i);
+        const refHigh = Math.max(...lookbackData.map(dx => dx.close));
+        const refLow = Math.min(...lookbackData.map(dx => dx.close));
+        
+        // 判斷是否翻色
+        if (current.close > refHigh) tColor = '#ef4444';
+        else if (current.close < refLow) tColor = '#22c55e';
+        else tColor = prevTowerColor; // 沒有突破就維持昨天的顏色
+      } else {
+        tColor = current.close >= current.open ? '#ef4444' : '#22c55e';
+      }
+      
+      prevTowerColor = tColor; // 把今天的顏色存起來，留給明天判斷用
+      let tower = { top: tTop, bottom: tBottom, color: tColor };
+
       return { 
-          ...current, 
-          ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
-          signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, 
-          customMarks,
-          macd: { dif, macd: macdSig, osc },
-          kd: { k, d },
-          rsi: { rsi1, rsi2 },
-          obv: obv,
-          bbands: { up: bbUp, mid: bbMid, down: bbDown },
-          tower: tower
+          ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
+          signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, customMarks,
+          macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },
+          obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown }, tower 
       };
     });
   };
@@ -2773,98 +2702,54 @@ const App = () => {
           {/* ✨ 新增的折疊面板 (圖表與均線設定) */}
           <Panel title="圖表技術指標與策略設定" icon="🎛️" isOpen={panelsOpen.config} onToggle={() => setPanelsOpen(p => ({...p, config: !p.config}))}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* 面板左半：K棒數與均線設定 */}
               <div className="flex flex-col gap-3">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1">K BARS 數量與均線 (MA / VMA)</span>
-                
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-slate-500 font-bold w-12">顯示數量</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[60, 90, 120, 180, 240].map(n => (
-                      <button key={n} onClick={() => setDisplayCount(n)} className={`px-2 py-0.5 text-xs rounded border font-bold transition-colors ${displayCount === n ? 'bg-cyan-900/60 text-cyan-300 border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'bg-slate-800 text-slate-500 border-slate-700 hover:bg-slate-700'}`}>{n}</button>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-2 mt-1">
+                  {[1, 2, 3].map(n => (
+                    <div key={`ma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
+                      <input type="checkbox" checked={maParams[`ma${n}`].show !== false} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
+                      <input type="color" value={maParams[`ma${n}`].c} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
+                      <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA {n}</span>
+                      <input type="number" value={maParams[`ma${n}`].p} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: maParams[`ma${n}`].c}} />
+                      <select value={maParams[`ma${n}`].w} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
+                        <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
+                      </select>
+                    </div>
+                  ))}
                 </div>
-                
-                <div className="flex flex-col gap-2">
-                  {/* MA1 */}
-                  <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                    <input type="color" value={maParams.ma1.c} onChange={e => setMaParams({...maParams, ma1: {...maParams.ma1, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA 1</span>
-                    <input type="number" value={maParams.ma1.p} onChange={e => setMaParams({...maParams, ma1: {...maParams.ma1, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: maParams.ma1.c}} />
-                    <select value={maParams.ma1.w} onChange={e => setMaParams({...maParams, ma1: {...maParams.ma1, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer min-w-0">
-                      <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                    </select>
-                  </div>
-                  {/* MA2 */}
-                  <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                    <input type="color" value={maParams.ma2.c} onChange={e => setMaParams({...maParams, ma2: {...maParams.ma2, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA 2</span>
-                    <input type="number" value={maParams.ma2.p} onChange={e => setMaParams({...maParams, ma2: {...maParams.ma2, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: maParams.ma2.c}} />
-                    <select value={maParams.ma2.w} onChange={e => setMaParams({...maParams, ma2: {...maParams.ma2, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer min-w-0">
-                      <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                    </select>
-                  </div>
-                  {/* MA3 */}
-                  <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                    <input type="color" value={maParams.ma3.c} onChange={e => setMaParams({...maParams, ma3: {...maParams.ma3, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA 3</span>
-                    <input type="number" value={maParams.ma3.p} onChange={e => setMaParams({...maParams, ma3: {...maParams.ma3, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: maParams.ma3.c}} />
-                    <select value={maParams.ma3.w} onChange={e => setMaParams({...maParams, ma3: {...maParams.ma3, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer min-w-0">
-                      <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* ✨ 均量線 (VMA) 設定區塊 */}
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1 mt-2">均量線 (VMA)</span>
-                <div className="flex flex-col gap-2">
-                  {/* VMA1 */}
-                  <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                    <input type="color" value={vmaParams.vma1.c} onChange={e => setVmaParams({...vmaParams, vma1: {...vmaParams.vma1, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">VMA 1</span>
-                    <input type="number" value={vmaParams.vma1.p} onChange={e => setVmaParams({...vmaParams, vma1: {...vmaParams.vma1, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams.vma1.c}} />
-                    <select value={vmaParams.vma1.w} onChange={e => setVmaParams({...vmaParams, vma1: {...vmaParams.vma1, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer min-w-0">
-                      <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                    </select>
-                  </div>
-                  {/* VMA2 */}
-                  <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                    <input type="color" value={vmaParams.vma2.c} onChange={e => setVmaParams({...vmaParams, vma2: {...vmaParams.vma2, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">VMA 2</span>
-                    <input type="number" value={vmaParams.vma2.p} onChange={e => setVmaParams({...vmaParams, vma2: {...vmaParams.vma2, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams.vma2.c}} />
-                    <select value={vmaParams.vma2.w} onChange={e => setVmaParams({...vmaParams, vma2: {...vmaParams.vma2, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer min-w-0">
-                      <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                    </select>
-                  </div>
-                  {/* VMA3 */}
-                  <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                    <input type="color" value={vmaParams.vma3.c} onChange={e => setVmaParams({...vmaParams, vma3: {...vmaParams.vma3, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">VMA 3</span>
-                    <input type="number" value={vmaParams.vma3.p} onChange={e => setVmaParams({...vmaParams, vma3: {...vmaParams.vma3, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams.vma3.c}} />
-                    <select value={vmaParams.vma3.w} onChange={e => setVmaParams({...vmaParams, vma3: {...vmaParams.vma3, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer min-w-0">
-                      <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                    </select>
-                  </div>
+                <div className="flex flex-col gap-2 mt-1">
+                  {[1, 2, 3].map(n => (
+                    <div key={`vma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
+                      <input type="checkbox" checked={vmaParams[`vma${n}`].show !== false} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
+                      <input type="color" value={vmaParams[`vma${n}`].c} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
+                      <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">VMA {n}</span>
+                      <input type="number" value={vmaParams[`vma${n}`].p} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams[`vma${n}`].c}} />
+                      <select value={vmaParams[`vma${n}`].w} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
+                        <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
+                      </select>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* 面板右半：訊號與策略開關 */}
               <div className="flex flex-col gap-3">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1">圖表訊號與自訂策略</span>
-                
-                <div className="flex flex-wrap gap-2">
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showMA} onChange={() => handleToggle('showMA')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均線</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線</span></label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMA} onChange={() => handleToggle('showMA')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均線總開關</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線總開關</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
+                  {/* ✨ 新增：詳細資訊分流勾選鍵 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showTooltipDetail} onChange={() => handleToggle('showTooltipDetail')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-amber-400 font-bold">查價詳細資訊</span></label>
+                  
+                  {/* ✨ 補回：量能標記、起漲、黑頓 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showVolSignal} onChange={() => handleToggle('showVolSignal')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">量能標記</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showTrend} onChange={() => handleToggle('showTrend')} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-emerald-400 font-bold">🔺起漲</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showHeidun} onChange={() => handleToggle('showHeidun')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-400 font-bold">黑頓</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showTower} onChange={() => handleToggle('showTower')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">寶塔線</span></label>
                 </div>
 
+                {/* ✨ 補回：自訂策略 (天機K) */}
                 {customStrategies.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-1">
                     {customStrategies.map(strat => (
@@ -2876,24 +2761,21 @@ const App = () => {
                   </div>
                 )}
               </div>
-
             </div>
 
-            {/* ✨ 副圖指標選擇與參數調整區塊 */}
             <div className="flex items-start gap-3 mt-4 pt-4 border-t border-slate-700/50">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 mt-2">副圖指標：</span>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {['None', 'MACD', 'KD', 'RSI', 'OBV'].map(type => (
-                    <button key={type} onClick={() => setIndicatorType(type)} className={`px-3 py-1.5 text-xs rounded font-bold transition-colors ${indicatorType === type ? 'bg-cyan-700 text-white shadow-[0_0_10px_rgba(6,182,212,0.5)] border border-cyan-500' : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-cyan-300'}`}>
-                      {type === 'None' ? '關閉 (隱藏)' : type}
+                  {['None', 'MACD', 'KD', 'RSI', 'OBV', 'TOWER'].map(type => (
+                    <button key={type} onClick={() => setIndicatorType(type)} className={`px-3 py-1.5 text-xs rounded font-bold ${indicatorType === type ? 'bg-cyan-700 text-white border border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+                      {type === 'None' ? '關閉' : (type === 'TOWER' ? '寶塔線' : type)}
                     </button>
                   ))}
                 </div>
-                
                 {/* 動態參數調整輸入框 */}
                 {indicatorType === 'MACD' && (
-                  <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
+                  <div className="flex flex-wrap items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
                     <span className="text-[10px] text-slate-400 font-bold">快線</span>
                     <input type="number" value={indicatorParams.macd.fast} onChange={e => setIndicatorParams({...indicatorParams, macd: {...indicatorParams.macd, fast: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                     <span className="text-[10px] text-slate-400 font-bold ml-2">慢線</span>
@@ -2903,7 +2785,7 @@ const App = () => {
                   </div>
                 )}
                 {indicatorType === 'KD' && (
-                  <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
+                  <div className="flex flex-wrap items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
                     <span className="text-[10px] text-slate-400 font-bold">RSV 週期</span>
                     <input type="number" value={indicatorParams.kd.rsv} onChange={e => setIndicatorParams({...indicatorParams, kd: {...indicatorParams.kd, rsv: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                     <span className="text-[10px] text-slate-400 font-bold ml-2">K 平滑</span>
@@ -2913,11 +2795,23 @@ const App = () => {
                   </div>
                 )}
                 {indicatorType === 'RSI' && (
-                  <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
+                  <div className="flex flex-wrap items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
                     <span className="text-[10px] text-slate-400 font-bold">短週期 (RSI 1)</span>
                     <input type="number" value={indicatorParams.rsi.p1} onChange={e => setIndicatorParams({...indicatorParams, rsi: {...indicatorParams.rsi, p1: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                     <span className="text-[10px] text-slate-400 font-bold ml-2">長週期 (RSI 2)</span>
                     <input type="number" value={indicatorParams.rsi.p2} onChange={e => setIndicatorParams({...indicatorParams, rsi: {...indicatorParams.rsi, p2: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
+                  </div>
+                )}
+                {indicatorType === 'OBV' && (
+                  <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
+                    <span className="text-[10px] text-slate-400 font-bold">OBV MA週期</span>
+                    <input type="number" value={indicatorParams.obv?.ma || 20} onChange={e => setIndicatorParams({...indicatorParams, obv: {...indicatorParams.obv, ma: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
+                  </div>
+                )}
+                {indicatorType === 'TOWER' && (
+                  <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
+                    <span className="text-[10px] text-slate-400 font-bold">寶塔線參數 (N日)</span>
+                    <input type="number" value={indicatorParams.tower?.p || 3} onChange={e => setIndicatorParams({...indicatorParams, tower: {...indicatorParams.tower, p: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
               </div>
@@ -4107,334 +4001,243 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
           onTouchEnd={handlePointerUp}
           onTouchCancel={handlePointerUp}
         >
-          <defs>
-            <clipPath id="chartClip">
-              <rect x={padding} y={0} width={width - padding * 2} height={totalSVGHeight} />
-            </clipPath>
-          </defs>
-
-          {/* ✨ 動態渲染底色與字體 */}
-          <rect x={0} y={0} width={width} height={totalSVGHeight} fill={theme.bg} />
-          
-          {/* ✨ 存圖用的頂部置中標題 */}
-          {stockName && <text x={width / 2} y={35} fontSize="22" fill={theme.title} fontWeight="bold" textAnchor="middle" opacity="0.8" className="tracking-widest" pointerEvents="none">{stockName} ({tfLabel})</text>}
-          
-          {/* ✨ 畫面中央的巨大淡色浮水印 */}
-          {stockName && <text x={width / 2} y={mainHeight / 2 + 20} fontSize="120" fill={theme.title} fontWeight="bold" textAnchor="middle" opacity="0.04" className="tracking-widest" pointerEvents="none">{stockName}</text>}
-          
-          <g transform={`translate(${width / 2}, ${mainHeight + volHeight + indicatorHeight + 60})`} textAnchor="middle" fontSize="14" fill={theme.text}>
-            {toggles.showTrend && <text x="-240"><tspan fill="#10b981" fontWeight="bold">🔺</tspan> 起漲</text>}
-            {toggles.showVolSignal && <text x="-160"><tspan fill="#ef4444" fontWeight="bold">天</tspan> 天量</text>}
-            {toggles.showVolSignal && <text x="-80"><tspan fill="#f97316" fontWeight="bold">巨</tspan> 巨量</text>}
-            {toggles.showVolSignal && <text x="0"><tspan fill="#8b5cf6" fontWeight="bold">極</tspan> 極限量</text>}
-            {toggles.showHeidun && <text x="80"><tspan fill={theme.heidunText} fontWeight="bold">黑頓</tspan></text>}
-            {activeCustomStrats.map((strat, idx) => <text key={strat.id} x={180 + (idx * 100)}><tspan fill="#4f46e5" fontWeight="bold">{strat.marker}</tspan> {strat.name}</text>)}
-          </g>
+          <defs><clipPath id="chartClip"><rect x={padding} y={0} width={width - padding * 2} height={totalSVGHeight} /></clipPath></defs>
+          <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           <g clipPath="url(#chartClip)">
-            <line x1={0} y1={getY(minPrice)} x2={width} y2={getY(minPrice)} stroke={theme.grid} strokeDasharray="4,4" />
-            <line x1={0} y1={getY(maxPrice)} x2={width} y2={getY(maxPrice)} stroke={theme.grid} strokeDasharray="4,4" />
+            
+            {/* ✨ 補回：最高最低價參考線與天量防守線 */}
+            <line x1={0} y1={getY(minPrice)} x2={width} y2={getY(minPrice)} stroke="#1e293b" strokeDasharray="4,4" />
+            <line x1={0} y1={getY(maxPrice)} x2={width} y2={getY(maxPrice)} stroke="#1e293b" strokeDasharray="4,4" />
             
             {toggles.showVolSignal && defensivePrice && (() => {
               const latestX = padding + (data.length - 1) * spacing + spacing / 2;
               return (
                 <g>
                   <line x1={0} y1={getY(defensivePrice)} x2={width} y2={getY(defensivePrice)} stroke="#ef4444" strokeDasharray="6,4" strokeWidth="1.5" opacity="0.8" />
-                  <text x={latestX + 10} y={getY(defensivePrice) - 6} fill="#ef4444" fontSize="14" fontWeight="bold" textAnchor="start">
+                  <text x={Math.min(latestX + 10, width - 80)} y={getY(defensivePrice) - 6} fill="#ef4444" fontSize="14" fontWeight="bold" textAnchor="start">
                     🛡️ {defensivePrice.toFixed(2)}
                   </text>
                 </g>
               );
             })()}
-            
-            {/* 布林通道 */}
-            {toggles.showBBands && (
-              <g opacity="0.6">
-                <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1].bbands?.up == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1].bbands?.mid == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1].bbands?.down == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-              </g>
-            )}
 
-            {/* 寶塔線 (若開啟，會覆蓋在原本K線上) */}
-            {toggles.showTower && data.map((d, i) => {
-              const x = padding + i * spacing + spacing / 2;
-              return <rect key={`tower-${i}`} x={x - candleWidth / 1.5} y={getY(d.tower.top)} width={candleWidth * 1.33} height={Math.max(1, getY(d.tower.bottom) - getY(d.tower.top))} fill={d.tower.color} opacity="0.85" />;
-            })}
+            {/* 獨立開關的主圖 MA */}
+            {toggles.showMA && maParams.ma1.show !== false && <path d={getLinePath(data, 'ma1')} stroke={maParams.ma1.c} strokeWidth={maParams.ma1.w} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams.ma2.show !== false && <path d={getLinePath(data, 'ma2')} stroke={maParams.ma2.c} strokeWidth={maParams.ma2.w} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams.ma3.show !== false && <path d={getLinePath(data, 'ma3')} stroke={maParams.ma3.c} strokeWidth={maParams.ma3.w} fill="none" opacity="0.8"/>}
 
-            {/* ✨ 修正 MA 科技色 */}
-            {toggles.showMA && (
-              <>
-                <path d={getLinePath(data, 'ma1')} stroke={maParams.ma1.c} strokeWidth={maParams.ma1.w} fill="none" opacity="0.8"/>
-                <path d={getLinePath(data, 'ma2')} stroke={maParams.ma2.c} strokeWidth={maParams.ma2.w} fill="none" opacity="0.8"/>
-                <path d={getLinePath(data, 'ma3')} stroke={maParams.ma3.c} strokeWidth={maParams.ma3.w} fill="none" opacity="0.8"/>
-              </>
-            )}
+            {toggles.showBBands && (<g opacity="0.6">
+                <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1]?.bbands?.mid == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1]?.bbands?.down == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+            </g>)}
 
+            {/* 標準 K 線 (拔除了與寶塔線衝突的邏輯) */}
             {data.map((d, i) => {
               const x = padding + i * spacing + spacing / 2;
               const color = d.close >= d.open ? '#ef4444' : '#22c55e';
-              const yTop = getY(Math.max(d.open, d.close)); const yBottom = getY(Math.min(d.open, d.close));
               return (
                 <g key={`candle-${i}`}>
                   <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1" />
-                  <rect x={x - candleWidth / 2} y={yTop} width={candleWidth} height={Math.max(1, yBottom - yTop)} fill={color} />
+                  <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
+                  {/* ✨ 補回：黑頓與自訂策略標記 */}
                   <g textAnchor="middle" fontSize="12" fontWeight="bold">
-                    {toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill={theme.heidunText}>黑頓</text>}
+                    {toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
                     {d.customMarks && d.customMarks.map((mark, markIdx) => <text key={markIdx} x={x} y={getY(d.high) - 10 - (toggles.showHeidun && d.signalHeidun ? 15 : 0) - (markIdx * 15)} fill="#818cf8">{mark}</text>)}
                   </g>
+                  {/* ✨ 補回：起漲標記 */}
                   {toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
-                  {toggles.showMA && i === data.length - maParams.ma1.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma1.c} />}
-                  {toggles.showMA && i === data.length - maParams.ma2.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma2.c} />}
-                  {toggles.showMA && i === data.length - maParams.ma3.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma3.c} />}
+                  {/* 獨立開關的 MA 圓點 */}
+                  {toggles.showMA && maParams.ma1.show !== false && i === data.length - maParams.ma1.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma1.c} />}
+                  {toggles.showMA && maParams.ma2.show !== false && i === data.length - maParams.ma2.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma2.c} />}
+                  {toggles.showMA && maParams.ma3.show !== false && i === data.length - maParams.ma3.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma3.c} />}
                 </g>
               );
             })}
           </g>
 
           <g transform={`translate(0, ${mainHeight})`} clipPath="url(#chartClip)">
-            {data.map((d, i) => {
-              const x = padding + i * spacing + spacing / 2;
-              return <rect key={`vol-${i}`} x={x - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>;
-            })}
-            {toggles.showVolume && (
-              <>
-                <path d={getLinePath(data, 'vma1')} stroke={vmaParams.vma1.c} strokeWidth={vmaParams.vma1.w} fill="none" opacity="0.8"/>
-                <path d={getLinePath(data, 'vma2')} stroke={vmaParams.vma2.c} strokeWidth={vmaParams.vma2.w} fill="none" opacity="0.8"/>
-                <path d={getLinePath(data, 'vma3')} stroke={vmaParams.vma3.c} strokeWidth={vmaParams.vma3.w} fill="none" opacity="0.8"/>
-              </>
-            )}
+            {data.map((d, i) => <rect key={`vol-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>)}
+            
+            {/* 獨立開關的 VMA */}
+            {toggles.showVolume && vmaParams.vma1.show !== false && <path d={getLinePath(data, 'vma1')} stroke={vmaParams.vma1.c} strokeWidth={vmaParams.vma1.w} fill="none" opacity="0.8"/>}
+            {toggles.showVolume && vmaParams.vma2.show !== false && <path d={getLinePath(data, 'vma2')} stroke={vmaParams.vma2.c} strokeWidth={vmaParams.vma2.w} fill="none" opacity="0.8"/>}
+            {toggles.showVolume && vmaParams.vma3.show !== false && <path d={getLinePath(data, 'vma3')} stroke={vmaParams.vma3.c} strokeWidth={vmaParams.vma3.w} fill="none" opacity="0.8"/>}
+
             {data.map((d, i) => {
               const x = padding + i * spacing + spacing / 2;
               return (
                 <g key={`volsignal-${i}`}>
+                  {toggles.showVolume && vmaParams.vma1.show !== false && i === data.length - vmaParams.vma1.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma1.c} strokeWidth="2" fill="none" />}
+                  {toggles.showVolume && vmaParams.vma2.show !== false && i === data.length - vmaParams.vma2.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma2.c} strokeWidth="2" fill="none" />}
+                  {toggles.showVolume && vmaParams.vma3.show !== false && i === data.length - vmaParams.vma3.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma3.c} strokeWidth="2" fill="none" />}
+                  {/* ✨ 補回：量能標記 */}
                   {toggles.showVolSignal && d.signalVol && <text x={x} y={getVolY(d.volume) - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill={d.signalVol === '天量' ? '#ef4444' : (d.signalVol === '巨量' ? '#f97316' : '#8b5cf6')}>{d.signalVol === '極限大量' ? '極' : d.signalVol[0]}</text>}
-                  {toggles.showVolume && i === data.length - vmaParams.vma1.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma1.c} strokeWidth="2" fill="none" />}
-                  {toggles.showVolume && i === data.length - vmaParams.vma2.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma2.c} strokeWidth="2" fill="none" />}
-                  {toggles.showVolume && i === data.length - vmaParams.vma3.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma3.c} strokeWidth="2" fill="none" />}
                 </g>
               );
             })}
           </g>
 
-          {/* ✨ 副圖指標繪製區 */}
+          {/* 副圖區塊 */}
           <g transform={`translate(0, ${mainHeight + volHeight})`} clipPath="url(#chartClip)">
-            {indicatorType !== 'None' && (
-              <>
-                <line x1={0} y1={0} x2={width} y2={0} stroke={theme.grid} strokeWidth="1" />
-                
-                {indicatorType === 'MACD' && (() => {
-                    let maxM = -Infinity, minM = Infinity;
-                    data.forEach(d => {
-                        if (d.macd.dif > maxM) maxM = d.macd.dif;
-                        if (d.macd.dif < minM) minM = d.macd.dif;
-                        if (d.macd.macd > maxM) maxM = d.macd.macd;
-                        if (d.macd.macd < minM) minM = d.macd.macd;
-                        if (d.macd.osc > maxM) maxM = d.macd.osc;
-                        if (d.macd.osc < minM) minM = d.macd.osc;
-                    });
-                    const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1;
-                    const getMyY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
-                    
-                    return (
-                        <g>
-                            <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke={theme.grid} strokeDasharray="4,4" />
-                            {data.map((d, i) => {
-                                const x = padding + i * spacing + spacing / 2;
-                                const y = getMyY(d.macd.osc);
-                                const zeroY = getMyY(0);
-                                const color = d.macd.osc >= 0 ? '#ef4444' : '#22c55e';
-                                return <rect key={`osc-${i}`} x={x - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.6"/>;
-                            })}
+            {indicatorType !== 'None' && (<line x1={0} y1={0} x2={width} y2={0} stroke="#1e293b" strokeWidth="1" />)}
+            
+            {indicatorType === 'OBV' && (() => {
+                let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
+                const range = (maxO - minO) || 1; const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - indPadding*2) - indPadding;
+                return (<g>
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                    <path d={data.map((d, i) => d.obvMa !== null ? `${i===0||data[i-1].obvMa===null?'M':'L'} ${padding + i*spacing + spacing/2} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                    <text x={padding} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
+                    <text x={padding + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
+                </g>);
+            })()}
+
+            {/* ✨ 寶塔線副圖 */}
+            {indicatorType === 'TOWER' && (() => {
+                let maxT = -Infinity, minT = Infinity; data.forEach(d => { if (d.tower.top > maxT) maxT = d.tower.top; if (d.tower.bottom < minT) minT = d.tower.bottom; });
+                const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - indPadding*2) - indPadding;
+                return (<g>
+                    {data.map((d, i) => <rect key={`tw-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
+                    <text x={padding} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
+                </g>);
+            })()}
+            
+            {indicatorType === 'MACD' && (() => {
+                    let maxM = -Infinity, minM = Infinity; data.forEach(d => { if (d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif < minM) minM = d.macd.dif; if (d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd < minM) minM = d.macd.macd; if (d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc < minM) minM = d.macd.osc; });
+                    const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; const getMyY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
+                    return (<g>
+                            <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                            {data.map((d, i) => { const y = getMyY(d.macd.osc); const zeroY = getMyY(0); return <rect key={`osc-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; })}
                             <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMyY(d.macd.dif)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                             <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMyY(d.macd.macd)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
-                            <text x={padding} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">DIF</text>
-                            <text x={padding + 30} y={15} fill="#f59e0b" fontSize="10" fontWeight="bold">MACD</text>
-                        </g>
-                    );
-                })()}
-
-                {indicatorType === 'KD' && (() => {
+                        </g>);
+            })()}
+            {indicatorType === 'KD' && (() => {
                     const getKdY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - indPadding*2) - indPadding;
-                    return (
-                        <g>
-                            <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke={theme.grid} strokeDasharray="4,4" />
-                            <line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke={theme.grid} strokeDasharray="4,4" />
-                            <text x={5} y={getKdY(80) - 2} fill={theme.grid} fontSize="10">80</text>
-                            <text x={5} y={getKdY(20) - 2} fill={theme.grid} fontSize="10">20</text>
+                    return (<g>
+                            <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
                             <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getKdY(d.kd.k)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                             <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getKdY(d.kd.d)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                            <text x={padding} y={15} fill="#f59e0b" fontSize="10" fontWeight="bold">K({indicatorParams.kd.rsv},{indicatorParams.kd.k},{indicatorParams.kd.d})</text>
-                            <text x={padding + 70} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">D</text>
-                        </g>
-                    );
-                })()}
-
-                {indicatorType === 'RSI' && (() => {
+                        </g>);
+            })()}
+            {indicatorType === 'RSI' && (() => {
                     const getRsiY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - indPadding*2) - indPadding;
-                    return (
-                        <g>
-                            <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke={theme.grid} strokeDasharray="4,4" />
-                            <line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke={theme.grid} strokeDasharray="4,4" />
-                            <line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke={theme.grid} strokeDasharray="4,4" />
-                            <text x={5} y={getRsiY(80) - 2} fill={theme.grid} fontSize="10">80</text>
-                            <text x={5} y={getRsiY(50) - 2} fill={theme.grid} fontSize="10">50</text>
-                            <text x={5} y={getRsiY(20) - 2} fill={theme.grid} fontSize="10">20</text>
+                    return (<g>
+                            <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
                             <path d={data.map((d, i) => d.rsi.rsi1 !== null ? `${i===0||data[i-1].rsi.rsi1===null?'M':'L'} ${padding + i*spacing + spacing/2} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
                             <path d={data.map((d, i) => d.rsi.rsi2 !== null ? `${i===0||data[i-1].rsi.rsi2===null?'M':'L'} ${padding + i*spacing + spacing/2} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                            <text x={padding} y={15} fill="#ec4899" fontSize="10" fontWeight="bold">RSI({indicatorParams.rsi.p1})</text>
-                            <text x={padding + 55} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">RSI({indicatorParams.rsi.p2})</text>
-                        </g>
-                    );
-                })()}
-                {indicatorType === 'OBV' && (() => {
-                    let maxO = -Infinity, minO = Infinity;
-                    data.forEach(d => {
-                        if (d.obv > maxO) maxO = d.obv;
-                        if (d.obv < minO) minO = d.obv;
-                    });
-                    const range = (maxO - minO) || 1;
-                    const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - indPadding*2) - indPadding;
-                    return (
-                        <g>
-                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
-                            <text x={padding} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV (能量潮)</text>
-                        </g>
-                    );
-                })()}
-              </>
-            )}
+                        </g>);
+            })()}
           </g>
 
-          {/* 👇 繪製已存檔的畫線 👇 */}
           <g clipPath="url(#chartClip)">
             {drawings.map(d => renderDrawingObject(d))}
-          </g>
-
-          {/* 👇 繪製正在畫的草稿線 (即時預覽) 👇 */}
-          <g clipPath="url(#chartClip)">
             {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && draftPoints.length > 0 && hoverPoint &&
-              renderDrawingObject({ 
-                type: activeTool, 
-                points: activeTool === 'crossline' ? [hoverPoint] : [...draftPoints, hoverPoint], 
-                color: drawColor, 
-                width: drawWidth,
-                opacity: drawOpacity // ✨ 即時預覽也能套用透明度
-              }, true)
+              renderDrawingObject({ type: activeTool, points: activeTool === 'crossline' ? [hoverPoint] : [...draftPoints, hoverPoint], color: drawColor, width: drawWidth, opacity: drawOpacity }, true)
             }
           </g>
 
-          {/* 👇 微調模式的拖曳控制點 👇 */}
-          {activeTool === 'edit' && drawings.map(d => {
-            const screenPts = d.points.map(resolvePoint).filter(p => p.x >= padding && p.x <= width - padding);
-            if (screenPts.length === 0) return null;
+          {/* ✨ 全新智慧查價線 (自動排版與縮放) */}
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && (() => {
+            const hoverD = data[crosshair.idx];
+            const tooltipLines = [];
+            // ==========================================
+            // 1. 基礎資訊（永遠顯示：開高低收量 + 3MA + 1VMA）
+            // ==========================================
+            tooltipLines.push({ color: '#94a3b8', text: hoverD?.date });
+            tooltipLines.push({ color: '#e2e8f0', text: `開： ${hoverD?.open?.toFixed(2)}` });
+            tooltipLines.push({ color: '#e2e8f0', text: `高： ${hoverD?.high?.toFixed(2)}` });
+            tooltipLines.push({ color: '#e2e8f0', text: `低： ${hoverD?.low?.toFixed(2)}` });
+            tooltipLines.push({ color: '#e2e8f0', text: `收： ${hoverD?.close?.toFixed(2)}` });
+            tooltipLines.push({ color: '#e2e8f0', text: `量： ${hoverD?.volume} 張` });
+
+            // 顯示 3 條主圖均線 MA
+            if (toggles.showMA) {
+                if (maParams.ma1.show !== false) tooltipLines.push({ color: maParams.ma1.c, text: `MA${maParams.ma1.p}： ${hoverD?.ma1?.toFixed(2) || '-'}` });
+                if (maParams.ma2.show !== false) tooltipLines.push({ color: maParams.ma2.c, text: `MA${maParams.ma2.p}： ${hoverD?.ma2?.toFixed(2) || '-'}` });
+                if (maParams.ma3.show !== false) tooltipLines.push({ color: maParams.ma3.c, text: `MA${maParams.ma3.p}： ${hoverD?.ma3?.toFixed(2) || '-'}` });
+            }
+
+            // 只顯示 1 條 VMA1 (預設5日均量線)
+            if (toggles.showVolume && vmaParams.vma1.show !== false) {
+                tooltipLines.push({ color: vmaParams.vma1.c, text: `VMA${vmaParams.vma1.p}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
+            }
+
+            // 主圖布林通道（有開啟就一併基本顯示）
+            if (toggles.showBBands) {
+                tooltipLines.push({ color: '#a855f7', text: `布林上： ${hoverD?.bbands?.up?.toFixed(2) || '-'}` });
+                tooltipLines.push({ color: '#d8b4fe', text: `布林中： ${hoverD?.bbands?.mid?.toFixed(2) || '-'}` });
+                tooltipLines.push({ color: '#a855f7', text: `布林下： ${hoverD?.bbands?.down?.toFixed(2) || '-'}` });
+            }
+
+            // ==========================================
+            // 2. 進階進階資訊（必須勾選「查價詳細資訊」才顯示）
+            // ==========================================
+            if (toggles.showTooltipDetail) {
+                // 補回 VMA2、VMA3 均量線
+                if (toggles.showVolume) {
+                    if (vmaParams.vma2.show !== false) tooltipLines.push({ color: vmaParams.vma2.c, text: `VMA${vmaParams.vma2.p}： ${hoverD?.vma2?.toFixed(2) || '-'}` });
+                    if (vmaParams.vma3.show !== false) tooltipLines.push({ color: vmaParams.vma3.c, text: `VMA${vmaParams.vma3.p}： ${hoverD?.vma3?.toFixed(2) || '-'}` });
+                }
+
+                // 根據當前切換的副圖指標顯示對應數值
+                if (indicatorType === 'MACD') {
+                    tooltipLines.push({ color: "#38bdf8", text: `DIF： ${hoverD?.macd?.dif?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: "#f59e0b", text: `MACD： ${hoverD?.macd?.macd?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: hoverD?.macd?.osc >= 0 ? '#ef4444' : '#22c55e', text: `OSC： ${hoverD?.macd?.osc?.toFixed(2) || '-'}` });
+                } else if (indicatorType === 'KD') {
+                    tooltipLines.push({ color: "#f59e0b", text: `K(${indicatorParams.kd.k})： ${hoverD?.kd?.k?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: "#38bdf8", text: `D(${indicatorParams.kd.d})： ${hoverD?.kd?.d?.toFixed(2) || '-'}` });
+                } else if (indicatorType === 'RSI') {
+                    tooltipLines.push({ color: "#ec4899", text: `RSI(${indicatorParams.rsi.p1})： ${hoverD?.rsi?.rsi1?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: "#38bdf8", text: `RSI(${indicatorParams.rsi.p2})： ${hoverD?.rsi?.rsi2?.toFixed(2) || '-'}` });
+                } else if (indicatorType === 'OBV') {
+                    tooltipLines.push({ color: "#eab308", text: `OBV： ${hoverD?.obv}` });
+                    tooltipLines.push({ color: "#38bdf8", text: `MA： ${hoverD?.obvMa?.toFixed(0) || '-'}` });
+                } else if (indicatorType === 'TOWER') {
+                    tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔頂： ${hoverD?.tower?.top?.toFixed(2)}` });
+                    tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔底： ${hoverD?.tower?.bottom?.toFixed(2)}` });
+                }
+            }
+
+            const boxWidth = 140; 
+            const boxHeight = tooltipLines.length * 22 + 10;
             
-            // 計算圖形的中心點，用來放操作選單
-            const cx = screenPts.reduce((sum, p) => sum + p.x, 0) / screenPts.length;
-            const cy = screenPts.reduce((sum, p) => sum + p.y, 0) / screenPts.length;
-
-            return (
-              <g key={`edit-group-${d.id}`}>
-                {d.points.map((pt, idx) => {
-                  const screenPt = resolvePoint(pt);
-                  if (screenPt.x < padding || screenPt.x > width - padding) return null;
-                  return (
-                    <g key={`edit-${d.id}-${idx}`}>
-                      <circle cx={screenPt.x} cy={screenPt.y} r={40} fill="transparent" style={{cursor: 'grab'}}
-                        onMouseDown={(e) => { e.stopPropagation(); setEditingPoint({ id: d.id, pointIdx: idx }); }}
-                        onTouchStart={(e) => { e.stopPropagation(); setEditingPoint({ id: d.id, pointIdx: idx }); }}
-                      />
-                      <circle cx={screenPt.x} cy={screenPt.y} r={8} fill="#f59e0b" stroke="#ffffff" strokeWidth={2} pointerEvents="none" />
-                    </g>
-                  );
-                })}
-
-                {/* ✨ Action Bar (中心移動與等距複製投影) */}
-                <g transform={`translate(${cx}, ${cy})`}>
-                   {/* 拖曳整體 */}
-                   <g onMouseDown={(e) => handleDragWholeStart(e, d)} onTouchStart={(e) => handleDragWholeStart(e, d)} style={{cursor: 'grab'}}>
-                     <circle cx={-24} cy={0} r={16} fill="#3b82f6" opacity={0.9} className="hover:opacity-100" />
-                     <text x={-24} y={5} fill="#fff" fontSize="14" textAnchor="middle" pointerEvents="none">✥</text>
-                   </g>
-                   {/* 投影複製：套用新的防鬼鍵點擊函式 */}
-                   <g onMouseDown={(e) => onCloneClick(e, d)} onTouchStart={(e) => onCloneClick(e, d)} style={{cursor: 'pointer'}}>
-                     <circle cx={24} cy={0} r={16} fill="#10b981" opacity={0.9} className="hover:opacity-100" />
-                     <text x={24} y={5} fill="#fff" fontSize="14" textAnchor="middle" pointerEvents="none">⧉</text>
-                   </g>
-                </g>
-              </g>
-            );
-          })}
-
-          {/* ✨ 全新整合：游標查價線與直立式資訊板 (包含動態 MA) */}
-          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && currentHoverData && (() => {
-            let extraHeight = 0;
-            if (indicatorType === 'MACD') extraHeight = 66;
-            else if (indicatorType === 'KD') extraHeight = 44;
-            else if (indicatorType === 'RSI') extraHeight = 44;
-
-            const boxWidth = 140; const boxHeight = 286 + extraHeight;
             let tooltipX = crosshair.x + 15; let tooltipY = crosshair.y - boxHeight / 2;
             if (tooltipX + boxWidth > width) tooltipX = crosshair.x - boxWidth - 15;
             if (tooltipY < 0) tooltipY = 5; if (tooltipY + boxHeight > mainHeight + volHeight + indicatorHeight) tooltipY = mainHeight + volHeight + indicatorHeight - boxHeight - 5;
 
-            const hoverD = currentHoverData;
-
             return (
               <g className="pointer-events-none">
-                <line x1={crosshair.x} y1={padding} x2={crosshair.x} y2={mainHeight + volHeight + indicatorHeight} stroke={theme.crosshairLine} strokeDasharray="4,4" strokeWidth="1.2" />
+                <line x1={crosshair.x} y1={padding} x2={crosshair.x} y2={mainHeight + volHeight + indicatorHeight} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" />
                 {crosshair.priceHover !== null && (
                   <g>
-                    <line x1={0} y1={crosshair.y} x2={width} y2={crosshair.y} stroke={theme.crosshairLine} strokeDasharray="4,4" strokeWidth="1.2" />
-                    <rect x={width - 55} y={crosshair.y - 12} width={55} height={24} fill={theme.crosshairBg} rx="4" />
-                    <text x={width - 27} y={crosshair.y + 4} fill={theme.crosshairText} fontSize="13" fontWeight="bold" textAnchor="middle">{crosshair.priceHover.toFixed(2)}</text>
+                    <line x1={0} y1={crosshair.y} x2={width} y2={crosshair.y} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" />
+                    <rect x={width - 55} y={crosshair.y - 12} width={55} height={24} fill="#0ea5e9" rx="4" />
+                    <text x={width - 27} y={crosshair.y + 4} fill="#0f172a" fontSize="13" fontWeight="bold" textAnchor="middle">{crosshair.priceHover.toFixed(2)}</text>
                   </g>
                 )}
                 <g transform={`translate(${tooltipX}, ${tooltipY})`}>
-                  <rect x={0} y={0} width={boxWidth} height={boxHeight} fill={theme.tooltipBg} stroke={theme.tooltipBorder} rx="8" />
-                  <text x={12} y={22} fontSize="13" fill={theme.tooltipText1} fontWeight="bold">{hoverD?.date}</text>
-                  <text x={12} y={44} fontSize="13" fill={theme.tooltipText2} fontWeight="bold">開： {hoverD?.open?.toFixed(2)}</text>
-                  <text x={12} y={66} fontSize="13" fill={theme.tooltipText2} fontWeight="bold">高： {hoverD?.high?.toFixed(2)}</text>
-                  <text x={12} y={88} fontSize="13" fill={theme.tooltipText2} fontWeight="bold">低： {hoverD?.low?.toFixed(2)}</text>
-                  <text x={12} y={110} fontSize="13" fill={theme.tooltipText2} fontWeight="bold">收： {hoverD?.close?.toFixed(2)}</text>
-                  <text x={12} y={132} fontSize="13" fill={theme.tooltipText2} fontWeight="bold">量： {hoverD?.volume} 張</text>
-                  
-                  {/* ✨ MA 數值完美整合進查價表中 */}
-                  <text x={12} y={160} fill={maParams.ma1.c} fontSize="13" fontWeight="bold">MA{maParams.ma1.p}： {hoverD?.ma1?.toFixed(2) || '-'}</text>
-                  <text x={12} y={182} fill={maParams.ma2.c} fontSize="13" fontWeight="bold">MA{maParams.ma2.p}： {hoverD?.ma2?.toFixed(2) || '-'}</text>
-                  <text x={12} y={204} fill={maParams.ma3.c} fontSize="13" fontWeight="bold">MA{maParams.ma3.p}： {hoverD?.ma3?.toFixed(2) || '-'}</text>
-
-                  {/* ✨ VMA 數值 */}
-                  <text x={12} y={226} fill={vmaParams.vma1.c} fontSize="13" fontWeight="bold">VMA{vmaParams.vma1.p}： {hoverD?.vma1?.toFixed(2) || '-'}</text>
-                  <text x={12} y={248} fill={vmaParams.vma2.c} fontSize="13" fontWeight="bold">VMA{vmaParams.vma2.p}： {hoverD?.vma2?.toFixed(2) || '-'}</text>
-                  <text x={12} y={270} fill={vmaParams.vma3.c} fontSize="13" fontWeight="bold">VMA{vmaParams.vma3.p}： {hoverD?.vma3?.toFixed(2) || '-'}</text>
-
-                  {/* ✨ 副圖指標數值 */}
-                  {indicatorType === 'MACD' && (
-                      <>
-                          <text x={12} y={292} fill="#38bdf8" fontSize="13" fontWeight="bold">DIF： {hoverD?.macd?.dif?.toFixed(2) || '-'}</text>
-                          <text x={12} y={314} fill="#f59e0b" fontSize="13" fontWeight="bold">MACD： {hoverD?.macd?.macd?.toFixed(2) || '-'}</text>
-                          <text x={12} y={336} fill={hoverD?.macd?.osc >= 0 ? '#ef4444' : '#22c55e'} fontSize="13" fontWeight="bold">OSC： {hoverD?.macd?.osc?.toFixed(2) || '-'}</text>
-                      </>
-                  )}
-                  {indicatorType === 'KD' && (
-                      <>
-                          <text x={12} y={292} fill="#f59e0b" fontSize="13" fontWeight="bold">K({indicatorParams.kd.k})： {hoverD?.kd?.k?.toFixed(2) || '-'}</text>
-                          <text x={12} y={314} fill="#38bdf8" fontSize="13" fontWeight="bold">D({indicatorParams.kd.d})： {hoverD?.kd?.d?.toFixed(2) || '-'}</text>
-                      </>
-                  )}
-                  {indicatorType === 'RSI' && (
-                      <>
-                          <text x={12} y={292} fill="#ec4899" fontSize="13" fontWeight="bold">RSI({indicatorParams.rsi.p1})： {hoverD?.rsi?.rsi1?.toFixed(2) || '-'}</text>
-                          <text x={12} y={314} fill="#38bdf8" fontSize="13" fontWeight="bold">RSI({indicatorParams.rsi.p2})： {hoverD?.rsi?.rsi2?.toFixed(2) || '-'}</text>
-                      </>
-                  )}
-
+                  <rect x={0} y={0} width={boxWidth} height={boxHeight} fill="rgba(15, 23, 42, 0.90)" stroke="#0ea5e9" rx="8" />
+                  {tooltipLines.map((l, i) => (
+                      <text key={i} x={12} y={22 + i * 22} fontSize="13" fill={l.color} fontWeight="bold">{l.text}</text>
+                  ))}
                 </g>
               </g>
             );
           })()}
-
+          {/* ✨ 補回：圖表底部圖例 (Legend) */}
+          <g transform={`translate(${width / 2}, ${mainHeight + volHeight + indicatorHeight + 60})`} textAnchor="middle" fontSize="14" fill="#94a3b8">
+            {toggles.showTrend && <text x="-240"><tspan fill="#10b981" fontWeight="bold">🔺</tspan> 起漲</text>}
+            {toggles.showVolSignal && <text x="-160"><tspan fill="#ef4444" fontWeight="bold">天</tspan> 天量</text>}
+            {toggles.showVolSignal && <text x="-80"><tspan fill="#f97316" fontWeight="bold">巨</tspan> 巨量</text>}
+            {toggles.showVolSignal && <text x="0"><tspan fill="#8b5cf6" fontWeight="bold">極</tspan> 極限量</text>}
+            {toggles.showHeidun && <text x="80"><tspan fill="#f8fafc" fontWeight="bold">黑頓</tspan></text>}
+            {customStrategies.filter(s => s.isActive).map((strat, idx) => <text key={strat.id} x={180 + (idx * 100)}><tspan fill="#4f46e5" fontWeight="bold">{strat.marker}</tspan> {strat.name}</text>)}
+          </g>
+          
         </svg>
       </div>
     </div>
