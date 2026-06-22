@@ -2218,6 +2218,7 @@ const App = () => {
   const currentRealSymbol = getRealSymbol(currentViewedSymbol); // ✨ 新增：目前觀看的真實股號，傳給圖表存檔用
   const activeToolTargetName = getFullName(symbolInput || currentViewedSymbol); // ✨ 新增：產業工具目標 (優先吃打字的，否則吃圖表正在看的)
 
+  const [panelsOpen, setPanelsOpen] = useState({ config: false }); // ✨ 補回這行：控制面板收合狀態
   // ✨ 狀態改變：將工具收合狀態預設為 false (畫面乾淨)
   const [toggles, setToggles] = useState({
     showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false,
@@ -4149,9 +4150,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
             {/* 布林通道 */}
             {toggles.showBBands && (
               <g opacity="0.6">
-                <path d={getLinePath(data, d => d.bbands?.up)} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-                <path d={getLinePath(data, d => d.bbands?.mid)} stroke="#d8b4fe" strokeWidth="1" fill="none" />
-                <path d={getLinePath(data, d => d.bbands?.down)} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1].bbands?.up == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1].bbands?.mid == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1].bbands?.down == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
               </g>
             )}
 
