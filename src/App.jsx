@@ -2127,8 +2127,8 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [dbLoaded, setDbLoaded] = useState(false);
 
-  const [userApiKey, setUserApiKey] = useState('');
-  const [showKeySetup, setShowKeySetup] = useState(true);
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('MY_STOCK_API_KEY') || '');
+  const [showKeySetup, setShowKeySetup] = useState(() => !localStorage.getItem('MY_STOCK_API_KEY'));
   const [tempKey, setTempKey] = useState('');
 
   const [symbolInput, setSymbolInput] = useState(''); 
@@ -2262,7 +2262,9 @@ const App = () => {
 
   const handleSaveKey = () => {
     if (!tempKey.trim()) return showAlert('金鑰不能為空！');
-    setUserApiKey(tempKey.trim());
+    const key = tempKey.trim();
+    setUserApiKey(key);
+    localStorage.setItem('MY_STOCK_API_KEY', key); // 新增這行：把金鑰存在手機裡
     setShowKeySetup(false);
   };
 
