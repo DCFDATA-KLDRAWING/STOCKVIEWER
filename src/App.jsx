@@ -2943,7 +2943,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
   const [isMagnetOn, setIsMagnetOn] = useState(false);
 
   // === 畫布縮放狀態 ===
-  const [pinchDist, setPinchDist] = useState(null);
+  const pinchDistRef = useRef(null); // ✨ 改用 useRef，讓它跟得上手指滑動的光速
   const [zoomScale, setZoomScale] = useState(1); // ✨ 新增兩指縮放倍率
 
   // === 畫線工具狀態 ===
@@ -3194,7 +3194,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     // ✨ 兩指縮放：記錄初始距離
     if (e.touches && e.touches.length === 2) {
       const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      setPinchDist(dist);
+      pinchDistRef.current = dist;
       return;
     }
 
@@ -3216,14 +3216,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     e.stopPropagation();
     if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
     if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
-    // ✨ 兩指縮放：動態計算縮放比例
+    // ✨ 兩指縮放：動態計算縮放比例 (高靈敏光速版)
     if (e.touches && e.touches.length === 2) {
       const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      if (pinchDist) {
-        const diff = dist - pinchDist;
-        setZoomScale(prev => Math.max(0.3, Math.min(prev + diff * 0.005, 5))); // 限制縮放倍率在 0.3倍 ~ 5倍 之間
+      if (pinchDistRef.current) {
+        const diff = dist - pinchDistRef.current;
+        // ✨ 把靈敏度從 0.005 放大到 0.015，保證一捏就有感！
+        setZoomScale(prev => Math.max(0.3, Math.min(prev + diff * 0.015, 5))); 
       }
-      setPinchDist(dist);
+      pinchDistRef.current = dist;
       return;
     }
     handleCloneShape(d);
@@ -3326,7 +3327,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
   // ✨ 手勢：放開 (確定畫線)
   const handlePointerUp = () => {
-    setPinchDist(null);
+    pinchDistRef.current = null;
     
     if (activeTool === 'edit' && editingPoint) { 
         commitDrawings(drawings); 
