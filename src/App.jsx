@@ -3782,14 +3782,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     <div ref={chartContainerRef} className={isFullscreen ? "fixed inset-0 z-[100] bg-[#020617] flex flex-col w-full h-full" : `relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col`}>
       <CustomModal modal={chartModal} />
       
-      {/* ✨ 1. 頂部資訊列 (僅在全螢幕模式下顯示，節省平常畫面空間) */}
-      {isFullscreen && (
-        <div className="flex items-center justify-center gap-3 px-3 py-2 shrink-0 bg-[#0f172a] relative z-20 min-h-[50px] border-b border-cyan-900/30 shadow-sm">
-           <img src="https://lh3.googleusercontent.com/d/1Non2p5IUFcBtKWqq0P8LulQo-Df83ivk" alt="Logo" className="h-[28px] opacity-90 drop-shadow-[0_0_8px_rgba(6,182,212,0.4)]" onError={(e) => { e.target.style.display = 'none'; }} />
-           <span className="text-cyan-400 text-xl font-extrabold tracking-widest drop-shadow-[0_0_8px_rgba(8,145,178,0.3)]">{stockName} ({tfLabel})</span>
-        </div>
-      )}
-
       {/* ✨ 2. 次級功能列 (縮看全圖、放大、存圖) - 移除重複的工具箱按鈕，改為靠右對齊 */}
       <div className="flex items-center justify-end px-2 sm:px-3 py-2 shrink-0 border-b border-cyan-900/50 bg-slate-900/60 relative z-20 shadow-sm overflow-x-auto [&::-webkit-scrollbar]:hidden w-full">
          {/* 將間距從 gap-2 改為手機 gap-1.5，大螢幕維持 gap-2 */}
@@ -4003,6 +3995,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         >
           <defs><clipPath id="chartClip"><rect x={padding} y={0} width={width - padding * 2} height={totalSVGHeight} /></clipPath></defs>
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
+          
+          {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
+          <text x={padding + 10} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85">
+            {stockName} ({timeframe === 'D' ? '日K' : timeframe === 'W' ? '週K' : '月K'})
+          </text>
           
           <g clipPath="url(#chartClip)">
             
