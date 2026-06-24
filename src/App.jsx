@@ -3977,7 +3977,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         )}
 
         {/* ✨ 動態切換 className 讓全圖模式可以完美縮進單一螢幕裡 */}
-        <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} className={`w-full h-full select-none ${isFullChart ? 'min-w-full' : 'min-w-[800px]'} ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`}
+        <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} className={`h-full select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} style={{ width: width, minWidth: width }}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove} 
           onMouseUp={handlePointerUp}
