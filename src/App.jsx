@@ -2943,8 +2943,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
   const [isMagnetOn, setIsMagnetOn] = useState(false);
 
   // === 畫布縮放狀態 ===
-  const pinchDistRef = useRef(null); // ✨ 改用 useRef，讓它跟得上手指滑動的光速
-  const [zoomScale, setZoomScale] = useState(1); // ✨ 新增兩指縮放倍率
+  const [pinchDist, setPinchDist] = useState(null);
 
   // === 畫線工具狀態 ===
   const [activeTool, setActiveTool] = useState('cursor'); 
@@ -2994,28 +2993,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器寬度，實現「橫向完美滾動」與「不壓縮比例」
+  // ✨ 動態監聽容器寬度，實現「手機直式縮看全圖」不超框
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const updateWidth = () => {
       const cw = container.clientWidth || 1200;
-      
-      if (isFullChart) {
-        setChartWidth(cw); 
-      } else if (displayCount === 9998) {
-        const currentDataLen = data ? data.length : 0;
-        const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
-        const currentTotalSlots = currentDataLen + currentExtra;
-        
-        // ✨ 套用 zoomScale (兩指縮放倍率)
-        const calculatedWidth = (cw / 90) * currentTotalSlots * zoomScale;
-        setChartWidth(Math.max(cw, calculatedWidth));
-      } else {
-        // ✨ 直式一般模式也套用 zoomScale
-        setChartWidth(Math.max(cw, 800) * zoomScale);
-      }
+      // 全圖模式時，寬度與螢幕完全相等 (完美壓縮)；非全圖模式時，保留最小 800px 以便滑動看細節
+      setChartWidth(isFullChart ? cw : Math.max(cw, 800));
     };
 
     const observer = new ResizeObserver(() => updateWidth());
@@ -3023,7 +3009,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     updateWidth();
 
     return () => observer.disconnect();
-  }, [isFullChart, displayCount, data.length, zoomScale]); // ✨ 加入 zoomScale 依賴
+  }, [isFullChart, isFullscreen]);
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
@@ -3034,7 +3020,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         }
       }, 50);
     }
-  }, [realSymbol, timeframe, isFullChart, displayCount]);
+  },  [realSymbol, timeframe]);
 
   const commitDrawings = (newDrawings) => {
     setDrawings(newDrawings);
@@ -3099,22 +3085,40 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         if (chartContainerRef.current.requestFullscreen) await chartContainerRef.current.requestFullscreen();
         else if (chartContainerRef.current.webkitRequestFullscreen) await chartContainerRef.current.webkitRequestFullscreen();
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
-        
-        // ✨ 放大時，載入全部歷史資料，但使用 9998 代號，避免觸發「全圖(9999)」的極度壓縮模式
-        setDisplayCount(9998);
-        setZoomScale(1); // ✨ 重置縮放 
-
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
       if (document.exitFullscreen) await document.exitFullscreen();
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-      if (window.screen && window.screen.orientation && window.screen.orientation.unlock) { try { window.screen.orientation.unlock(); } catch (e) {} }
-      
-      // ✨ 退出放大時，恢復原本的 90 根 K 棒
-      setDisplayCount(90);
-      setZoomScale(1); // ✨ 重置縮放
     }
   };
+
+  const startDragToolbar = (e) => {
+    setDraggingToolbar(true);
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragStartPos.current = { x: toolbarPos.x, y: toolbarPos.y, mouseX: clientX, mouseY: clientY };
+  };
+
+  useEffect(() => {
+    const doDragToolbar = (e) => {
+      if (!draggingToolbar) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const dx = clientX - dragStartPos.current.mouseX;
+      const dy = clientY - dragStartPos.current.mouseY;
+      setToolbarPos({ x: Math.max(0, dragStartPos.current.x + dx), y: Math.max(0, dragStartPos.current.y + dy) });
+    };
+    const stopDragToolbar = () => setDraggingToolbar(false);
+
+    if (draggingToolbar) {
+      window.addEventListener('mousemove', doDragToolbar); window.addEventListener('mouseup', stopDragToolbar);
+      window.addEventListener('touchmove', doDragToolbar, {passive: false}); window.addEventListener('touchend', stopDragToolbar);
+      return () => {
+        window.removeEventListener('mousemove', doDragToolbar); window.removeEventListener('mouseup', stopDragToolbar);
+        window.removeEventListener('touchmove', doDragToolbar); window.removeEventListener('touchend', stopDragToolbar);
+      };
+    }
+  }, [draggingToolbar, toolbarPos]);
 
   if (!data || data.length === 0) return null;
 
@@ -3191,12 +3195,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     // ✨ 加入防鬼鍵 (防雙重觸發) 邏輯
     if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
     if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
-    // ✨ 兩指縮放：記錄初始距離
-    if (e.touches && e.touches.length === 2) {
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      pinchDistRef.current = dist;
-      return;
-    }
 
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -3216,17 +3214,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     e.stopPropagation();
     if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
     if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
-    // ✨ 兩指縮放：動態計算縮放比例 (高靈敏光速版)
-    if (e.touches && e.touches.length === 2) {
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      if (pinchDistRef.current) {
-        const diff = dist - pinchDistRef.current;
-        // ✨ 把靈敏度從 0.005 放大到 0.015，保證一捏就有感！
-        setZoomScale(prev => Math.max(0.3, Math.min(prev + diff * 0.015, 5))); 
-      }
-      pinchDistRef.current = dist;
-      return;
-    }
     handleCloneShape(d);
   };
 
@@ -3327,7 +3314,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
   // ✨ 手勢：放開 (確定畫線)
   const handlePointerUp = () => {
-    pinchDistRef.current = null;
+    setPinchDist(null);
     
     if (activeTool === 'edit' && editingPoint) { 
         commitDrawings(drawings); 
@@ -3996,7 +3983,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         )}
 
         {/* ✨ 動態切換 className 讓全圖模式可以完美縮進單一螢幕裡 */}
-        <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} className={`h-full select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} style={{ width: width, minWidth: width }}
+        <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} className={`w-full h-full select-none ${isFullChart ? 'min-w-full' : 'min-w-[800px]'} ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove} 
           onMouseUp={handlePointerUp}
