@@ -2944,6 +2944,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
   // === 畫布縮放狀態 ===
   const [pinchDist, setPinchDist] = useState(null);
+  const [zoomScale, setZoomScale] = useState(1); // ✨ 新增兩指縮放倍率
 
   // === 畫線工具狀態 ===
   const [activeTool, setActiveTool] = useState('cursor'); 
@@ -3002,19 +3003,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       const cw = container.clientWidth || 1200;
       
       if (isFullChart) {
-        // 1. 點擊「全圖」時，強制壓縮在一個螢幕內
         setChartWidth(cw); 
       } else if (displayCount === 9998) {
-        // 2. ✨ 橫向放大時：不依賴瀏覽器旋轉延遲，直接靠 9998 密碼零延遲判定！
         const currentDataLen = data ? data.length : 0;
         const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
         const currentTotalSlots = currentDataLen + currentExtra;
         
-        const calculatedWidth = (cw / 90) * currentTotalSlots;
+        // ✨ 套用 zoomScale (兩指縮放倍率)
+        const calculatedWidth = (cw / 90) * currentTotalSlots * zoomScale;
         setChartWidth(Math.max(cw, calculatedWidth));
       } else {
-        // 3. ✨ 直式一般模式：恢復原本的固定比例
-        setChartWidth(Math.max(cw, 800));
+        // ✨ 直式一般模式也套用 zoomScale
+        setChartWidth(Math.max(cw, 800) * zoomScale);
       }
     };
 
@@ -3023,7 +3023,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     updateWidth();
 
     return () => observer.disconnect();
-  }, [isFullChart, displayCount, data.length]); // ✨ 關鍵：把依賴項改為 displayCount，反應絕對零延遲！
+  }, [isFullChart, displayCount, data.length, zoomScale]); // ✨ 加入 zoomScale 依賴
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
@@ -3101,7 +3101,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
         
         // ✨ 放大時，載入全部歷史資料，但使用 9998 代號，避免觸發「全圖(9999)」的極度壓縮模式
-        setDisplayCount(9998); 
+        setDisplayCount(9998);
+        setZoomScale(1); // ✨ 重置縮放 
 
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
@@ -3111,6 +3112,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       
       // ✨ 退出放大時，恢復原本的 90 根 K 棒
       setDisplayCount(90);
+      setZoomScale(1); // ✨ 重置縮放
     }
   };
 
@@ -3189,6 +3191,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     // ✨ 加入防鬼鍵 (防雙重觸發) 邏輯
     if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
     if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
+    // ✨ 兩指縮放：記錄初始距離
+    if (e.touches && e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      setPinchDist(dist);
+      return;
+    }
 
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -3208,6 +3216,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     e.stopPropagation();
     if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
     if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
+    // ✨ 兩指縮放：動態計算縮放比例
+    if (e.touches && e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (pinchDist) {
+        const diff = dist - pinchDist;
+        setZoomScale(prev => Math.max(0.3, Math.min(prev + diff * 0.005, 5))); // 限制縮放倍率在 0.3倍 ~ 5倍 之間
+      }
+      setPinchDist(dist);
+      return;
+    }
     handleCloneShape(d);
   };
 
