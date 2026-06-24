@@ -2993,25 +2993,28 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器寬度，實現「橫向完美滾動」與「不壓縮比例」(安全修正版)
+  // ✨ 動態監聽容器寬度，實現「橫向完美滾動」與「不壓縮比例」
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const updateWidth = () => {
       const cw = container.clientWidth || 1200;
+      
       if (isFullChart) {
-        // 點擊「全圖」時，強制壓縮在一個螢幕內
+        // 1. 點擊「全圖」時，強制壓縮在一個螢幕內
         setChartWidth(cw); 
-      } else {
-        // ✨ 安全計算目前的 K 棒總數 (包含未來空白區)
+      } else if (isFullscreen) {
+        // 2. ✨ 橫向放大時：套用「近四個月(約90天)」的完美比例，剩下的延伸出去供滑動
         const currentDataLen = data ? data.length : 0;
         const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
         const currentTotalSlots = currentDataLen + currentExtra;
         
-        // 讓一個螢幕固定顯示約 90 根 K 棒，剩下的延伸出去供滑動！
         const calculatedWidth = (cw / 90) * currentTotalSlots;
         setChartWidth(Math.max(cw, calculatedWidth));
+      } else {
+        // 3. ✨ 直式一般模式：恢復原本你最熟悉的固定比例 (保留最小 800px 讓畫面可以滑動)
+        setChartWidth(Math.max(cw, 800));
       }
     };
 
@@ -3020,7 +3023,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     updateWidth();
 
     return () => observer.disconnect();
-  }, [isFullChart, isFullscreen, data]); // ✨ 修正依賴項目
+  }, [isFullChart, isFullscreen, data.length]); // ✨ 依賴項改為 data.length 效能更穩不閃爍
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
