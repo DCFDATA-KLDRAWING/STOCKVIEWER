@@ -3085,40 +3085,41 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         if (chartContainerRef.current.requestFullscreen) await chartContainerRef.current.requestFullscreen();
         else if (chartContainerRef.current.webkitRequestFullscreen) await chartContainerRef.current.webkitRequestFullscreen();
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
+        
+        setDisplayCount(9999); // 載入全部一年歷史資料
+        
+        // ✨ 動態計算放大倍率：讓畫面剛好塞滿約 90 天 (近 4 個半月)
+        const targetDays = 90; 
+        const newScale = Math.max(1, data.length / targetDays);
+        setZoomScale(newScale);
+        initialZoomScale.current = newScale;
+
+        // ✨ 延遲一下，等畫布放大後，自動把視角滾動到最右邊 (最新日期)
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+          }
+        }, 150);
+
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
       if (document.exitFullscreen) await document.exitFullscreen();
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      if (window.screen && window.screen.orientation && window.screen.orientation.unlock) { try { window.screen.orientation.unlock(); } catch (e) {} }
+      
+      // ✨ 退出全螢幕時，恢復原本的畫面比例與資料量
+      setDisplayCount(90);
+      setZoomScale(1);
+      initialZoomScale.current = 1;
+
+      // ✨ 退出時也確保視角回到最右邊
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+        }
+      }, 150);
     }
   };
-
-  const startDragToolbar = (e) => {
-    setDraggingToolbar(true);
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    dragStartPos.current = { x: toolbarPos.x, y: toolbarPos.y, mouseX: clientX, mouseY: clientY };
-  };
-
-  useEffect(() => {
-    const doDragToolbar = (e) => {
-      if (!draggingToolbar) return;
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const dx = clientX - dragStartPos.current.mouseX;
-      const dy = clientY - dragStartPos.current.mouseY;
-      setToolbarPos({ x: Math.max(0, dragStartPos.current.x + dx), y: Math.max(0, dragStartPos.current.y + dy) });
-    };
-    const stopDragToolbar = () => setDraggingToolbar(false);
-
-    if (draggingToolbar) {
-      window.addEventListener('mousemove', doDragToolbar); window.addEventListener('mouseup', stopDragToolbar);
-      window.addEventListener('touchmove', doDragToolbar, {passive: false}); window.addEventListener('touchend', stopDragToolbar);
-      return () => {
-        window.removeEventListener('mousemove', doDragToolbar); window.removeEventListener('mouseup', stopDragToolbar);
-        window.removeEventListener('touchmove', doDragToolbar); window.removeEventListener('touchend', stopDragToolbar);
-      };
-    }
-  }, [draggingToolbar, toolbarPos]);
 
   if (!data || data.length === 0) return null;
 
