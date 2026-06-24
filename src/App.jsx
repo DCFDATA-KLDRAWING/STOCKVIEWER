@@ -3004,8 +3004,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       if (isFullChart) {
         // 1. 點擊「全圖」時，強制壓縮在一個螢幕內
         setChartWidth(cw); 
-      } else if (isFullscreen) {
-        // 2. ✨ 橫向放大時：套用「近四個月(約90天)」的完美比例，剩下的延伸出去供滑動
+      } else if (displayCount === 9998) {
+        // 2. ✨ 橫向放大時：不依賴瀏覽器旋轉延遲，直接靠 9998 密碼零延遲判定！
         const currentDataLen = data ? data.length : 0;
         const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
         const currentTotalSlots = currentDataLen + currentExtra;
@@ -3013,7 +3013,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         const calculatedWidth = (cw / 90) * currentTotalSlots;
         setChartWidth(Math.max(cw, calculatedWidth));
       } else {
-        // 3. ✨ 直式一般模式：恢復原本你最熟悉的固定比例 (保留最小 800px 讓畫面可以滑動)
+        // 3. ✨ 直式一般模式：恢復原本的固定比例
         setChartWidth(Math.max(cw, 800));
       }
     };
@@ -3023,7 +3023,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     updateWidth();
 
     return () => observer.disconnect();
-  }, [isFullChart, isFullscreen, data.length]); // ✨ 依賴項改為 data.length 效能更穩不閃爍
+  }, [isFullChart, displayCount, data.length]); // ✨ 關鍵：把依賴項改為 displayCount，反應絕對零延遲！
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
