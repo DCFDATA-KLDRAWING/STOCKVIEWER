@@ -3973,7 +3973,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       {/* ✨ 移除 touch-none，讓游標模式可以原生水平滑動 */}
       <div 
         ref={scrollContainerRef}
-        className={`${isFullscreen ? "flex-1" : ""} overflow-x-auto p-2 pt-1 relative ${activeTool !== 'cursor' ? 'touch-none' : ''} h-full flex flex-col`}
+        className={`${isFullscreen ? "flex-1" : ""} overflow-x-auto p-2 pt-1 relative ${(activeTool !== 'cursor' || toggles.showCrosshair) ? 'touch-none' : ''} h-full flex flex-col`}
       >
         
         {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && (
