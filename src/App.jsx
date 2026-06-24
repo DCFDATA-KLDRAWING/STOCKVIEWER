@@ -3020,7 +3020,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         }
       }, 50);
     }
-  }, [data, displayCount, isFullChart]);
+  },  [realSymbol, timeframe]);
 
   const commitDrawings = (newDrawings) => {
     setDrawings(newDrawings);
