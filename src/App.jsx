@@ -2993,7 +2993,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器寬度，實現「橫向完美滾動」與「不壓縮比例」
+  // ✨ 動態監聽容器寬度，實現「橫向完美滾動」與「不壓縮比例」(安全修正版)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -3004,8 +3004,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         // 點擊「全圖」時，強制壓縮在一個螢幕內
         setChartWidth(cw); 
       } else {
-        // 一般/放大模式：讓一個螢幕固定顯示約 90 根 K 棒，剩下的延伸出去供滑動！
-        const calculatedWidth = (cw / 90) * totalSlots;
+        // ✨ 安全計算目前的 K 棒總數 (包含未來空白區)
+        const currentDataLen = data ? data.length : 0;
+        const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
+        const currentTotalSlots = currentDataLen + currentExtra;
+        
+        // 讓一個螢幕固定顯示約 90 根 K 棒，剩下的延伸出去供滑動！
+        const calculatedWidth = (cw / 90) * currentTotalSlots;
         setChartWidth(Math.max(cw, calculatedWidth));
       }
     };
@@ -3015,7 +3020,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     updateWidth();
 
     return () => observer.disconnect();
-  }, [isFullChart, isFullscreen, totalSlots]);
+  }, [isFullChart, isFullscreen, data]); // ✨ 修正依賴項目
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
