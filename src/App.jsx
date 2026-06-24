@@ -2993,15 +2993,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器寬度，實現「手機直式縮看全圖」不超框
+  // ✨ 動態監聽容器寬度，實現「橫向完美滾動」與「不壓縮比例」
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const updateWidth = () => {
       const cw = container.clientWidth || 1200;
-      // 全圖模式時，寬度與螢幕完全相等 (完美壓縮)；非全圖模式時，保留最小 800px 以便滑動看細節
-      setChartWidth(isFullChart ? cw : Math.max(cw, 800));
+      if (isFullChart) {
+        // 點擊「全圖」時，強制壓縮在一個螢幕內
+        setChartWidth(cw); 
+      } else {
+        // 一般/放大模式：讓一個螢幕固定顯示約 90 根 K 棒，剩下的延伸出去供滑動！
+        const calculatedWidth = (cw / 90) * totalSlots;
+        setChartWidth(Math.max(cw, calculatedWidth));
+      }
     };
 
     const observer = new ResizeObserver(() => updateWidth());
@@ -3009,7 +3015,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     updateWidth();
 
     return () => observer.disconnect();
-  }, [isFullChart, isFullscreen]);
+  }, [isFullChart, isFullscreen, totalSlots]);
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
@@ -3020,7 +3026,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         }
       }, 50);
     }
-  },  [realSymbol, timeframe]);
+  }, [realSymbol, timeframe, isFullChart, displayCount]);
 
   const commitDrawings = (newDrawings) => {
     setDrawings(newDrawings);
@@ -3086,20 +3092,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         else if (chartContainerRef.current.webkitRequestFullscreen) await chartContainerRef.current.webkitRequestFullscreen();
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
         
-        setDisplayCount(9999); // 載入全部一年歷史資料
-        
-        // ✨ 動態計算放大倍率：讓畫面剛好塞滿約 90 天 (近 4 個半月)
-        const targetDays = 90; 
-        const newScale = Math.max(1, data.length / targetDays);
-        setZoomScale(newScale);
-        initialZoomScale.current = newScale;
-
-        // ✨ 延遲一下，等畫布放大後，自動把視角滾動到最右邊 (最新日期)
-        setTimeout(() => {
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
-          }
-        }, 150);
+        // ✨ 放大時，載入全部歷史資料，但使用 9998 代號，避免觸發「全圖(9999)」的極度壓縮模式
+        setDisplayCount(9998); 
 
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
@@ -3107,17 +3101,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
       if (window.screen && window.screen.orientation && window.screen.orientation.unlock) { try { window.screen.orientation.unlock(); } catch (e) {} }
       
-      // ✨ 退出全螢幕時，恢復原本的畫面比例與資料量
+      // ✨ 退出放大時，恢復原本的 90 根 K 棒
       setDisplayCount(90);
-      setZoomScale(1);
-      initialZoomScale.current = 1;
-
-      // ✨ 退出時也確保視角回到最右邊
-      setTimeout(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
-        }
-      }, 150);
     }
   };
 
