@@ -4086,7 +4086,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
-          <text x={padding + 10} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85">
+          <text x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85" textAnchor="middle" pointerEvents="none">
             {stockName} ({timeframe === 'D' ? '日K' : timeframe === 'W' ? '週K' : '月K'})
           </text>
           
