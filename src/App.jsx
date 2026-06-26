@@ -3882,7 +3882,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
          <div className="flex gap-1.5 sm:gap-2 z-10 shrink-0">
            <button onClick={toggleFullscreen} className="justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
-             {isFullscreen ? '↙️ 退出' : '🔲 翻轉'}
+             {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
            </button>
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
              📁 畫板
