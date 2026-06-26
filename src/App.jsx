@@ -3843,12 +3843,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
          <div className="flex gap-1.5 sm:gap-2 z-10 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
      
            {/* 將 px-3 改為 px-2 sm:px-3，text-sm 改為 text-xs sm:text-sm，並加上 flex-1 讓按鈕在極小螢幕均分寬度 */}
-           <button onClick={() => setDisplayCount(displayCount === 9999 ? 120 : 9999)} className="flex-1 sm:flex-none justify-center bg-slate-800/80 border border-amber-700 text-amber-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
+           <button onClick={() => setDisplayCount(displayCount === 9999 ? 60 : 9999)} className="flex-1 sm:flex-none justify-center bg-slate-800/80 border border-amber-700 text-amber-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
              {displayCount === 9999 ? '🔍 恢復' : '🔍 全圖'}
            </button>
      
            <button onClick={toggleFullscreen} className="flex-1 sm:flex-none justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
-             {isFullscreen ? '↙️ 退出' : '🔲 放大'}
+             {isFullscreen ? '↙️ 退出' : '🔲 翻轉'}
            </button>
      
            <button onClick={() => setIsLayoutModalOpen(true)} className="flex-1 sm:flex-none justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
