@@ -2202,6 +2202,7 @@ const App = () => {
   const [toggles, setToggles] = useState({
     showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
     showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
+    showBBandsCompress: false, // ✨ 新增：布林壓縮區塊 開關
     showTooltipDetail: false // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
   });
 
@@ -2750,6 +2751,8 @@ const App = () => {
                   {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
+                  {/* ✨ 新增：布林壓縮(0.15%) 打勾按鈕 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBandsCompress} onChange={() => handleToggle('showBBandsCompress')} className="w-3.5 h-3.5 text-yellow-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-yellow-400 font-bold">布林壓縮</span></label>
                   {/* ✨ 新增：詳細資訊分流勾選鍵 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showTooltipDetail} onChange={() => handleToggle('showTooltipDetail')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-amber-400 font-bold">查價詳細資訊</span></label>
                   
@@ -4211,6 +4214,69 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                 <path d={data.map((d, i) => d.bbands?.up3 != null ? `${i===0 || data[i-1]?.bbands?.up3 == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
                 <path d={data.map((d, i) => d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
             </g>)}
+
+            {/* ✨ 新增：布林帶寬壓縮區塊標示 (連續10天，帶寬<=1.5%) */}
+            {toggles.showBBandsCompress && (
+              <g>
+                {(() => {
+                  const zones = [];
+                  let startIdx = -1;
+                  let count = 0;
+                  
+                  // 1. 掃描全部的 K 線資料
+                  data.forEach((d, i) => {
+                    if (d.bbands?.up != null && d.bbands?.down != null && d.bbands?.mid != null) {
+                      // ✨ 阿水布林帶寬公式： (上軌 - 下軌) / 中軌
+                      const bandwidth = (d.bbands.up - d.bbands.down) / d.bbands.mid;
+                      
+                      // ✨ 判斷阿水帶寬是否在 0.15 (15%) 的極度壓縮範圍內
+                      if (bandwidth <= 0.15) {
+                        if (startIdx === -1) startIdx = i; // 記錄壓縮開始的第一天
+                        count++;
+                      } else {
+                        // 如果壓縮中斷了，檢查剛剛是不是已經連續超過 10 天
+                        // 💡 如果你想改成連續 5 天就顯示，就把這裡的 10 改成 5
+                        if (count >= 10) {
+                          zones.push({ start: startIdx, end: i - 1 });
+                        }
+                        // 重置計數器
+                        startIdx = -1;
+                        count = 0;
+                      }
+                    } else {
+                        if (count >= 10) zones.push({ start: startIdx, end: i - 1 });
+                        startIdx = -1;
+                        count = 0;
+                    }
+                  });
+                  
+                  // 處理到最後一天如果還在壓縮狀態
+                  if (count >= 10) {
+                    zones.push({ start: startIdx, end: data.length - 1 });
+                  }
+
+                  // 2. 把符合條件的區塊，畫成半透明的黃色大方塊
+                  return zones.map((z, idx) => {
+                    // X 座標：區塊第一根 K 棒的位置
+                    const rectX = padding + z.start * spacing;
+                    // 寬度：涵蓋的 K 棒數量 * 間距
+                    const rectWidth = (z.end - z.start + 1) * spacing;
+                    
+                    return (
+                      <rect 
+                        key={`compress-${idx}`} 
+                        x={rectX} 
+                        y={0} 
+                        width={rectWidth} 
+                        height={mainHeight} 
+                        fill="rgba(234, 179, 8, 0.15)" // ✨ 帶有質感的半透明黃色
+                        pointerEvents="none" 
+                      />
+                    );
+                  });
+                })()}
+              </g>
+            )}
 
             {/* 標準 K 線 (拔除了與寶塔線衝突的邏輯) */}
             {data.map((d, i) => {
