@@ -2441,6 +2441,25 @@ const App = () => {
     }
   }, [rawDailyData, timeframe, customStrategies, issuedShares, maParams, vmaParams, indicatorParams]);
 
+  // ✨ 獲取富果排行榜資料
+  const fetchRankingData = async () => {
+    setIsRankingOpen(true);
+    setIsLoadingRanking(true);
+    
+    try {
+      const response = await fetch(`https://api.fugle.tw/marketdata/v1.0/stock/snapshot/ranking?type=VOL&limit=20`, {
+        headers: { 'X-API-KEY': userApiKey } 
+      });
+      
+      const result = await response.json();
+      setRankingList(result.data || []);
+    } catch (error) {
+      console.error("讀取排行榜失敗:", error);
+    } finally {
+      setIsLoadingRanking(false);
+    }
+  };
+  
   const getMetricValue = (data, index, metricDef) => {
     const { target, scope, n } = metricDef; if (index < 0) return null;
     const getValue = (idx) => {
@@ -2926,6 +2945,48 @@ const App = () => {
           </div>
         </div>
       )}
+      {/* 👇 👇 👇 請把排行榜整段貼在這裡！ 👇 👇 👇 */}
+      {/* ✨ 🏆 富果排行榜彈出視窗 */}
+      {isRankingOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh]">
+            
+            {/* 面板標題 */}
+            <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
+              <h3 className="text-rose-400 font-bold text-base sm:text-lg">🏆 盤中強勢排行榜</h3>
+              <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
+            </div>
+
+            {/* 股票列表區塊 */}
+            <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
+              {isLoadingRanking ? (
+                <div className="text-center text-slate-400 py-10 font-bold animate-pulse">讀取排行榜中...</div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {rankingList.map((stock, idx) => (
+                    <div 
+                      key={stock.symbol}
+                      onClick={() => {
+                        fetchStockData(stock.symbol); 
+                        setIsRankingOpen(false); 
+                      }}
+                      className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span>
+                        <span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span>
+                      </div>
+                      <span className="text-red-400 font-bold text-sm bg-red-400/10 px-2 py-1 rounded">
+                        {stock.change}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
@@ -2976,6 +3037,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
   // ✨ 雲端畫板彈窗狀態
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
+
+  // ✨ 排行榜相關狀態
+  const [isRankingOpen, setIsRankingOpen] = useState(false);
+  const [rankingList, setRankingList] = useState([]);
+  const [isLoadingRanking, setIsLoadingRanking] = useState(false);
 
   // === 漂浮工具列 ===
   const [toolbarPos, setToolbarPos] = useState({ x: 10, y: 110 });
@@ -3975,6 +4041,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
            <button onClick={toggleFullscreen} className="justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
              {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
            </button>
+           {/* ✨ 新增：排行榜按鈕 */}
+           <button onClick={fetchRankingData} className="justify-center bg-rose-900/50 border border-rose-700 text-rose-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(225,29,72,0.2)] hover:bg-rose-800 whitespace-nowrap transition-all flex items-center">
+             🏆 排行
+           </button>           
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
              📁 畫板
            </button>
