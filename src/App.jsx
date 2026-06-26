@@ -3147,21 +3147,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
   const padding = 30;
   const indPadding = 15;
   
-  // ✨ 動態分配高度，徹底解決橫向上下留白、扁塌的問題！
-  const minAllowedHeight = indicatorType !== 'None' ? 450 : 350; 
-  // 🛡️ 加上 (chartHeight || 600) 防止初始狀態高度異常
-  const finalSvgHeight = Math.max(chartHeight || 600, minAllowedHeight); 
-  
-  const isLandscape = finalSvgHeight < 500;
+  // ✨ 動態分配高度 (完美分流版)：只有橫向放大時才撐滿螢幕，直式恢復原本的舒服高度！
+  const volHeight = isFullscreen ? 70 : 120;
+  const indicatorHeight = indicatorType !== 'None' ? (isFullscreen ? 70 : 120) : 0;
+  const chartPaddingTop = isFullscreen ? 35 : 80;
   const bottomLegendHeight = 40; 
   
-  // 橫向時量能與副圖稍微縮小，把黃金空間留給 K 線主圖！
-  const volHeight = isLandscape ? 70 : 120;
-  const indicatorHeight = indicatorType !== 'None' ? (isLandscape ? 70 : 120) : 0;
-  const chartPaddingTop = isLandscape ? 35 : 80;
+  let mainHeight = 400; // 直式預設主圖高度 (固定)
+  let totalSVGHeight = mainHeight + volHeight + indicatorHeight + 80; // 直式預設總高度 (固定)
   
-  const mainHeight = finalSvgHeight - volHeight - indicatorHeight - bottomLegendHeight;
-  const totalSVGHeight = finalSvgHeight;
+  // 如果是橫向翻轉(放大)，才用實際容器高度來反推主圖高度，解決上下留白
+  if (isFullscreen) {
+    totalSVGHeight = Math.max(chartHeight, 350); 
+    mainHeight = totalSVGHeight - volHeight - indicatorHeight - bottomLegendHeight;
+  }
 
   // ✨ 動態計算額外的空白 K 棒數 (預留 15% 空間給未來畫線用)
   const extraCandles = Math.floor(data.length * 0.15) || 15; 
