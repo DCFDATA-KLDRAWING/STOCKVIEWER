@@ -3843,7 +3843,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
          <div className="flex gap-1.5 sm:gap-2 z-10 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
      
            {/* 將 px-3 改為 px-2 sm:px-3，text-sm 改為 text-xs sm:text-sm，並加上 flex-1 讓按鈕在極小螢幕均分寬度 */}
-           <button onClick={() => setDisplayCount(displayCount === 9999 ? 60 : 9999)} className="flex-1 sm:flex-none justify-center bg-slate-800/80 border border-amber-700 text-amber-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
+           <button onClick={() => setDisplayCount(displayCount === 9999 ? 240 : 9999)} className="flex-1 sm:flex-none justify-center bg-slate-800/80 border border-amber-700 text-amber-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
              {displayCount === 9999 ? '🔍 恢復' : '🔍 全圖'}
            </button>
      
