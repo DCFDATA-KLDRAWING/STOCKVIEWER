@@ -3449,16 +3449,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     }
   };
 
-  // 🍎 完美相容 Apple 與 Android 的存圖機制 (升級：智慧選擇可見範圍或全圖)
+  // 🍎 完美相容 Apple 與 Android 的存圖機制 (所見即所得、絕對不跳出全螢幕版)
   const handleDownloadImage = () => {
     setCrosshair(null); setHoverPoint(null);
 
-    // ✨ 使用內建視窗詢問，不需要額外寫 UI
-    const onlyVisible = window.confirm("📸 存圖範圍選擇：\n\n👉 按【確定】：只儲存目前螢幕看見的範圍 (字體較大、適合分享)\n👉 按【取消】：儲存整張完整的歷史長圖 (全景、字體較小)");
+    // ✨ 拔除 window.confirm，直接預設儲存「目前螢幕看見的範圍」，保護全螢幕不中斷！
+    const onlyVisible = true; 
 
     setTimeout(() => {
       const svg = document.getElementById('trend-chart-svg'); 
-      const container = scrollContainerRef.current; // 取得外層能滑動的容器
+      const container = scrollContainerRef.current; 
       if (!svg || !container) return;
 
       const fullWidth = svg.getBoundingClientRect().width;
@@ -3466,46 +3466,41 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       const visibleWidth = container.clientWidth;
       const scrollX = container.scrollLeft;
 
-      // ✨ 存圖瞬間，決定標題位置
+      // ✨ 動態把標題移到「目前可見範圍」的正中央，確保存圖一定有股號
       const titleText = svg.querySelector('#chart-title');
-      if (titleText && !onlyVisible) {
-          // 如果是存「全景長圖」，把標題暫時移到整張圖的最中間
-          titleText.setAttribute('x', fullWidth / 2); 
+      if (titleText) {
+          titleText.setAttribute('x', scrollX + visibleWidth / 2);
       }
 
       const svgData = new XMLSerializer().serializeToString(svg);
       
-      // ✨ 存完圖後，立刻讓標題恢復回到你目前畫面的正中央
-      if (titleText && !onlyVisible) {
-          titleText.setAttribute('x', scrollX + visibleWidth / 2);
+      // ✨ 存完圖馬上把標題恢復原位
+      if (titleText) {
+          titleText.setAttribute('x', fullWidth / 2);
       }
 
       const canvas = document.createElement("canvas"); 
       const ctx = canvas.getContext("2d"); 
       const img = new Image();
       
-      // ✨ 如果只要目前範圍，畫布寬度就設定為螢幕寬度
-      const targetWidth = onlyVisible ? visibleWidth : fullWidth;
-      const scale = 2; // 維持你原本的 2倍 清晰度
+      // ✨ 目標寬度就是你當下螢幕的寬度
+      const targetWidth = visibleWidth;
+      const scale = 2; // 維持 2 倍高畫質
 
       canvas.width = targetWidth * scale; 
       canvas.height = fullHeight * scale;
       
       img.onload = () => {
-        ctx.fillStyle = "#0f172a"; // 保留原本的深色背景
+        ctx.fillStyle = "#0f172a"; 
         ctx.fillRect(0, 0, canvas.width, canvas.height); 
         
-        // ✨ 如果只要存可見範圍，就把畫筆的起點往左移 (扣除你已經滑動的距離)
-        if (onlyVisible) {
-            ctx.translate(-scrollX * scale, 0);
-        }
-        
-        // 畫上整張圖 (超出範圍的部分會自動被切掉)
+        // ✨ 把畫布往左平移，精準切下你目前螢幕停留的畫面
+        ctx.translate(-scrollX * scale, 0);
         ctx.drawImage(img, 0, 0, fullWidth * scale, fullHeight * scale);
         
-        // 👇👇👇 以下完全保留你原本的雙平台下載邏輯，一行都沒改 👇👇👇
+        // 👇 雙平台下載邏輯完全保留 👇
         const isAppleDevice = /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) || /Macintosh/i.test(navigator.userAgent);
-        const fileName = `${stockName}_策略圖_${onlyVisible ? '目前視角' : '全圖'}_${new Date().toISOString().split('T')[0]}.png`;
+        const fileName = `${stockName}_策略圖_目前視角_${new Date().toISOString().split('T')[0]}.png`;
         
         if (isAppleDevice) {
            canvas.toBlob((blob) => {
@@ -3529,7 +3524,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       };
       
       img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
-    }, 150);
+    }, 100); 
   };
 
   const renderDrawingObject = (drawObj, isDraft = false) => {
