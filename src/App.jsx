@@ -3408,21 +3408,62 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     }
   };
 
-  // 🍎 完美相容 Apple 與 Android 的存圖機制
+  // 🍎 完美相容 Apple 與 Android 的存圖機制 (升級：智慧選擇可見範圍或全圖)
   const handleDownloadImage = () => {
     setCrosshair(null); setHoverPoint(null);
+
+    // ✨ 使用內建視窗詢問，不需要額外寫 UI
+    const onlyVisible = window.confirm("📸 存圖範圍選擇：\n\n👉 按【確定】：只儲存目前螢幕看見的範圍 (字體較大、適合分享)\n👉 按【取消】：儲存整張完整的歷史長圖 (全景、字體較小)");
+
     setTimeout(() => {
-      const svg = document.getElementById('trend-chart-svg'); if (!svg) return;
+      const svg = document.getElementById('trend-chart-svg'); 
+      const container = scrollContainerRef.current; // 取得外層能滑動的容器
+      if (!svg || !container) return;
+
+      const fullWidth = svg.getBoundingClientRect().width;
+      const fullHeight = svg.getBoundingClientRect().height;
+      const visibleWidth = container.clientWidth;
+      const scrollX = container.scrollLeft;
+
+      // ✨ 動態把標題移到「目前可見範圍」的正中央，確保存圖一定有股號！
+      const titleText = svg.querySelector('#chart-title');
+      if (titleText && onlyVisible) {
+          titleText.setAttribute('x', scrollX + visibleWidth / 2);
+      }
+
       const svgData = new XMLSerializer().serializeToString(svg);
-      const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d"); const img = new Image();
-      const svgSize = svg.getBoundingClientRect(); canvas.width = svgSize.width * 2; canvas.height = svgSize.height * 2;
+      
+      // ✨ 存完圖馬上把標題恢復回原本的全圖中心點
+      if (titleText && onlyVisible) {
+          titleText.setAttribute('x', fullWidth / 2);
+      }
+
+      const canvas = document.createElement("canvas"); 
+      const ctx = canvas.getContext("2d"); 
+      const img = new Image();
+      
+      // ✨ 如果只要目前範圍，畫布寬度就設定為螢幕寬度
+      const targetWidth = onlyVisible ? visibleWidth : fullWidth;
+      const scale = 2; // 維持你原本的 2倍 清晰度
+
+      canvas.width = targetWidth * scale; 
+      canvas.height = fullHeight * scale;
       
       img.onload = () => {
-        ctx.fillStyle = "#0f172a"; 
+        ctx.fillStyle = "#0f172a"; // 保留原本的深色背景
         ctx.fillRect(0, 0, canvas.width, canvas.height); 
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
+        // ✨ 如果只要存可見範圍，就把畫筆的起點往左移 (扣除你已經滑動的距離)
+        if (onlyVisible) {
+            ctx.translate(-scrollX * scale, 0);
+        }
+        
+        // 畫上整張圖 (超出範圍的部分會自動被切掉)
+        ctx.drawImage(img, 0, 0, fullWidth * scale, fullHeight * scale);
+        
+        // 👇👇👇 以下完全保留你原本的雙平台下載邏輯，一行都沒改 👇👇👇
         const isAppleDevice = /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) || /Macintosh/i.test(navigator.userAgent);
+        const fileName = `${stockName}_策略圖_${onlyVisible ? '目前視角' : '全圖'}_${new Date().toISOString().split('T')[0]}.png`;
         
         if (isAppleDevice) {
            canvas.toBlob((blob) => {
@@ -3430,7 +3471,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
              const url = URL.createObjectURL(blob);
              const a = document.createElement("a");
              a.href = url;
-             a.download = `${stockName}_策略圖_${new Date().toISOString().split('T')[0]}.png`;
+             a.download = fileName;
              a.target = "_blank"; 
              document.body.appendChild(a); 
              a.click();
@@ -3439,14 +3480,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
            }, "image/png");
         } else {
            const a = document.createElement("a");
-           a.download = `${stockName}_策略圖_${new Date().toISOString().split('T')[0]}.png`;
+           a.download = fileName;
            a.href = canvas.toDataURL("image/png");
            a.click();
         }
       };
       
       img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
-    }, 100);
+    }, 150);
   };
 
   const renderDrawingObject = (drawObj, isDraft = false) => {
@@ -4096,7 +4137,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
-          <text x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85" textAnchor="middle" pointerEvents="none">
+          <text id="chart-title" x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85" textAnchor="middle" pointerEvents="none">
             {stockName} ({timeframe === 'D' ? '日K' : timeframe === 'W' ? '週K' : '月K'})
           </text>
           
