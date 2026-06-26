@@ -2134,7 +2134,7 @@ const App = () => {
   const [symbolInput, setSymbolInput] = useState(''); 
   const [currentViewedSymbol, setCurrentViewedSymbol] = useState(''); // ✨ 新增：用來記錄目前「成功載入並顯示在圖表上」的股號
   const [issuedShares, setIssuedShares] = useState(''); 
-  const [displayCount, setDisplayCount] = useState(90);
+  const [displayCount, setDisplayCount] = useState(120);
   const [timeframe, setTimeframe] = useState('D');
   
   // ✨ 新增副圖指標狀態 (預設關閉 None)
