@@ -3058,16 +3058,33 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     return () => container.removeEventListener('scroll', updateTitlePosition);
   }, [displayCount, isFullscreen, data.length]);
 
-  // ✨ 自動滾動到最右側 (最新日期)
+  // ✨ 自動滾動到最右側，但「隱藏未來留白」(滑動才會出現)
   useEffect(() => {
-    if (scrollContainerRef.current && !isFullChart) {
+    const container = scrollContainerRef.current;
+    if (container && !isFullChart) {
       setTimeout(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
-        }
-      }, 50);
+        const scrollW = container.scrollWidth;
+        const clientW = container.clientWidth;
+
+        // 1. 抓出你目前的 K 棒總數與留白數量
+        const currentDataLen = data ? data.length : 0;
+        // 💡 這裡的 0.25 (25%) 或 0.15 (15%) 要跟你畫布計算寬度的留白比例一致
+        const extraSlots = Math.floor(displayCount * 0.25) || 15; 
+        const totalSlots = currentDataLen + extraSlots;
+        
+        if (totalSlots === 0) return;
+        
+        // 2. 算出一根 K 棒有多寬，進而推算出「留白區塊」總共佔了幾 Pixel
+        const singleSlotWidth = scrollW / totalSlots;
+        const extraWidth = extraSlots * singleSlotWidth;
+
+        // 3. 算出極限位置後，往回扣除留白寬度，讓最新 K 棒剛好貼齊右側邊緣！
+        const maxScroll = scrollW - clientW; 
+        container.scrollLeft = Math.max(0, maxScroll - extraWidth);
+
+      }, 50); 
     }
-  },  [realSymbol, timeframe]);
+  }, [realSymbol, timeframe, isFullscreen, data?.length, displayCount, isFullChart]);
 
   const commitDrawings = (newDrawings) => {
     setDrawings(newDrawings);
