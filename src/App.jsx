@@ -2201,6 +2201,7 @@ const App = () => {
   // ✨ 狀態開關管理
   const [toggles, setToggles] = useState({
     showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
+    showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
     showTooltipDetail: false // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
   });
 
@@ -2535,7 +2536,14 @@ const App = () => {
         rsi2 = avgLoss2 === 0 ? 100 : 100 - (100 / (1 + (avgGain2 / avgLoss2)));
       }
 
-      let bbUp = null, bbMid = bbMa[i], bbDown = null; if (bbStd[i] !== null) { bbUp = bbMid + bbStdDev * bbStd[i]; bbDown = bbMid - bbStdDev * bbStd[i]; }
+      let bbUp = null, bbMid = bbMa[i], bbDown = null; 
+      let bbUp3 = null, bbDown3 = null; // ✨ 新增：高布林參數
+      if (bbStd[i] !== null) { 
+        bbUp = bbMid + bbStdDev * bbStd[i]; 
+        bbDown = bbMid - bbStdDev * bbStd[i]; 
+        bbUp3 = bbMid + 3.0 * bbStd[i]; // ✨ 3.0倍 高布林上軌
+        bbDown3 = bbMid - 3.0 * bbStd[i]; // ✨ 3.0倍 高布林下軌
+      }
       
       // ✨ 寶塔線 N 日參數運算邏輯 (修正版)
       const towerP = indParams.tower?.p || 3;
@@ -2569,7 +2577,7 @@ const App = () => {
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, customMarks,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },
-          obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown }, tower 
+          obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower 
       };
     });
   };
@@ -2739,6 +2747,8 @@ const App = () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMA} onChange={() => handleToggle('showMA')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均線總開關</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線總開關</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
+                  {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
                   {/* ✨ 新增：詳細資訊分流勾選鍵 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showTooltipDetail} onChange={() => handleToggle('showTooltipDetail')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-amber-400 font-bold">查價詳細資訊</span></label>
@@ -4118,6 +4128,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                 <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1]?.bbands?.mid == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
                 <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1]?.bbands?.down == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
             </g>)}
+            {/* ✨ 新增：繪製 高布林(3.0) 的上軌與下軌 (使用不同的粉紅色與虛線樣式區分) */}
+            {toggles.showBBands3 && (<g opacity="0.5">
+                <path d={data.map((d, i) => d.bbands?.up3 != null ? `${i===0 || data[i-1]?.bbands?.up3 == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
+            </g>)}
 
             {/* 標準 K 線 (拔除了與寶塔線衝突的邏輯) */}
             {data.map((d, i) => {
@@ -4256,6 +4271,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                 tooltipLines.push({ color: '#a855f7', text: `布林上： ${hoverD?.bbands?.up?.toFixed(2) || '-'}` });
                 tooltipLines.push({ color: '#d8b4fe', text: `布林中： ${hoverD?.bbands?.mid?.toFixed(2) || '-'}` });
                 tooltipLines.push({ color: '#a855f7', text: `布林下： ${hoverD?.bbands?.down?.toFixed(2) || '-'}` });
+            }
+
+            // ✨ 新增：高布林(3.0) 查價資訊
+            if (toggles.showBBands3) {
+                tooltipLines.push({ color: '#f472b6', text: `高布林上： ${hoverD?.bbands?.up3?.toFixed(2) || '-'}` });
+                tooltipLines.push({ color: '#f472b6', text: `高布林下： ${hoverD?.bbands?.down3?.toFixed(2) || '-'}` });
             }
 
             // ==========================================
