@@ -2823,7 +2823,7 @@ const App = () => {
           {klineData.length > 0 ? (
             <div className="flex-1 w-full h-full relative">
               <TrendChart 
-                data={klineData.slice(-Math.abs(displayCount))} 
+                data={klineData} // ✨ 不再切斷，傳入全部資料，讓畫布可以無限往左滑！ 
                 timeframe={timeframe}
                 stockName={displayFullname} 
                 toggles={toggles} 
@@ -2937,6 +2937,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
   // ✨ 新增：圖表動態寬度狀態與全圖判定
   const [chartWidth, setChartWidth] = useState(1200);
+  const [chartHeight, setChartHeight] = useState(600);
   const isFullChart = displayCount === 9999; // ✨ 修正：改用 9999 專屬代號，避免小週期的卡死問題
 
   // === 磁吸開關 ===
@@ -2993,38 +2994,32 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器寬度，實現「橫向看240根且胖胖的」
+  // ✨ 動態監聽容器尺寸，實現完美直橫式視角與滑桿縮放
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const updateWidth = () => {
+    const updateSize = () => {
       const cw = container.clientWidth || 1200;
+      const ch = container.clientHeight || 600; // ✨ 取得實際高度
       
-      if (isFullChart) {
-        // 1. 全圖模式：強制壓縮在一個螢幕內
-        setChartWidth(cw); 
-      } else if (isFullscreen) {
-        // 2. ✨ 橫向翻轉時：讓螢幕固定顯示約 60 根 (保持胖胖的比例)，剩下的延伸出畫面讓你左右滑！
-        // 💡 如果你覺得不夠胖，就把 60 改成 40 或 50；覺得太胖就改成 80。
-        const currentDataLen = data ? data.length : 0;
-        const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
-        const totalSlots = currentDataLen + currentExtra;
-        
-        const calculatedWidth = (cw / 60) * totalSlots; 
-        setChartWidth(Math.max(cw, calculatedWidth));
-      } else {
-        // 3. 直式一般模式：恢復預設
-        setChartWidth(Math.max(cw, 800));
-      }
+      setChartHeight(ch); // ✨ 把高度存起來，給下面分配比例用
+
+      const currentDataLen = data ? data.length : 0;
+      const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
+      const totalSlots = currentDataLen + currentExtra;
+      
+      // ✨ 終極公式：無論直橫式，都依照滑桿 (displayCount) 計算比例，保證絕對胖胖的！
+      const calculatedWidth = (cw / displayCount) * totalSlots * zoomScale; 
+      setChartWidth(Math.max(cw, calculatedWidth));
     };
 
-    const observer = new ResizeObserver(() => updateWidth());
+    const observer = new ResizeObserver(() => updateSize());
     observer.observe(container);
-    updateWidth();
+    updateSize();
 
     return () => observer.disconnect();
-  }, [isFullChart, isFullscreen, data]);
+  }, [displayCount, zoomScale, data.length]);
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
@@ -3146,11 +3141,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
   if (!data || data.length === 0) return null;
 
   const width = chartWidth; // ✨ 使用動態寬度取代原本寫死的 1200
-  const mainHeight = 400; const volHeight = 120; const padding = 30; 
-  const indicatorHeight = indicatorType !== 'None' ? 120 : 0;
+  const padding = 30;
   const indPadding = 15;
-  const chartPaddingTop = 80; // ✨ 增加上方留白，讓 K 線有空間
-  const totalSVGHeight = mainHeight + volHeight + indicatorHeight + 80;
+  
+  // ✨ 動態分配高度，徹底解決橫向上下留白、扁塌的問題！
+  const minAllowedHeight = indicatorType !== 'None' ? 450 : 350; // 避免極端螢幕把圖壓得太小
+  const finalSvgHeight = Math.max(chartHeight, minAllowedHeight); // 以實際容器高度為準
+  
+  const isLandscape = finalSvgHeight < 500;
+  const bottomLegendHeight = 40; // 留給底部圖例的空間
+  
+  // 橫向時量能與副圖稍微縮小，把黃金空間留給 K 線主圖！
+  const volHeight = isLandscape ? 70 : 120;
+  const indicatorHeight = indicatorType !== 'None' ? (isLandscape ? 70 : 120) : 0;
+  const chartPaddingTop = isLandscape ? 35 : 80;
+  
+  const mainHeight = finalSvgHeight - volHeight - indicatorHeight - bottomLegendHeight;
+  const totalSVGHeight = finalSvgHeight;
 
   // ✨ 動態計算額外的空白 K 棒數 (預留 15% 空間給未來畫線用)
   const extraCandles = Math.floor(data.length * 0.15) || 15; 
@@ -3860,28 +3867,26 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     <div ref={chartContainerRef} className={isFullscreen ? "fixed inset-0 z-[100] bg-[#020617] flex flex-col w-full h-full" : `relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col`}>
       <CustomModal modal={chartModal} />
       
-      {/* ✨ 2. 次級功能列 (縮看全圖、放大、存圖) - 移除重複的工具箱按鈕，改為靠右對齊 */}
-      <div className="flex items-center justify-end px-2 sm:px-3 py-2 shrink-0 border-b border-cyan-900/50 bg-slate-900/60 relative z-20 shadow-sm overflow-x-auto [&::-webkit-scrollbar]:hidden w-full">
-         {/* 將間距從 gap-2 改為手機 gap-1.5，大螢幕維持 gap-2 */}
-         <div className="flex gap-1.5 sm:gap-2 z-10 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
-     
-           {/* 將 px-3 改為 px-2 sm:px-3，text-sm 改為 text-xs sm:text-sm，並加上 flex-1 讓按鈕在極小螢幕均分寬度 */}
-           <button onClick={() => setDisplayCount(displayCount === 9999 ? 240 : 9999)} className="flex-1 sm:flex-none justify-center bg-slate-800/80 border border-amber-700 text-amber-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
-             {displayCount === 9999 ? '🔍 恢復' : '🔍 全圖'}
-           </button>
-     
-           <button onClick={toggleFullscreen} className="flex-1 sm:flex-none justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
+      {/* ✨ 2. 次級功能列 (滑桿、翻轉、畫板、存圖) */}
+      <div className="flex items-center justify-between px-2 sm:px-3 py-2 shrink-0 border-b border-cyan-900/50 bg-slate-900/60 relative z-20 shadow-sm overflow-x-auto [&::-webkit-scrollbar]:hidden w-full">
+         
+         {/* ✨ 新增：K棒數量縮放滑桿 */}
+         <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-600 shrink-0 shadow-inner mr-auto">
+           <span className="text-cyan-400 text-xs font-bold whitespace-nowrap">🔎 視角</span>
+           <input type="range" min="30" max="300" step="10" value={displayCount} onChange={(e) => { setDisplayCount(Number(e.target.value)); }} className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" />
+           <span className="text-slate-300 text-xs font-bold w-6">{displayCount}</span>
+         </div>
+
+         <div className="flex gap-1.5 sm:gap-2 z-10 shrink-0">
+           <button onClick={toggleFullscreen} className="justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
              {isFullscreen ? '↙️ 退出' : '🔲 翻轉'}
            </button>
-     
-           <button onClick={() => setIsLayoutModalOpen(true)} className="flex-1 sm:flex-none justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
+           <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
              📁 畫板
            </button>
-     
-           <button onClick={handleDownloadImage} className="flex-1 sm:flex-none justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">
+           <button onClick={handleDownloadImage} className="justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">
              📸 存圖
            </button>
-     
          </div>
       </div>
 
@@ -4061,7 +4066,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         )}
 
         {/* ✨ 動態切換 className 讓全圖模式可以完美縮進單一螢幕裡 */}
-        <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} className={`w-full h-full select-none ${isFullChart ? 'min-w-full' : 'min-w-[800px]'} ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`}
+        {/* ✨ 解除畫布高度與寬度限制，完全貼合手機螢幕不留白 */}
+        <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} 
+          className={`select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} 
+          style={{ width: width, minWidth: width, height: totalSVGHeight }}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove} 
           onMouseUp={handlePointerUp}
