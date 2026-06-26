@@ -3413,7 +3413,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setCrosshair(null); setHoverPoint(null);
 
     // ✨ 使用內建視窗詢問，不需要額外寫 UI
-    const onlyVisible = window.confirm("📸 存圖範圍選擇：\n\n👉 按【A】：只儲存目前螢幕看見的範圍 (字體較大、適合分享)\n👉 按【B】：儲存整張完整的歷史長圖 (全景、字體較小)");
+    const onlyVisible = window.confirm("📸 存圖範圍選擇：\n\n👉 按【確定】：只儲存目前螢幕看見的範圍 (字體較大、適合分享)\n👉 按【取消】：儲存整張完整的歷史長圖 (全景、字體較小)");
 
     setTimeout(() => {
       const svg = document.getElementById('trend-chart-svg'); 
