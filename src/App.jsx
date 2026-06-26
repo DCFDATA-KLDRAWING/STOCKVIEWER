@@ -3034,6 +3034,30 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     return () => observer.disconnect();
   }, [displayCount, data ? data.length : 0]);
 
+  // ✨ 標題永遠置中的追蹤雷達 (60fps光速跟隨)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const updateTitlePosition = () => {
+      const title = document.getElementById('chart-title');
+      if (title) {
+        // 動態將 X 座標設為「目前滾動距離 + 螢幕一半」，讓標題永遠黏在視角正中間！
+        title.setAttribute('x', container.scrollLeft + container.clientWidth / 2);
+      }
+    };
+
+    // 監聽手指滑動與拖曳
+    container.addEventListener('scroll', updateTitlePosition);
+    
+    // 剛載入、翻轉螢幕、或切換 K 棒數量時，主動對齊一次
+    updateTitlePosition();
+    // 延遲 150 毫秒再確認一次，確保自動滾動到最新日期後標題有跟上
+    setTimeout(updateTitlePosition, 150); 
+
+    return () => container.removeEventListener('scroll', updateTitlePosition);
+  }, [displayCount, isFullscreen, data.length]);
+
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
     if (scrollContainerRef.current && !isFullChart) {
@@ -3425,17 +3449,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
       const visibleWidth = container.clientWidth;
       const scrollX = container.scrollLeft;
 
-      // ✨ 動態把標題移到「目前可見範圍」的正中央，確保存圖一定有股號！
+      // ✨ 存圖瞬間，決定標題位置
       const titleText = svg.querySelector('#chart-title');
-      if (titleText && onlyVisible) {
-          titleText.setAttribute('x', scrollX + visibleWidth / 2);
+      if (titleText && !onlyVisible) {
+          // 如果是存「全景長圖」，把標題暫時移到整張圖的最中間
+          titleText.setAttribute('x', fullWidth / 2); 
       }
 
       const svgData = new XMLSerializer().serializeToString(svg);
       
-      // ✨ 存完圖馬上把標題恢復回原本的全圖中心點
-      if (titleText && onlyVisible) {
-          titleText.setAttribute('x', fullWidth / 2);
+      // ✨ 存完圖後，立刻讓標題恢復回到你目前畫面的正中央
+      if (titleText && !onlyVisible) {
+          titleText.setAttribute('x', scrollX + visibleWidth / 2);
       }
 
       const canvas = document.createElement("canvas"); 
