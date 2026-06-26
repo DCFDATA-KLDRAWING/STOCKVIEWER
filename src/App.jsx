@@ -3414,23 +3414,78 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     const baseOpacity = drawObj.opacity ?? 1; // ✨ 讀取圖形專屬透明度 (舊圖形預設為 1)
     
     const renderDots = () => {
-      return pts.map((pt, idx) => (
-        <g key={`dot-${idx}`}>
-          <circle cx={pt.x} cy={pt.y} r={4} fill={drawObj.color} opacity={isDraft ? baseOpacity * 0.8 : baseOpacity} pointerEvents="none" />
-          {/* ✨ 當橡皮擦工具啟用時，在控制點顯示刪除按鈕 */}
-          {activeTool === 'eraser' && !isDraft && (
-            <g
-              className="cursor-pointer"
-              pointerEvents="all"
-              onMouseDown={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}
-              onTouchStart={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}
-            >
-              <circle cx={pt.x} cy={pt.y} r={14} fill="#ef4444" opacity={0.6} className="hover:opacity-100 transition-opacity" />
-              <text x={pt.x} y={pt.y + 4} fontSize="12" fontWeight="bold" fill="#ffffff" textAnchor="middle" pointerEvents="none">✕</text>
+      return (
+        <>
+          {pts.map((pt, idx) => (
+            <g key={`dot-${idx}`}>
+              <circle cx={pt.x} cy={pt.y} r={4} fill={drawObj.color} opacity={isDraft ? baseOpacity * 0.8 : baseOpacity} pointerEvents="none" />
+              
+              {/* ✨ 微調模式：單點拖曳控制 (透明感應區) */}
+              {activeTool === 'edit' && !isDraft && (
+                <circle 
+                  cx={pt.x} cy={pt.y} r={20} 
+                  fill="transparent" 
+                  className="cursor-move" 
+                  pointerEvents="all"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
+                    if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
+                    setEditingPoint({ id: drawObj.id, pointIdx: idx });
+                  }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
+                    if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
+                    setEditingPoint({ id: drawObj.id, pointIdx: idx });
+                  }}
+                />
+              )}
+
+              {/* ✨ 當橡皮擦工具啟用時，在控制點顯示刪除按鈕 */}
+              {activeTool === 'eraser' && !isDraft && (
+                <g
+                  className="cursor-pointer"
+                  pointerEvents="all"
+                  onMouseDown={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}
+                  onTouchStart={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}
+                >
+                  <circle cx={pt.x} cy={pt.y} r={14} fill="#ef4444" opacity={0.6} className="hover:opacity-100 transition-opacity" />
+                  <text x={pt.x} y={pt.y + 4} fontSize="12" fontWeight="bold" fill="#ffffff" textAnchor="middle" pointerEvents="none">✕</text>
+                </g>
+              )}
+            </g>
+          ))}
+          
+          {/* ✨ 整塊拖曳與複製的工具列 (微調模式專屬) */}
+          {activeTool === 'edit' && !isDraft && pts.length > 0 && (
+            <g transform={`translate(${pts[0].x}, ${pts[0].y - 30})`} pointerEvents="all">
+              <rect x="-45" y="-14" width="90" height="28" fill="#1e293b" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1.5" />
+              
+              {/* 🖐️ 移動整塊按鈕 */}
+              <g className="cursor-move" 
+                 onMouseDown={(e) => handleDragWholeStart(e, drawObj)}
+                 onTouchStart={(e) => handleDragWholeStart(e, drawObj)}
+              >
+                <rect x="-45" y="-14" width="45" height="28" fill="transparent" />
+                <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️移動</text>
+              </g>
+
+              {/* 分隔線 */}
+              <line x1="0" y1="-10" x2="0" y2="10" stroke="#475569" strokeWidth="1" />
+              
+              {/* 📄 複製按鈕 */}
+              <g className="cursor-pointer"
+                 onMouseDown={(e) => onCloneClick(e, drawObj)}
+                 onTouchStart={(e) => onCloneClick(e, drawObj)}
+              >
+                <rect x="0" y="-14" width="45" height="28" fill="transparent" />
+                <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄複製</text>
+              </g>
             </g>
           )}
-        </g>
-      ));
+        </>
+      );
     };
 
     if (drawObj.type === 'crossline') {
