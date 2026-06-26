@@ -3151,7 +3151,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
         
         // ✨ 進入橫向時，自動載入 240 根 K 線
-        setDisplayCount(240);
+        setDisplayCount(120);
 
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
