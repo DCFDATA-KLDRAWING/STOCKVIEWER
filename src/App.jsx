@@ -2994,23 +2994,25 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器尺寸，實現完美直橫式視角與滑桿縮放
+  // ✨ 動態監聽容器尺寸，實現完美直橫式視角與滑桿縮放 (防呆安全版)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const updateSize = () => {
       const cw = container.clientWidth || 1200;
-      const ch = container.clientHeight || 600; // ✨ 取得實際高度
+      const ch = container.clientHeight || 600; 
       
-      setChartHeight(ch); // ✨ 把高度存起來，給下面分配比例用
+      setChartHeight(ch); 
 
       const currentDataLen = data ? data.length : 0;
       const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
       const totalSlots = currentDataLen + currentExtra;
       
-      // ✨ 終極公式：無論直橫式，都依照滑桿 (displayCount) 計算比例，保證絕對胖胖的！
-      const calculatedWidth = (cw / displayCount) * totalSlots * zoomScale; 
+      // 🛡️ 安全保護：自動判斷你是否有兩指縮放功能，沒有也不會當機！
+      const currentScale = typeof zoomScale !== 'undefined' ? zoomScale : 1;
+      const calculatedWidth = (cw / displayCount) * totalSlots * currentScale; 
+      
       setChartWidth(Math.max(cw, calculatedWidth));
     };
 
@@ -3018,8 +3020,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     observer.observe(container);
     updateSize();
 
+    // 🛡️ 將 zoomScale 移出依賴陣列，徹底防止黑畫面
     return () => observer.disconnect();
-  }, [displayCount, zoomScale, data.length]);
+  }, [displayCount, data ? data.length : 0]);
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
@@ -3145,11 +3148,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
   const indPadding = 15;
   
   // ✨ 動態分配高度，徹底解決橫向上下留白、扁塌的問題！
-  const minAllowedHeight = indicatorType !== 'None' ? 450 : 350; // 避免極端螢幕把圖壓得太小
-  const finalSvgHeight = Math.max(chartHeight, minAllowedHeight); // 以實際容器高度為準
+  const minAllowedHeight = indicatorType !== 'None' ? 450 : 350; 
+  // 🛡️ 加上 (chartHeight || 600) 防止初始狀態高度異常
+  const finalSvgHeight = Math.max(chartHeight || 600, minAllowedHeight); 
   
   const isLandscape = finalSvgHeight < 500;
-  const bottomLegendHeight = 40; // 留給底部圖例的空間
+  const bottomLegendHeight = 40; 
   
   // 橫向時量能與副圖稍微縮小，把黃金空間留給 K 線主圖！
   const volHeight = isLandscape ? 70 : 120;
