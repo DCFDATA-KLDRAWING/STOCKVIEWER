@@ -2993,15 +2993,30 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器寬度，實現「手機直式縮看全圖」不超框
+  // ✨ 動態監聽容器寬度，實現「橫向看240根且胖胖的」
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const updateWidth = () => {
       const cw = container.clientWidth || 1200;
-      // 全圖模式時，寬度與螢幕完全相等 (完美壓縮)；非全圖模式時，保留最小 800px 以便滑動看細節
-      setChartWidth(isFullChart ? cw : Math.max(cw, 800));
+      
+      if (isFullChart) {
+        // 1. 全圖模式：強制壓縮在一個螢幕內
+        setChartWidth(cw); 
+      } else if (isFullscreen) {
+        // 2. ✨ 橫向翻轉時：讓螢幕固定顯示約 60 根 (保持胖胖的比例)，剩下的延伸出畫面讓你左右滑！
+        // 💡 如果你覺得不夠胖，就把 60 改成 40 或 50；覺得太胖就改成 80。
+        const currentDataLen = data ? data.length : 0;
+        const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
+        const totalSlots = currentDataLen + currentExtra;
+        
+        const calculatedWidth = (cw / 60) * totalSlots; 
+        setChartWidth(Math.max(cw, calculatedWidth));
+      } else {
+        // 3. 直式一般模式：恢復預設
+        setChartWidth(Math.max(cw, 800));
+      }
     };
 
     const observer = new ResizeObserver(() => updateWidth());
@@ -3009,7 +3024,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     updateWidth();
 
     return () => observer.disconnect();
-  }, [isFullChart, isFullscreen]);
+  }, [isFullChart, isFullscreen, data]);
 
   // ✨ 自動滾動到最右側 (最新日期)
   useEffect(() => {
