@@ -3100,10 +3100,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         if (chartContainerRef.current.requestFullscreen) await chartContainerRef.current.requestFullscreen();
         else if (chartContainerRef.current.webkitRequestFullscreen) await chartContainerRef.current.webkitRequestFullscreen();
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
+        
+        // ✨ 進入橫向時，自動載入 240 根 K 線
+        setDisplayCount(240);
+
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
       if (document.exitFullscreen) await document.exitFullscreen();
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      if (window.screen && window.screen.orientation && window.screen.orientation.unlock) { try { window.screen.orientation.unlock(); } catch (e) {} }
+      
+      // ✨ 退出橫向時，恢復你原本的 60 根
+      setDisplayCount(120);
     }
   };
 
