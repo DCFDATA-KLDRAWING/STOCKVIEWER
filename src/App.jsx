@@ -2123,6 +2123,10 @@ const App = () => {
   const [appModal, setAppModal] = useState(null);
   const showAlert = (msg) => setAppModal({ type: 'alert', message: msg, onConfirm: () => setAppModal(null) });
 
+  // ✨ 排行榜相關狀態
+  const [isRankingOpen, setIsRankingOpen] = useState(false);
+  const [rankingList, setRankingList] = useState([]);
+  const [isLoadingRanking, setIsLoadingRanking] = useState(false);
   // ✨ Firebase 認證與資料庫載入狀態
   const [user, setUser] = useState(null);
   const [dbLoaded, setDbLoaded] = useState(false);
@@ -3037,11 +3041,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
 
   // ✨ 雲端畫板彈窗狀態
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
-
-  // ✨ 排行榜相關狀態
-  const [isRankingOpen, setIsRankingOpen] = useState(false);
-  const [rankingList, setRankingList] = useState([]);
-  const [isLoadingRanking, setIsLoadingRanking] = useState(false);
 
   // === 漂浮工具列 ===
   const [toolbarPos, setToolbarPos] = useState({ x: 10, y: 110 });
