@@ -2876,6 +2876,8 @@ const App = () => {
                 savedLayouts={savedLayouts}        // ✨ 傳入畫板資料
                 setSavedLayouts={setSavedLayouts}  // ✨ 傳入更新畫板的方法
                 onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
+                // 👇 👇 新增這一行：把功能傳遞給 K 線圖
+                onOpenRanking={fetchRankingData}
               />
             </div>
           ) : (
@@ -3005,7 +3007,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, onOpenRanking }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -4041,7 +4043,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
              {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
            </button>
            {/* ✨ 新增：排行榜按鈕 */}
-           <button onClick={fetchRankingData} className="justify-center bg-rose-900/50 border border-rose-700 text-rose-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(225,29,72,0.2)] hover:bg-rose-800 whitespace-nowrap transition-all flex items-center">
+           <button onClick={onOpenRanking} className="justify-center bg-rose-900/50...">
              🏆 排行
            </button>           
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
