@@ -2123,10 +2123,6 @@ const App = () => {
   const [appModal, setAppModal] = useState(null);
   const showAlert = (msg) => setAppModal({ type: 'alert', message: msg, onConfirm: () => setAppModal(null) });
 
-  // ✨ 排行榜相關狀態
-  const [isRankingOpen, setIsRankingOpen] = useState(false);
-  const [rankingList, setRankingList] = useState([]);
-  const [isLoadingRanking, setIsLoadingRanking] = useState(false);
   // ✨ Firebase 認證與資料庫載入狀態
   const [user, setUser] = useState(null);
   const [dbLoaded, setDbLoaded] = useState(false);
@@ -2302,6 +2298,26 @@ const App = () => {
     return () => clearTimeout(timeoutId);
   }, [userApiKey, indicatorParams, maParams, vmaParams, customStrategies, savedLayouts, user, dbLoaded]);
 
+  // ✨ AI 讀圖與排行榜狀態 (加入 localStorage 記憶功能)
+  const [isRankingOpen, setIsRankingOpen] = useState(false);
+  const [isLoadingRanking, setIsLoadingRanking] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // 初始化時去記憶體找找看有沒有上次存的名單
+  const [rankingList, setRankingList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_RANKING_LIST');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // 只要 rankingList 有變動（例如 AI 讀完新圖），就自動存入記憶體
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_RANKING_LIST', JSON.stringify(rankingList));
+  }, [rankingList]);
+  
   const [isBuilderOpen, setIsBuilderOpen] = useState(false); 
   const [draftStrategy, setDraftStrategy] = useState({
     name: '我的新策略', marker: '🔥', matchType: 'AND', conditions: [{ left: { target: 'close', scope: 'today', n: 1 }, operator: '>', rightType: 'metric', rightMetric: { target: 'close', scope: 'ago', n: 1 }, rightMathOp: 'none', rightMathNum: 1, rightNumber: 100 }]
@@ -2367,7 +2383,64 @@ const App = () => {
  2)接下來這產業的新增需求是否有在加速, 且新增的年增需求金額會多少? 3)受惠的國外廠商/ 台股的巿佔率多少?能吃到多少新增需求金額? 而新增的需求金額和目前個股的年營收佔比如何, 有沒有受惠很多? 4)目前此產業有哪些廠有增加資本支出?且這資本支出對台股的受惠程度, 或台股也有產能滿載/要增加資本支出的狀況?`;
     window.open(`https://www.google.com/search?udm=50&q=${encodeURIComponent(query)}`, '_blank');
   };
+  // ✨ 把圖片轉 Base64 的小工具
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const fileReader = new FileReader();
+      fileReader.readAsDataURL(file);
+      fileReader.onload = () => resolve(fileReader.result.split(',')[1]);
+      fileReader.onerror = (error) => reject(error);
+    });
+  };
 
+  // ✨ 處理截圖上傳與 AI 辨識 (專攻富邦排行榜)
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsRankingOpen(true);
+    setIsLoadingRanking(true); 
+
+    try {
+      const base64Image = await convertToBase64(file);
+      const geminiApiKey = ""; // 系統底層會自動代入環境金鑰
+      
+      const payload = {
+        contents: [{
+          role: "user",
+          parts: [
+            { text: "這是一張富邦證券(MoneyDJ)的台股排行榜截圖。請幫我精準辨識圖中表格，提取出所有的『股票代號(symbol)』、『股票名稱(name)』與『漲跌幅或狀態(change)』。請直接回傳嚴格的 JSON 陣列格式，不要任何 Markdown 標記，不要任何解釋。若沒有明確漲跌幅請預設填入'熱門'。格式範例：[{\"symbol\":\"2330\", \"name\":\"台積電\", \"change\":\"+1.5%\"}]" },
+            { inlineData: { mimeType: file.type, data: base64Image } }
+          ]
+        }],
+        generationConfig: { responseMimeType: "application/json" }
+      };
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "[]";
+      
+      const cleanText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const rankingData = JSON.parse(cleanText);
+      
+      if(Array.isArray(rankingData) && rankingData.length > 0) {
+          setRankingList(rankingData); // 這裡一更新，第一步的 useEffect 就會自動幫你存檔！
+      } else {
+          throw new Error("無法從圖片中解析出股票陣列");
+      }
+    } catch (error) {
+      console.error("AI 辨識失敗:", error);
+      showAlert("圖片辨識失敗，請確認截圖是否清晰包含股票代號！");
+    } finally {
+      setIsLoadingRanking(false);
+      if (event.target) event.target.value = null; // 清空 input 讓下次可重選同張圖
+    }
+  };
   // ✨ 修改 fetchStockData 讓它支援從畫板載入指定的股號
   const fetchStockData = async (overrideSymbol = null) => {
     const targetInput = (typeof overrideSymbol === 'string' ? overrideSymbol : null) || symbolInput;
@@ -2445,25 +2518,6 @@ const App = () => {
     }
   }, [rawDailyData, timeframe, customStrategies, issuedShares, maParams, vmaParams, indicatorParams]);
 
-  // ✨ 獲取富果排行榜資料
-  const fetchRankingData = async () => {
-    setIsRankingOpen(true);
-    setIsLoadingRanking(true);
-    
-    try {
-      const response = await fetch(`https://api.fugle.tw/marketdata/v1.0/stock/snapshot/ranking?type=VOL&limit=20`, {
-        headers: { 'X-API-KEY': userApiKey } 
-      });
-      
-      const result = await response.json();
-      setRankingList(result.data || []);
-    } catch (error) {
-      console.error("讀取排行榜失敗:", error);
-    } finally {
-      setIsLoadingRanking(false);
-    }
-  };
-  
   const getMetricValue = (data, index, metricDef) => {
     const { target, scope, n } = metricDef; if (index < 0) return null;
     const getValue = (idx) => {
@@ -2716,7 +2770,34 @@ const App = () => {
           </div>
 
           <div className="w-[1px] h-6 bg-slate-700 mx-1 shrink-0"></div>
+          {/* ✨ 1. 快捷開啟排行連結 */}
+          <button onClick={() => window.open('https://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_A.djhtm', '_blank')} className="shrink-0 justify-center bg-blue-900/40 border border-blue-700 text-blue-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(59,130,246,0.2)] hover:bg-blue-800 whitespace-nowrap transition-all flex items-center">
+            🔗 排行截圖點
+          </button>
           
+          {/* ✨ 2. AI 讀圖上傳按鈕 */}
+          <div className="relative inline-block h-full shrink-0">
+            <input 
+              type="file" 
+              accept="image/*" 
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+              disabled={isLoadingRanking}
+            />
+            <div className={`h-full flex justify-center items-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${isLoadingRanking ? 'bg-purple-900/30 text-purple-500 border border-purple-800' : 'bg-purple-900/50 border border-purple-700 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.2)] hover:bg-purple-800'}`}>
+              {isLoadingRanking ? '⏳ 處理中' : '📸 上傳截圖'}
+            </div>
+          </div>
+
+          {/* ✨ 3. 開啟已記憶的 AI 名單 (只有當記憶體有資料時才顯示) */}
+          {rankingList.length > 0 && (
+            <button onClick={() => setIsRankingOpen(true)} className="shrink-0 justify-center bg-pink-900/40 border border-pink-700 text-pink-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(236,72,153,0.2)] hover:bg-pink-800 whitespace-nowrap transition-all flex items-center">
+              📋 漲幅排行
+            </button>
+          )}
+
+          <div className="w-[1px] h-6 bg-slate-700 mx-1 shrink-0"></div>
           {/* 面板控制按鈕 */}
           <button onClick={() => setIsBuilderOpen(!isBuilderOpen)} className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-colors shrink-0 ${isBuilderOpen ? 'bg-teal-900/60 text-teal-300 border-teal-500 shadow-[0_0_10px_rgba(20,184,166,0.4)]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-teal-400'}`}>🧪策略</button>
 
@@ -2876,8 +2957,6 @@ const App = () => {
                 savedLayouts={savedLayouts}        // ✨ 傳入畫板資料
                 setSavedLayouts={setSavedLayouts}  // ✨ 傳入更新畫板的方法
                 onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
-                // 👇 👇 新增這一行：把功能傳遞給 K 線圖
-                onOpenRanking={fetchRankingData}
               />
             </div>
           ) : (
@@ -2916,6 +2995,45 @@ const App = () => {
 
       </div>
 
+      {/* ✨ 🏆 AI 辨識排行榜彈出視窗 */}
+      {isRankingOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 pointer-events-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh] animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
+              <h3 className="text-purple-400 font-bold text-base sm:text-lg">📸 智慧選股名單</h3>
+              <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
+              {isLoadingRanking ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <span className="text-4xl animate-bounce">🤖</span>
+                  <div className="text-center text-purple-400 font-bold animate-pulse">正在精準讀取截圖中的股票...</div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {rankingList.length > 0 ? rankingList.map((stock, idx) => (
+                    <div 
+                      key={stock.symbol + idx}
+                      onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }}
+                      className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span>
+                        <span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span>
+                      </div>
+                      <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded">
+                        {stock.change || '熱門'}
+                      </span>
+                    </div>
+                  )) : (
+                    <div className="text-center text-slate-500 py-10 font-bold">目前無資料，請上傳截圖</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* ✨ 浮動的策略打造器 (只有開啟時顯示在中間) */}
       {isBuilderOpen && (
         <div className="fixed inset-0 z-[100] flex justify-center items-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto">
@@ -2951,48 +3069,6 @@ const App = () => {
           </div>
         </div>
       )}
-      {/* 👇 👇 👇 請把排行榜整段貼在這裡！ 👇 👇 👇 */}
-      {/* ✨ 🏆 富果排行榜彈出視窗 */}
-      {isRankingOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh]">
-            
-            {/* 面板標題 */}
-            <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
-              <h3 className="text-rose-400 font-bold text-base sm:text-lg">🏆 盤中強勢排行榜</h3>
-              <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
-            </div>
-
-            {/* 股票列表區塊 */}
-            <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
-              {isLoadingRanking ? (
-                <div className="text-center text-slate-400 py-10 font-bold animate-pulse">讀取排行榜中...</div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {rankingList.map((stock, idx) => (
-                    <div 
-                      key={stock.symbol}
-                      onClick={() => {
-                        fetchStockData(stock.symbol); 
-                        setIsRankingOpen(false); 
-                      }}
-                      className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span>
-                        <span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span>
-                      </div>
-                      <span className="text-red-400 font-bold text-sm bg-red-400/10 px-2 py-1 rounded">
-                        {stock.change}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );
@@ -3007,7 +3083,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, onOpenRanking }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -4042,10 +4118,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
            <button onClick={toggleFullscreen} className="justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
              {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
            </button>
-           {/* ✨ 新增：排行榜按鈕 */}
-           <button onClick={onOpenRanking} className="justify-center bg-rose-900/50...">
-             🏆 排行
-           </button>           
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
              📁 畫板
            </button>
