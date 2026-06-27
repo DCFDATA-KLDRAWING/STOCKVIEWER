@@ -2399,7 +2399,7 @@ const App = () => {
     if (!file) return;
 
     setIsRankingOpen(true);
-    setIsLoadingRanking(true); 
+    setIsLoadingRanking(true);
 
     try {
       const base64Image = await convertToBase64(file);
