@@ -2807,20 +2807,20 @@ const App = () => {
             🔗 排行截圖點
           </button>
           
-          //{/* ✨ 2. AI 讀圖上傳按鈕 */}
-          //<div className="relative inline-block h-full shrink-0">
-            //<input 
-              //type="file" 
-              //accept="image/*" 
-              //ref={fileInputRef}
-              //onChange={handleImageUpload}
-              //className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
-              //disabled={isLoadingRanking}
-            ///>
-            //<div className={`h-full flex justify-center items-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${isLoadingRanking ? 'bg-purple-900/30 text-purple-500 border border-purple-800' : 'bg-purple-900/50 border border-purple-700 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.2)] hover:bg-purple-800'}`}>
-              //{isLoadingRanking ? '⏳ 處理中' : '📸 上傳截圖'}
-            //</div>
-          //</div>
+          {/* ✨ 2. AI 讀圖上傳按鈕 
+          <div className="relative inline-block h-full shrink-0">
+            <input 
+              type="file" 
+              accept="image/*" 
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+              disabled={isLoadingRanking}
+            />
+            <div className={`h-full flex justify-center items-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${isLoadingRanking ? 'bg-purple-900/30 text-purple-500 border border-purple-800' : 'bg-purple-900/50 border border-purple-700 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.2)] hover:bg-purple-800'}`}>
+              {isLoadingRanking ? '⏳ 處理中' : '📸 上傳截圖'}
+            </div>
+          </div>*/}
 
           {/* ✨ 2.5 手動貼上排行按鈕 */}
           <button onClick={() => setIsPasteModalOpen(true)} className="shrink-0 justify-center bg-emerald-900/40 border border-emerald-700 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center">
