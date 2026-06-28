@@ -3536,7 +3536,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         },
         onCancel: () => { setActiveTool('cursor'); setChartModal(null); }
       });
-    } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'crossline', 'measure'].includes(activeTool)) {
+    } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'crossline', 'measure', 'pen'].includes(activeTool)) {
       setDraftPoints([newPt]);
       setIsDrawingDrag(true);
     } else if (activeTool === 'n-shape' || activeTool === 'wave') {
@@ -3587,6 +3587,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     } else {
       setCrosshair(null);
       setHoverPoint({ idxFromEnd: snap.idxFromEnd, price: snap.price });
+
+
+      // ✨ 處理畫筆連續作圖
+      if (activeTool === 'pen' && isDrawingDrag) {
+         setDraftPoints(prev => {
+            const lastPt = prev[prev.length - 1];
+            // 💡 效能優化防呆：防止加入距離太近的點（如果沒移動超過 0.001 就忽略），避免消耗過多效能導致卡頓
+            if (lastPt && lastPt.idxFromEnd === snap.idxFromEnd && Math.abs(lastPt.price - snap.price) < 0.001) return prev;
+            return [...prev, { idxFromEnd: snap.idxFromEnd, price: snap.price }];
+         });
+      }
     }
   };
 
@@ -3602,7 +3613,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     if (isDrawingDrag && hoverPoint && draftPoints.length > 0) {
       const isSamePoint = (p1, p2) => p1.idxFromEnd === p2.idxFromEnd && Math.abs(p1.price - p2.price) < 0.0001;
 
-      if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'measure'].includes(activeTool)) {
+      if (activeTool === 'pen') {
+        if (draftPoints.length > 1) {
+          commitDrawings([...drawings, { id: Date.now(), type: 'pen', points: draftPoints, color: drawColor, width: drawWidth, opacity: drawOpacity }]);
+        }
+        setDraftPoints([]); setIsDrawingDrag(false);
+      } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'measure'].includes(activeTool)) {
         if (!isSamePoint(draftPoints[0], hoverPoint)) {
           commitDrawings([...drawings, { id: Date.now(), type: activeTool, points: [draftPoints[0], hoverPoint], color: drawColor, width: drawWidth, opacity: drawOpacity }]); // ✨ 加入 opacity
         }
@@ -3729,6 +3745,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     const baseOpacity = drawObj.opacity ?? 1; // ✨ 讀取圖形專屬透明度 (舊圖形預設為 1)
     
     const renderDots = () => {
+      if (drawObj.type === 'pen') return null;
       return (
         <>
           {pts.map((pt, idx) => (
@@ -3802,6 +3819,46 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
         </>
       );
     };
+
+    // 👇👇👇 貼在這裡：渲染畫筆的邏輯 👇👇👇
+    if (drawObj.type === 'pen') {
+       return (
+         <g key={idKey}>
+           {pts.length > 1 && (
+             <polyline 
+               points={pts.map(p => `${p.x},${p.y}`).join(' ')} 
+               fill="none" 
+               stroke={drawObj.color} 
+               strokeWidth={drawObj.width} 
+               strokeLinecap="round" 
+               strokeLinejoin="round" 
+               opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} 
+               pointerEvents="none" 
+             />
+           )}
+           {!isDraft && activeTool === 'eraser' && pts.length > 0 && (
+             <g className="cursor-pointer" pointerEvents="all" onMouseDown={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }} onTouchStart={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}>
+               <circle cx={pts[Math.floor(pts.length/2)].x} cy={pts[Math.floor(pts.length/2)].y} r={14} fill="#ef4444" opacity={0.6} className="hover:opacity-100 transition-opacity" />
+               <text x={pts[Math.floor(pts.length/2)].x} y={pts[Math.floor(pts.length/2)].y + 4} fontSize="12" fontWeight="bold" fill="#ffffff" textAnchor="middle" pointerEvents="none">✕</text>
+             </g>
+           )}
+           {!isDraft && activeTool === 'edit' && pts.length > 0 && (
+             <g transform={`translate(${pts[Math.floor(pts.length/2)].x}, ${pts[Math.floor(pts.length/2)].y - 30})`} pointerEvents="all">
+               <rect x="-45" y="-14" width="90" height="28" fill="#1e293b" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1.5" />
+               <g className="cursor-move" onMouseDown={(e) => handleDragWholeStart(e, drawObj)} onTouchStart={(e) => handleDragWholeStart(e, drawObj)}>
+                 <rect x="-45" y="-14" width="45" height="28" fill="transparent" />
+                 <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️移動</text>
+               </g>
+               <line x1="0" y1="-10" x2="0" y2="10" stroke="#475569" strokeWidth="1" />
+               <g className="cursor-pointer" onMouseDown={(e) => onCloneClick(e, drawObj)} onTouchStart={(e) => onCloneClick(e, drawObj)}>
+                 <rect x="0" y="-14" width="45" height="28" fill="transparent" />
+                 <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄複製</text>
+               </g>
+             </g>
+           )}
+         </g>
+       );
+    }
 
     if (drawObj.type === 'crossline') {
       return (
@@ -4194,6 +4251,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
           <div className="p-3 flex flex-col gap-3">
             <div className="flex flex-wrap gap-1.5">
               <button onClick={()=> {setActiveTool('cursor'); setDraftPoints([]);}} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'cursor' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🖱️ 游標</button>
+
+              <button onClick={()=> {setActiveTool('pen'); setDraftPoints([]);}} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'pen' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🖍️ 畫筆</button>
+
               <button onClick={()=>setActiveTool('segment')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'segment' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>📏 線段</button>
               
               <button onClick={()=>setActiveTool('arrow')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'arrow' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>➡️ 箭頭</button>
