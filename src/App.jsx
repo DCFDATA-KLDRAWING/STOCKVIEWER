@@ -2399,7 +2399,7 @@ const App = () => {
     if (!file) return;
 
     setIsRankingOpen(true);
-    setIsLoadingRanking(true);
+    setIsLoadingRanking(true); 
 
     try {
       const base64Image = await convertToBase64(file);
@@ -2790,13 +2790,6 @@ const App = () => {
             </div>
           </div>
 
-          {/* ✨ 3. 開啟已記憶的 AI 名單 (只有當記憶體有資料時才顯示) */}
-          {rankingList.length > 0 && (
-            <button onClick={() => setIsRankingOpen(true)} className="shrink-0 justify-center bg-pink-900/40 border border-pink-700 text-pink-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(236,72,153,0.2)] hover:bg-pink-800 whitespace-nowrap transition-all flex items-center">
-              📋 漲幅排行
-            </button>
-          )}
-
           <div className="w-[1px] h-6 bg-slate-700 mx-1 shrink-0"></div>
           {/* 面板控制按鈕 */}
           <button onClick={() => setIsBuilderOpen(!isBuilderOpen)} className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-colors shrink-0 ${isBuilderOpen ? 'bg-teal-900/60 text-teal-300 border-teal-500 shadow-[0_0_10px_rgba(20,184,166,0.4)]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-teal-400'}`}>🧪策略</button>
@@ -3083,7 +3076,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -4124,7 +4117,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
            <button onClick={handleDownloadImage} className="justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">
              📸 存圖
            </button>
-         </div>
+           {/* ✨ 移過來的：漲幅排行/AI名單 按鈕 */}
+            {rankingList && rankingList.length > 0 && (
+              <button onClick={onOpenRanking} className="justify-center bg-pink-900/50 border border-pink-700 text-pink-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(236,72,153,0.2)] hover:bg-pink-800 whitespace-nowrap transition-all flex items-center">
+                🏆 漲幅排行
+              </button>
+            )}
+         </div>         
       </div>
 
       {/* ✨ 工具箱 (改為 fixed 懸浮，無論如何滑動都不會消失出螢幕) */}
