@@ -2302,6 +2302,9 @@ const App = () => {
   const [isRankingOpen, setIsRankingOpen] = useState(false);
   const [isLoadingRanking, setIsLoadingRanking] = useState(false);
   const fileInputRef = useRef(null);
+  // ✨ 貼上文字排行的狀態
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
 
   // 初始化時去記憶體找找看有沒有上次存的名單
   const [rankingList, setRankingList] = useState(() => {
@@ -2439,6 +2442,35 @@ const App = () => {
     } finally {
       setIsLoadingRanking(false);
       if (event.target) event.target.value = null; // 清空 input 讓下次可重選同張圖
+    }
+  };
+
+  // ✨ 處理手動貼上文字排行
+  const handlePasteRanking = () => {
+    if (!pasteText.trim()) return showAlert("請先貼上資料！");
+    const lines = pasteText.split('\n');
+    const newRanking = [];
+    
+    lines.forEach(line => {
+      // 聰明正則表達式：在每一行尋找「4位數字」或「4位數字+英文(如特別股)」
+      const match = line.match(/([0-9]{4}[a-zA-Z]?)/);
+      if (match) {
+        const symbol = match[1];
+        const stockInfo = STOCKS.find(s => s.id === symbol);
+        // 如果有找到對應的台股，且還沒被加進去過，就加入名單
+        if (stockInfo && !newRanking.find(r => r.symbol === symbol)) {
+          newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change: '文字轉入' });
+        }
+      }
+    });
+
+    if (newRanking.length > 0) {
+      setRankingList(newRanking); // 存入名單 (會自動存進記憶體)
+      setIsPasteModalOpen(false); // 關閉貼上視窗
+      setPasteText("");           // 清空輸入框
+      setIsRankingOpen(true);     // 打開排行榜視窗
+    } else {
+      showAlert("找不到任何有效的台股代號，請確認貼上的文字格式！");
     }
   };
   // ✨ 修改 fetchStockData 讓它支援從畫板載入指定的股號
@@ -2790,6 +2822,11 @@ const App = () => {
             </div>
           </div>
 
+          {/* ✨ 2.5 手動貼上排行按鈕 */}
+          <button onClick={() => setIsPasteModalOpen(true)} className="shrink-0 justify-center bg-emerald-900/40 border border-emerald-700 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center">
+            📝 貼上排行
+          </button>
+
           <div className="w-[1px] h-6 bg-slate-700 mx-1 shrink-0"></div>
           {/* 面板控制按鈕 */}
           <button onClick={() => setIsBuilderOpen(!isBuilderOpen)} className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-colors shrink-0 ${isBuilderOpen ? 'bg-teal-900/60 text-teal-300 border-teal-500 shadow-[0_0_10px_rgba(20,184,166,0.4)]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-teal-400'}`}>🧪策略</button>
@@ -2987,6 +3024,30 @@ const App = () => {
         </div>
 
       </div>
+      {/* ✨ 📝 手動貼上排行彈出視窗 */}
+      {isPasteModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 pointer-events-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+              <h3 className="text-emerald-400 font-bold text-lg">📝 貼上文字排行</h3>
+              <button onClick={() => setIsPasteModalOpen(false)} className="text-slate-400 hover:text-white font-bold">✕ 關閉</button>
+            </div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              請將您在券商軟體、網頁或 Excel 複製的排行資料直接貼在下方。<br/>
+              <span className="text-emerald-300 font-bold">💡 系統會自動掃描文字中的「4碼數字」轉換成股票選單！</span>
+            </p>
+            <textarea 
+              value={pasteText} 
+              onChange={(e) => setPasteText(e.target.value)} 
+              className="w-full h-40 bg-slate-800 border border-slate-600 rounded-lg p-3 text-emerald-100 focus:outline-none focus:border-emerald-500 font-mono text-sm leading-relaxed"
+              placeholder="請貼上內容，例如：&#10;2330 台積電 漲停&#10;2317 鴻海 大漲..."
+            />
+            <button onClick={handlePasteRanking} className="w-full bg-emerald-700 text-white font-bold py-3 rounded-lg hover:bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all">
+              🔍 開始解析並轉成名單
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ✨ 🏆 AI 辨識排行榜彈出視窗 */}
       {isRankingOpen && (
