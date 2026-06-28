@@ -2989,6 +2989,37 @@ const App = () => {
                 onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
+                rankingModalContent={
+                  isRankingOpen && (
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 pointer-events-auto">
+                      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh] animate-in fade-in zoom-in duration-200">
+                        <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
+                          <h3 className="text-purple-400 font-bold text-base sm:text-lg">📸 智慧選股名單</h3>
+                          <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
+                          {isLoadingRanking ? (
+                            <div className="flex flex-col items-center justify-center py-12 gap-3">
+                              <span className="text-4xl animate-bounce">🤖</span>
+                              <div className="text-center text-purple-400 font-bold animate-pulse">正在精準讀取截圖中的股票...</div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              {rankingList.length > 0 ? rankingList.map((stock, idx) => (
+                                <div key={stock.symbol + idx} onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }} className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]">
+                                  <div className="flex items-center gap-3"><span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span><span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span></div>
+                                  <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded">{stock.change || '熱門'}</span>
+                                </div>
+                              )) : (
+                                <div className="text-center text-slate-500 py-10 font-bold">目前無資料，請上傳截圖或貼上文字</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }              
               />
             </div>
           ) : (
@@ -3050,46 +3081,7 @@ const App = () => {
           </div>
         </div>
       )}
-
-      {/* ✨ 🏆 AI 辨識排行榜彈出視窗 */}
-      {isRankingOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 pointer-events-auto">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
-              <h3 className="text-purple-400 font-bold text-base sm:text-lg">📸 智慧選股名單</h3>
-              <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
-              {isLoadingRanking ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-3">
-                  <span className="text-4xl animate-bounce">🤖</span>
-                  <div className="text-center text-purple-400 font-bold animate-pulse">正在精準讀取截圖中的股票...</div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {rankingList.length > 0 ? rankingList.map((stock, idx) => (
-                    <div 
-                      key={stock.symbol + idx}
-                      onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }}
-                      className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span>
-                        <span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span>
-                      </div>
-                      <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded">
-                        {stock.change || '熱門'}
-                      </span>
-                    </div>
-                  )) : (
-                    <div className="text-center text-slate-500 py-10 font-bold">目前無資料，請上傳截圖</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      
       {/* ✨ 浮動的策略打造器 (只有開啟時顯示在中間) */}
       {isBuilderOpen && (
         <div className="fixed inset-0 z-[100] flex justify-center items-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto">
@@ -3139,7 +3131,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -4160,6 +4152,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
     <div ref={chartContainerRef} className={isFullscreen ? "fixed inset-0 z-[100] bg-[#020617] flex flex-col w-full h-full" : `relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col`}>
       <CustomModal modal={chartModal} />
       
+      {/* ✨ 排行榜視窗被安置在全螢幕容器內部，保證絕不會被遮擋 */}
+      {rankingModalContent}
+
       {/* ✨ 2. 次級功能列 (滑桿、翻轉、畫板、存圖) */}
       <div className="flex items-center justify-between px-2 sm:px-3 py-2 shrink-0 border-b border-cyan-900/50 bg-slate-900/60 relative z-20 shadow-sm overflow-x-auto [&::-webkit-scrollbar]:hidden w-full">
          
