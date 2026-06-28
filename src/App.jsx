@@ -4615,23 +4615,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                 tooltipLines.push({ color: vmaParams.vma1.c, text: `VMA${vmaParams.vma1.p}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
             }
 
-            // 主圖布林通道（有開啟就一併基本顯示）
-            if (toggles.showBBands) {
-                tooltipLines.push({ color: '#a855f7', text: `布林上： ${hoverD?.bbands?.up?.toFixed(2) || '-'}` });
-                tooltipLines.push({ color: '#d8b4fe', text: `布林中： ${hoverD?.bbands?.mid?.toFixed(2) || '-'}` });
-                tooltipLines.push({ color: '#a855f7', text: `布林下： ${hoverD?.bbands?.down?.toFixed(2) || '-'}` });
-            }
-
-            // ✨ 新增：高布林(3.0) 查價資訊
-            if (toggles.showBBands3) {
-                tooltipLines.push({ color: '#f472b6', text: `高布林上： ${hoverD?.bbands?.up3?.toFixed(2) || '-'}` });
-                tooltipLines.push({ color: '#f472b6', text: `高布林下： ${hoverD?.bbands?.down3?.toFixed(2) || '-'}` });
-            }
-
+            
             // ==========================================
             // 2. 進階進階資訊（必須勾選「查價詳細資訊」才顯示）
             // ==========================================
             if (toggles.showTooltipDetail) {
+                if (toggles.showBBands) {
+                    tooltipLines.push({ color: '#a855f7', text: `布林上： ${hoverD?.bbands?.up?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: '#d8b4fe', text: `布林中： ${hoverD?.bbands?.mid?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: '#a855f7', text: `布林下： ${hoverD?.bbands?.down?.toFixed(2) || '-'}` });
+                }
+
+                // ✨ 新增：高布林(3.0) 查價資訊
+                if (toggles.showBBands3) {
+                    tooltipLines.push({ color: '#f472b6', text: `高布林上： ${hoverD?.bbands?.up3?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: '#f472b6', text: `高布林下： ${hoverD?.bbands?.down3?.toFixed(2) || '-'}` });
+                }
+
                 // 補回 VMA2、VMA3 均量線
                 if (toggles.showVolume) {
                     if (vmaParams.vma2.show !== false) tooltipLines.push({ color: vmaParams.vma2.c, text: `VMA${vmaParams.vma2.p}： ${hoverD?.vma2?.toFixed(2) || '-'}` });
@@ -4675,7 +4675,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                     <text x={width - 27} y={crosshair.y + 4} fill="#0f172a" fontSize="13" fontWeight="bold" textAnchor="middle">{crosshair.priceHover.toFixed(2)}</text>
                   </g>
                 )}
-                <g transform={`translate(${tooltipX}, ${tooltipY})`}>
+                <g transform={`translate(${tooltipX}, ${tooltipY})`} opacity="0.6">
                   <rect x={0} y={0} width={boxWidth} height={boxHeight} fill="rgba(15, 23, 42, 0.30)" stroke="#0ea5e9" rx="8" />
                   {tooltipLines.map((l, i) => (
                       <text key={i} x={12} y={22 + i * 22} fontSize="13" fill={l.color} fontWeight="bold" opacity="0.4">{l.text}</text>
