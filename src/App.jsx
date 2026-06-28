@@ -4676,9 +4676,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                   </g>
                 )}
                 <g transform={`translate(${tooltipX}, ${tooltipY})`}>
-                  <rect x={0} y={0} width={boxWidth} height={boxHeight} fill="rgba(15, 23, 42, 0.90)" stroke="#0ea5e9" rx="8" />
+                  <rect x={0} y={0} width={boxWidth} height={boxHeight} fill="rgba(15, 23, 42, 0.30)" stroke="#0ea5e9" rx="8" />
                   {tooltipLines.map((l, i) => (
-                      <text key={i} x={12} y={22 + i * 22} fontSize="13" fill={l.color} fontWeight="bold">{l.text}</text>
+                      <text key={i} x={12} y={22 + i * 22} fontSize="13" fill={l.color} fontWeight="bold" opacity="0.4">{l.text}</text>
                   ))}
                 </g>
               </g>
