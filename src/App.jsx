@@ -2987,6 +2987,8 @@ const App = () => {
                 savedLayouts={savedLayouts}        // ✨ 傳入畫板資料
                 setSavedLayouts={setSavedLayouts}  // ✨ 傳入更新畫板的方法
                 onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
+                rankingList={rankingList}
+                onOpenRanking={() => setIsRankingOpen(true)}
               />
             </div>
           ) : (
