@@ -2990,35 +2990,35 @@ const App = () => {
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
                 rankingModalContent={
-                  isRankingOpen && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 pointer-events-auto">
-                      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh] animate-in fade-in zoom-in duration-200">
-                        <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
-                          <h3 className="text-purple-400 font-bold text-base sm:text-lg">📸 智慧選股名單</h3>
-                          <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
-                          {isLoadingRanking ? (
-                            <div className="flex flex-col items-center justify-center py-12 gap-3">
-                              <span className="text-4xl animate-bounce">🤖</span>
-                              <div className="text-center text-purple-400 font-bold animate-pulse">正在精準讀取截圖中的股票...</div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-1">
-                              {rankingList.length > 0 ? rankingList.map((stock, idx) => (
-                                <div key={stock.symbol + idx} onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }} className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]">
-                                  <div className="flex items-center gap-3"><span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span><span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span></div>
-                                  <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded">{stock.change || '熱門'}</span>
-                                </div>
-                              )) : (
-                                <div className="text-center text-slate-500 py-10 font-bold">目前無資料，請上傳截圖或貼上文字</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                  /* ✨ 這裡把 isRankingOpen && ( 拿掉了，直接回傳 div，並用 className 控制隱藏/顯示 */
+                  <div className={`fixed inset-0 z-[9999] items-center justify-center bg-black/70 backdrop-blur-sm px-4 pointer-events-auto ${isRankingOpen ? 'flex' : 'hidden'}`}>
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh] animate-in fade-in zoom-in duration-200">
+                      <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
+                        <h3 className="text-purple-400 font-bold text-base sm:text-lg">📸 智慧選股名單</h3>
+                        <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
+                        {isLoadingRanking ? (
+                          <div className="flex flex-col items-center justify-center py-12 gap-3">
+                            <span className="text-4xl animate-bounce">🤖</span>
+                            <div className="text-center text-purple-400 font-bold animate-pulse">正在精準讀取截圖中的股票...</div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            {rankingList.length > 0 ? rankingList.map((stock, idx) => (
+                              /* ✨ 這裡你改得很好，加了 setIsRankingOpen(false) 讓它點了會關閉 */
+                              <div key={stock.symbol + idx} onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }} className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]">
+                                <div className="flex items-center gap-3"><span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span><span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span></div>
+                                <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded">{stock.change || '熱門'}</span>
+                              </div>
+                            )) : (
+                              <div className="text-center text-slate-500 py-10 font-bold">目前無資料，請上傳截圖或貼上文字</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )
+                  </div>
                 }              
               />
             </div>
