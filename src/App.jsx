@@ -2323,10 +2323,13 @@ const App = () => {
   
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [builderFormula, setBuilderFormula] = useState([]);
-  const [builderTab, setBuilderTab] = useState('運算'); 
+  const [builderTab, setBuilderTab] = useState('運算');
+  // ✨ 新增：策略名稱與圖標的狀態
+  const [strategyName, setStrategyName] = useState('');
+  const [strategyMarker, setStrategyMarker] = useState('🎯'); 
 
   // ✨ 翻譯蒟蒻：把中文陣列轉換成系統懂的 JSON 條件
-  const parseFormulaToStrategy = (formulaArray) => {
+  const parseFormulaToStrategy = (formulaArray, customName, customMarker) => {
     try {
       const conditions = [];
       let currentLeft = null;
@@ -2419,8 +2422,8 @@ const App = () => {
 
       return {
         id: Date.now(),
-        name: `自訂策略_${new Date().getHours()}${new Date().getMinutes()}`,
-        marker: '🎯',
+        name: customName || `自訂策略_${new Date().getHours()}${new Date().getMinutes()}`,
+        marker: customMarker || '🎯',
         matchType: matchType,
         isActive: true,
         conditions: conditions
@@ -3204,14 +3207,34 @@ const App = () => {
           <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[80vh] overflow-hidden">
             
             {/* 標題與控制列 */}
-            <div className="flex justify-between items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0">
-              <h2 className="text-lg font-bold text-cyan-400 flex items-center gap-2"><span>🧪</span> 策略打造器</h2>
-              <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0 gap-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xl">🧪</span>
+                {/* 策略名稱輸入框 */}
+                <input 
+                  type="text" 
+                  placeholder="幫策略取個名字..." 
+                  value={strategyName} 
+                  onChange={(e) => setStrategyName(e.target.value)} 
+                  className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-400 w-40 sm:w-48 shadow-inner placeholder-slate-600" 
+                />
+                {/* 標記圖案輸入框 (限制最多2個字，避免圖表太亂) */}
+                <input 
+                  type="text" 
+                  placeholder="標記" 
+                  value={strategyMarker} 
+                  onChange={(e) => setStrategyMarker(e.target.value)} 
+                  maxLength="2" 
+                  className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-center text-pink-400 font-bold text-sm outline-none focus:border-pink-400 w-12 shadow-inner" 
+                  title="顯示在 K 線上的圖案" 
+                />
+              </div>
+              <div className="flex gap-2 shrink-0 self-end sm:self-auto">
                 {/* ✨ 點擊儲存時，呼叫翻譯蒟蒻，如果成功就存入系統 */}
                 <button 
                   onClick={() => {
                     if (builderFormula.length === 0) return showAlert('請先輸入公式！');
-                    const newStrategy = parseFormulaToStrategy(builderFormula);
+                    const newStrategy = parseFormulaToStrategy(builderFormula, strategyName, strategyMarker);
                     
                     if (newStrategy.error) {
                        // 翻譯失敗，跳出警告
