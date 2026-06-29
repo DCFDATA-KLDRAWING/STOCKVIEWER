@@ -2321,7 +2321,117 @@ const App = () => {
     localStorage.setItem('MY_STOCK_RANKING_LIST', JSON.stringify(rankingList));
   }, [rankingList]);
   
-  const [isBuilderOpen, setIsBuilderOpen] = useState(false); 
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [builderFormula, setBuilderFormula] = useState([]);
+  const [builderTab, setBuilderTab] = useState('運算'); 
+
+  // ✨ 翻譯蒟蒻：把中文陣列轉換成系統懂的 JSON 條件
+  const parseFormulaToStrategy = (formulaArray) => {
+    try {
+      const conditions = [];
+      let currentLeft = null;
+      let currentOp = null;
+      let matchType = 'AND'; // 預設多個條件用「而且(AND)」連接
+
+      // 字典表：把中文名詞對應到我們系統的底層變數
+      const dictionary = {
+        '開盤價': { target: 'open', scope: 'today', n: 1 },
+        '最高價': { target: 'high', scope: 'today', n: 1 },
+        '最低價': { target: 'low', scope: 'today', n: 1 },
+        '收盤價': { target: 'close', scope: 'today', n: 1 },
+        '成交量': { target: 'volume', scope: 'today', n: 1 },
+        '漲跌幅': { target: 'changeRatio', scope: 'today', n: 1 },
+        '5日均線': { target: 'close', scope: 'avg', n: 5 },
+        '10日均線': { target: 'close', scope: 'avg', n: 10 },
+        '20日均線': { target: 'close', scope: 'avg', n: 20 },
+        '5日均量': { target: 'volume', scope: 'avg', n: 5 }
+      };
+
+      // 解析邏輯
+      for (let i = 0; i < formulaArray.length; i++) {
+        let token = formulaArray[i];
+
+        // 1. 處理時間偏移 (例如看到 "1日前的"，就把它跟下一個名詞組合)
+        let offset = 0;
+        if (token.includes('日前的')) {
+          offset = parseInt(token) || 0;
+          i++; // 跳到下一個詞
+          if (i >= formulaArray.length) break;
+          token = formulaArray[i]; 
+        }
+
+        if (token === '而且') {
+          matchType = 'AND';
+          continue;
+        } else if (token === '或者') {
+          matchType = 'OR';
+          continue;
+        }
+
+        // 2. 如果遇到比較符號，就把它記下來當作 Operator
+        if (['>', '<', '≥', '≤', '=', '≠'].includes(token)) {
+          let op = token;
+          if (op === '≥') op = '>=';
+          if (op === '≤') op = '<=';
+          if (op === '=') op = '==';
+          if (op === '≠') op = '!=';
+          currentOp = op;
+          continue;
+        }
+
+        // 3. 判斷這個詞是數字還是字典裡的名詞
+        let parsedValue;
+        if (!isNaN(token)) {
+          parsedValue = { type: 'number', value: parseFloat(token) };
+        } else if (dictionary[token]) {
+          parsedValue = { type: 'metric', metric: { ...dictionary[token], offset } };
+        } else {
+          // 如果遇到還沒支援的詞(例如外資買賣超)，先丟出錯誤
+          throw new Error(`目前系統尚未支援「${token}」的資料，請先移除。`);
+        }
+
+        // 4. 組裝左邊與右邊
+        if (!currentLeft) {
+          if (parsedValue.type === 'number') throw new Error('公式左邊不能是純數字！');
+          currentLeft = parsedValue.metric;
+        } else if (currentOp) {
+          // 已經有左邊跟符號了，現在這個一定是右邊！組裝完成！
+          const condition = {
+            left: currentLeft,
+            operator: currentOp,
+            rightType: parsedValue.type,
+            rightNumber: parsedValue.type === 'number' ? parsedValue.value : null,
+            rightMetric: parsedValue.type === 'metric' ? parsedValue.metric : null,
+            rightMathOp: 'none',
+            rightMathNum: 1
+          };
+          conditions.push(condition);
+          // 重置狀態，準備迎接下一個條件（如果有「而且」的話）
+          currentLeft = null;
+          currentOp = null;
+        }
+      }
+
+      // 如果有沒組裝完的（例如寫了 "收盤價 > " 就結束），提醒使用者
+      if (currentLeft && currentOp) {
+        throw new Error('公式尚未完成，比較符號後面缺少條件！');
+      }
+
+      return {
+        id: Date.now(),
+        name: `自訂策略_${new Date().getHours()}${new Date().getMinutes()}`,
+        marker: '🎯',
+        matchType: matchType,
+        isActive: true,
+        conditions: conditions
+      };
+
+    } catch (err) {
+      // 翻譯失敗，回傳錯誤訊息
+      return { error: err.message };
+    }
+  };
+
   const [draftStrategy, setDraftStrategy] = useState({
     name: '我的新策略', marker: '🔥', matchType: 'AND', conditions: [{ left: { target: 'close', scope: 'today', n: 1 }, operator: '>', rightType: 'metric', rightMetric: { target: 'close', scope: 'ago', n: 1 }, rightMathOp: 'none', rightMathNum: 1, rightNumber: 100 }]
   });
@@ -2551,7 +2661,12 @@ const App = () => {
   }, [rawDailyData, timeframe, customStrategies, issuedShares, maParams, vmaParams, indicatorParams]);
 
   const getMetricValue = (data, index, metricDef) => {
-    const { target, scope, n } = metricDef; if (index < 0) return null;
+    // ✨ 升級：取出 offset (往前推幾天)，並計算出基準日 baseIndex
+    const { target, scope, n, offset } = metricDef; 
+    const shift = parseInt(offset) || 0;
+    const baseIndex = index - shift;
+    if (baseIndex < 0) return null;
+
     const getValue = (idx) => {
       if (idx < 0) return null;
       if (target === 'changeRatio') return idx === 0 ? 0 : ((data[idx].close - data[idx-1].close) / data[idx-1].close) * 100;
@@ -2559,15 +2674,16 @@ const App = () => {
       if (target === 'amplitude') return idx === 0 ? 0 : ((data[idx].high - data[idx].low) / data[idx-1].close) * 100;
       return data[idx][target];
     };
-    if (scope === 'today') return getValue(index);
-    if (scope === 'ago') { const targetIdx = index - n; return targetIdx < 0 ? null : getValue(targetIdx); }
-    const numN = parseInt(n) || 1; if (index - numN + 1 < 0) return null; 
-    const sliceValues = []; for (let i = index - numN + 1; i <= index; i++) sliceValues.push(getValue(i));
+    
+    // ✨ 將原本所有的 index 都改成平移過後的 baseIndex
+    if (scope === 'today') return getValue(baseIndex);
+    if (scope === 'ago') { const targetIdx = baseIndex - n; return targetIdx < 0 ? null : getValue(targetIdx); }
+    const numN = parseInt(n) || 1; if (baseIndex - numN + 1 < 0) return null; 
+    const sliceValues = []; for (let i = baseIndex - numN + 1; i <= baseIndex; i++) sliceValues.push(getValue(i));
     if (scope === 'max') return Math.max(...sliceValues); if (scope === 'min') return Math.min(...sliceValues);
     if (scope === 'sum') return sliceValues.reduce((a, b) => a + b, 0); if (scope === 'avg') return sliceValues.reduce((a, b) => a + b, 0) / numN;
     return null;
   };
-
   const evaluateCondition = (data, index, condition) => {
     const leftVal = getMetricValue(data, index, condition.left); if (leftVal === null) return false;
     let rightVal;
@@ -3082,54 +3198,180 @@ const App = () => {
         </div>
       )}
       
-      {/* ✨ 浮動的策略打造器 (只有開啟時顯示在中間) */}
+      {/* ✨ 浮動的策略打造器 (計算機版) */}
       {isBuilderOpen && (
-        <div className="fixed inset-0 z-[100] flex justify-center items-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto">
-          <div className="bg-slate-900 p-5 rounded-2xl border border-cyan-700 shadow-[0_0_30px_rgba(8,145,178,0.4)] w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
-              <h2 className="text-xl font-bold text-cyan-400 flex items-center gap-2"><span>🧪</span> 策略打造器</h2>
-              <button onClick={() => setIsBuilderOpen(false)} className="text-slate-400 hover:text-white font-bold bg-slate-800 px-3 py-1 rounded">✕ 關閉</button>
-            </div>
+        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">
+          <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[80vh] overflow-hidden">
             
-            <div className="flex flex-col sm:flex-row gap-4 mb-6 items-start">
-              <div className="flex-1 w-full"><label className="block text-xs font-bold text-slate-400 mb-1">策略名稱</label><input type="text" value={draftStrategy.name} onChange={e => setDraftStrategy({...draftStrategy, name: e.target.value})} className="w-full p-2 bg-slate-800 border border-slate-700 text-cyan-300 rounded-md outline-none focus:border-cyan-500" /></div>
-              <div className="w-full sm:w-32"><label className="block text-xs font-bold text-slate-400 mb-1">標記圖示</label><input type="text" maxLength="3" value={draftStrategy.marker} onChange={e => setDraftStrategy({...draftStrategy, marker: e.target.value})} className="w-full p-2 bg-slate-800 border border-slate-700 text-cyan-300 rounded-md text-center font-bold mb-2" placeholder="自訂" /><div className="flex flex-wrap gap-1 justify-center">{['🚀', '🔥', '💰', '💎', '多', '空'].map(emoji => (<button key={emoji} onClick={() => setDraftStrategy({...draftStrategy, marker: emoji})} className="text-sm bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 hover:bg-slate-700 hover:border-cyan-500 transition-colors">{emoji}</button>))}</div></div>
-              <div className="w-full sm:w-48"><label className="block text-xs font-bold text-slate-400 mb-1">觸發條件</label><select value={draftStrategy.matchType} onChange={e => setDraftStrategy({...draftStrategy, matchType: e.target.value})} className="w-full p-2 bg-slate-800 border border-slate-700 text-cyan-300 rounded-md outline-none"><option value="AND">滿足以下 [全部] 條件</option><option value="OR">滿足以下 [任一] 條件</option></select></div>
+            {/* 標題與控制列 */}
+            <div className="flex justify-between items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0">
+              <h2 className="text-lg font-bold text-cyan-400 flex items-center gap-2"><span>🧪</span> 策略打造器</h2>
+              <div className="flex gap-2">
+                {/* ✨ 點擊儲存時，呼叫翻譯蒟蒻，如果成功就存入系統 */}
+                <button 
+                  onClick={() => {
+                    if (builderFormula.length === 0) return showAlert('請先輸入公式！');
+                    const newStrategy = parseFormulaToStrategy(builderFormula);
+                    
+                    if (newStrategy.error) {
+                       // 翻譯失敗，跳出警告
+                       showAlert(`公式錯誤：${newStrategy.error}`);
+                    } else {
+                       // 翻譯成功！存入記憶體中，並把舊的都關掉，只啟用最新寫好的這一個
+                       setCustomStrategies(prev => {
+                          const updated = prev.map(s => ({...s, isActive: false}));
+                          return [newStrategy, ...updated];
+                       });
+                       setBuilderFormula([]); // 清空計算機
+                       setIsBuilderOpen(false); // 關閉視窗
+                       showAlert(`策略「${newStrategy.name}」已儲存並啟用！請在圖表上查看 🎯 標記。`);
+                    }
+                  }}
+                  className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1 rounded text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+                >
+                  💾 儲存策略
+                </button>
+                <button onClick={() => setIsBuilderOpen(false)} className="text-slate-400 hover:text-white font-bold bg-slate-900 px-3 py-1 rounded border border-slate-700">✕</button>
+              </div>
             </div>
 
-            <div className="space-y-3 mb-6">
-              {draftStrategy.conditions.map((cond, index) => (
-                <div key={index} className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 w-full">
-                  <div className="flex items-center gap-2 w-full sm:w-auto"><span className="bg-cyan-800 text-cyan-100 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0">{index + 1}</span><MetricSelector value={cond.left} onChange={(val, key) => updateCondition(index, `left.${key}`, val)} /></div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto"><select value={cond.operator} onChange={e => updateCondition(index, 'operator', e.target.value)} className="p-1.5 border border-slate-600 rounded-md bg-slate-900 font-bold text-cyan-400"><option value=">">{'>'}</option><option value="<">{'<'}</option><option value=">=">{'>='}</option><option value="<=">{'<='}</option><option value="==">{'=='}</option><option value="!=">{'!='}</option></select><select value={cond.rightType} onChange={e => updateCondition(index, 'rightType', e.target.value)} className="p-1.5 border border-slate-600 rounded-md bg-slate-900 text-slate-300 font-bold"><option value="number">固定數值</option><option value="metric">動態指標</option></select></div>
-                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    {cond.rightType === 'number' ? <input type="number" value={cond.rightNumber} onChange={e => updateCondition(index, 'rightNumber', e.target.value)} className="p-1.5 border border-slate-600 bg-slate-900 text-cyan-300 rounded-md w-24 font-mono text-center" /> : <div className="flex flex-wrap items-center gap-1 bg-slate-900 p-1.5 rounded-md border border-slate-600"><MetricSelector value={cond.rightMetric} onChange={(val, key) => updateCondition(index, `rightMetric.${key}`, val)} /><select value={cond.rightMathOp || 'none'} onChange={e => updateCondition(index, 'rightMathOp', e.target.value)} className="p-1.5 border border-pink-900 rounded-md font-bold text-pink-400 bg-pink-950/30"><option value="none">無計算</option><option value="+">＋</option><option value="-">－</option><option value="*">×</option><option value="/">÷</option></select>{(cond.rightMathOp && cond.rightMathOp !== 'none') && <input type="number" value={cond.rightMathNum || ''} onChange={e => updateCondition(index, 'rightMathNum', e.target.value)} className="p-1.5 border border-pink-900 bg-slate-900 text-pink-300 rounded-md w-16 font-mono text-center" placeholder="倍數" />}</div>}
-                    {draftStrategy.conditions.length > 1 && <button onClick={() => removeCondition(index)} className="sm:ml-auto text-slate-500 hover:text-red-400 font-bold p-1 transition-colors">✕ 刪除</button>}
-                  </div>
-                </div>
-              ))}
+            {/* 公式顯示螢幕 */}
+            <div className="p-3 bg-[#020617] shrink-0 border-b border-slate-700">
+               <div className="w-full h-32 sm:h-40 bg-slate-800 border-2 border-slate-600 rounded-lg p-3 overflow-y-auto text-lg leading-relaxed flex flex-wrap content-start gap-1">
+                  {builderFormula.length === 0 && <span className="text-slate-500 italic">請使用下方鍵盤輸入公式...</span>}
+                  {builderFormula.map((token, idx) => {
+                     // 讓邏輯字眼變紅色，數字變黃色，其他變藍色
+                     let colorClass = "text-cyan-300";
+                     if (['而且', '或者', '>', '<', '≥', '≤', '=', '+', '-', '×', '÷'].includes(token)) colorClass = "text-red-400 font-bold";
+                     else if (!isNaN(token)) colorClass = "text-amber-400 font-mono";
+                     return <span key={idx} className={colorClass}>{token}</span>;
+                  })}
+               </div>
+               <div className="flex justify-end gap-2 mt-2">
+                  <button onClick={() => setBuilderFormula(prev => prev.slice(0, -1))} className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm">⌫ 退格</button>
+                  <button onClick={() => setBuilderFormula([])} className="px-4 py-1.5 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm">🗑️ 清除</button>
+               </div>
             </div>
-            
-            <div className="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700">
-              <button onClick={addCondition} className="bg-slate-700 text-cyan-300 border border-cyan-800 px-4 py-2 rounded-lg font-bold hover:bg-slate-600 transition-colors">+ 新增條件</button>
-              <button onClick={saveStrategy} className="bg-cyan-600 text-slate-900 px-8 py-2 rounded-lg font-bold hover:bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">💾 儲存策略</button>
+
+            {/* 鍵盤頁籤 */}
+            <div className="flex bg-slate-800 shrink-0">
+               {['運算', '價量', '指標', '盤後'].map(tab => (
+                 <button 
+                   key={tab} 
+                   onClick={() => setBuilderTab(tab)}
+                   className={`flex-1 py-3 font-bold text-sm sm:text-base border-b-2 transition-all ${builderTab === tab ? 'border-cyan-400 text-cyan-300 bg-slate-700/50' : 'border-transparent text-slate-400 hover:bg-slate-700/30'}`}
+                 >
+                   {tab}
+                 </button>
+               ))}
             </div>
+
+            {/* 鍵盤按鈕區 */}
+            <div className="flex-1 overflow-y-auto p-2 bg-slate-900">
+               {builderTab === '運算' && (
+                 <div className="flex flex-col gap-5 h-full content-start overflow-y-auto pr-1 pb-4">
+                    
+                    {/* 1. 邏輯與括號區 */}
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">邏輯與群組</div>
+                      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                        {['而且', '或者', '(', ')', '如果', '成立取', '否則取'].map(btn => (
+                          <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-2.5 rounded font-bold text-sm bg-slate-800 border-slate-700 text-pink-400 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 2. 比較符號區 */}
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">比較符號</div>
+                      <div className="grid grid-cols-6 gap-2">
+                        {['>', '≥', '<', '≤', '=', '≠'].map(btn => (
+                          <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-2.5 rounded font-bold text-lg bg-slate-800 border-slate-700 text-cyan-300 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 3. 數字與四則運算區 (九宮格排列) */}
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">數字與基本運算</div>
+                      <div className="grid grid-cols-4 gap-2 max-w-[280px]">
+                         {/* 第 1 排 */}
+                         {['7', '8', '9', '+'].map(btn => (
+                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                         ))}
+                         {/* 第 2 排 */}
+                         {['4', '5', '6', '-'].map(btn => (
+                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                         ))}
+                         {/* 第 3 排 */}
+                         {['1', '2', '3', '×'].map(btn => (
+                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                         ))}
+                         {/* 第 4 排 */}
+                         {['.', '0', '00', '÷'].map(btn => (
+                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${btn === '÷' ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                         ))}
+                      </div>
+                    </div>
+
+                 </div>
+               )}
+               
+               {builderTab === '價量' && (
+                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
+                    {['開盤價', '最高價', '最低價', '收盤價', '成交量', '均價', '均量', '漲跌幅', '1日前的', '2日前的', '3日前的', '5日前的(週)', '10日前的(雙週)'].map(btn => {
+                      // 讓時間偏移的按鈕顯示粉紅色，一般價量顯示靛藍色
+                      const isTimeOffset = btn.includes('日前的');
+                      return (
+                        <button 
+                          key={btn} 
+                          onClick={() => setBuilderFormula(prev => [...prev, btn])} 
+                          className={`py-3 sm:py-4 rounded font-bold text-sm sm:text-base border active:scale-95 transition-transform ${isTimeOffset ? 'bg-pink-900/30 border-pink-700/50 text-pink-300 hover:bg-pink-800/50' : 'bg-indigo-900/40 border-indigo-700/50 text-indigo-300 hover:bg-indigo-800/60'}`}
+                        >
+                          {btn}
+                        </button>
+                      );
+                    })}
+                 </div>
+               )}
+
+               {builderTab === '指標' && (
+                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
+                    {['5日均線', '10日均線', '20日均線', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OBV值', '乖離率', '威廉指標'].map(btn => (
+                      <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-4 bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 rounded font-bold hover:bg-emerald-800/60 active:scale-95 transition-transform">{btn}</button>
+                    ))}
+                 </div>
+               )}
+
+               {builderTab === '盤後' && (
+                 <div className="grid grid-cols-2 gap-2 h-full content-start">
+                    {['外資買賣超', '投信買賣超', '自營商買賣超', '主力進出', '融資增減', '融券增減', '股本(億)'].map(btn => (
+                      <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-4 bg-purple-900/40 border border-purple-700/50 text-purple-300 rounded font-bold hover:bg-purple-800/60 active:scale-95 transition-transform">{btn}</button>
+                    ))}
+                 </div>
+               )}
+            </div>
+
           </div>
         </div>
       )}
-
-    </div>
-  );
+    </div>   
+  );         
 };
-
 const MetricSelector = ({ value, onChange }) => (
-  <div className="flex flex-wrap gap-1 shrink-0 items-center">
+  <div className="flex flex-wrap gap-1 shrink-0 items-center bg-slate-800/50 p-1.5 rounded-lg border border-slate-700">
     <select value={value.target} onChange={e => onChange(e.target.value, 'target')} className="p-1.5 border border-slate-600 rounded-md bg-slate-900 text-slate-300 text-sm outline-none focus:border-cyan-500"><option value="close">收盤價</option><option value="open">開盤價</option><option value="high">最高價</option><option value="low">最低價</option><option value="volume">成交量(張)</option><option value="changeRatio">漲跌幅(%)</option><option value="bodyRatio">K線實體幅(%)</option><option value="amplitude">振幅(%)</option></select>
-    <select value={value.scope} onChange={e => onChange(e.target.value, 'scope')} className="p-1.5 border border-slate-600 rounded-md bg-slate-900 text-slate-300 text-sm outline-none focus:border-cyan-500"><option value="today">今天</option><option value="ago">前 N 日</option><option value="max">近 N 日最大</option><option value="min">近 N 日最小</option><option value="sum">近 N 日總和</option><option value="avg">近 N 日平均</option></select>
-    {value.scope !== 'today' && (<div className="flex items-center gap-1 bg-slate-900 border border-slate-600 rounded-md px-1 h-[34px]"><span className="text-xs text-slate-500">N=</span><input type="number" min="1" max="100" value={value.n} onChange={e => onChange(e.target.value, 'n')} className="p-1 w-12 text-center text-sm outline-none bg-transparent text-cyan-300" /></div>)}
+    <select value={value.scope} onChange={e => onChange(e.target.value, 'scope')} className="p-1.5 border border-slate-600 rounded-md bg-slate-900 text-slate-300 text-sm outline-none focus:border-cyan-500"><option value="today">單日</option><option value="ago">單一 N 日前</option><option value="max">近 N 日最大</option><option value="min">近 N 日最小</option><option value="sum">近 N 日總和</option><option value="avg">近 N 日平均</option></select>
+    {value.scope !== 'today' && (<div className="flex items-center gap-1 bg-slate-900 border border-slate-600 rounded-md px-1 h-[34px]"><span className="text-xs text-slate-500 font-bold ml-1">N=</span><input type="number" min="1" max="100" value={value.n || 1} onChange={e => onChange(e.target.value, 'n')} className="p-1 w-10 text-center text-sm outline-none bg-transparent text-cyan-300 font-bold" /></div>)}
+    
+    {/* ✨ 新增：往前推幾天的設定 (Offset) */}
+    <div className="flex items-center gap-1 bg-slate-900 border border-slate-600 rounded-md px-2 h-[34px] ml-1">
+      <span className="text-xs text-slate-400 font-bold">往前推</span>
+      <input type="number" min="0" max="100" value={value.offset || 0} onChange={e => onChange(e.target.value, 'offset')} className="p-1 w-10 text-center text-sm outline-none bg-transparent text-pink-400 font-bold" />
+      <span className="text-xs text-slate-400 font-bold">天</span>
+    </div>
   </div>
 );
-
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
 const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent }) => {
   const chartContainerRef = useRef(null);
