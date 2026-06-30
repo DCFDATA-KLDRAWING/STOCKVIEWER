@@ -2320,6 +2320,22 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('MY_STOCK_RANKING_LIST', JSON.stringify(rankingList));
   }, [rankingList]);
+
+  // ✨ 新增：自選股狀態記憶 (Watchlist)
+  const [watchlist, setWatchlist] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_WATCHLIST');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_WATCHLIST', JSON.stringify(watchlist));
+  }, [watchlist]);
+
+  // ✨ 新增：彈窗的頁籤切換與排序狀態
+  const [rankingTab, setRankingTab] = useState('ranking'); // 'ranking' (讀圖排行) 或 'watchlist' (自選)
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' }); // 預設無排序
   
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [builderFormula, setBuilderFormula] = useState([]);
@@ -2565,26 +2581,102 @@ const App = () => {
     const newRanking = [];
     
     lines.forEach(line => {
-      // 聰明正則表達式：在每一行尋找「4位數字」或「4位數字+英文(如特別股)」
+      // 尋找 4 碼數字開頭的股號
       const match = line.match(/([0-9]{4}[a-zA-Z]?)/);
       if (match) {
         const symbol = match[1];
         const stockInfo = STOCKS.find(s => s.id === symbol);
-        // 如果有找到對應的台股，且還沒被加進去過，就加入名單
+        
         if (stockInfo && !newRanking.find(r => r.symbol === symbol)) {
-          newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change: '文字轉入' });
+          // ✨ 升級版邏輯：只用空白切割，把逗號留給成交量自己處理
+          const parts = line.split(/[\s\t]+/); 
+          let change = '熱門';
+          let volume = '-';
+          let maxVolume = 0; // 用來尋找整行最大的數字
+          
+          parts.forEach(p => {
+            // 抓取漲跌幅 (有 %, +, -, 漲停, 跌停)
+            if (p.includes('%') || p.startsWith('+') || p.startsWith('-') || p.includes('停')) {
+              change = p;
+            } else {
+              // 抓取成交量：把逗號清掉後，看看是不是純數字
+              const cleanStr = p.replace(/,/g, ''); 
+              // 確保是純數字，且不是股號本身
+              if (/^\d+$/.test(cleanStr) && cleanStr !== symbol) {
+                const num = parseInt(cleanStr, 10);
+                // 成交量通常是整行裡最大的數字 (防呆：避開開盤價、收盤價之類的小數字)
+                if (num > 100 && num > maxVolume) {
+                  maxVolume = num;
+                  volume = p; // 保留原本有逗號的漂亮格式 (例如 45,678)
+                }
+              }
+            }
+          });
+
+          newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
         }
       }
     });
 
     if (newRanking.length > 0) {
-      setRankingList(newRanking); // 存入名單 (會自動存進記憶體)
-      setIsPasteModalOpen(false); // 關閉貼上視窗
-      setPasteText("");           // 清空輸入框
-      setIsRankingOpen(true);     // 打開排行榜視窗
-    } else {
-      showAlert("找不到任何有效的台股代號，請確認貼上的文字格式！");
+      setRankingList(newRanking); 
+      setIsPasteModalOpen(false); 
+      setPasteText(""); 
+      setIsRankingOpen(true);
+    } else { 
+      showAlert("找不到任何有效的台股代號，請確認貼上的文字格式！"); 
     }
+  };
+
+  // ✨ 邏輯 1：切換自選股 (加入或移除)
+  const toggleWatchlist = (stock, e) => {
+    e.stopPropagation(); // 防止點擊星星時觸發切換 K 線圖
+    setWatchlist(prev => {
+      const exists = prev.find(s => s.symbol === stock.symbol);
+      if (exists) {
+        return prev.filter(s => s.symbol !== stock.symbol); // 已經存在就移除
+      } else {
+        return [...prev, { ...stock, addedAt: Date.now() }]; // 不存在就加入，並記錄時間
+      }
+    });
+  };
+
+  // ✨ 邏輯 2：處理點擊標題排序
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }; // 同一個欄位切換正反向
+      }
+      return { key, direction: 'desc' }; // 點擊新欄位，預設由大到小
+    });
+  };
+
+  // ✨ 邏輯 3：即時運算排序後的清單給畫面顯示
+  const getSortedData = (list) => {
+    if (!sortConfig.key) return list;
+    return [...list].sort((a, b) => {
+      let valA = a[sortConfig.key] || '';
+      let valB = b[sortConfig.key] || '';
+
+      // 處理漲跌幅 (把 "+1.5%" 轉成數字 1.5 比較)
+      if (sortConfig.key === 'change') {
+        const numA = parseFloat(valA.toString().replace(/[+%]/g, '')) || 0;
+        const numB = parseFloat(valB.toString().replace(/[+%]/g, '')) || 0;
+        return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+      }
+      
+      // ✨ 升級版：處理成交量 (把 "12,345" 轉成純數字 12345 比較，如果是 '-' 則視為 0)
+      if (sortConfig.key === 'volume') {
+        const numA = parseInt(valA.toString().replace(/,/g, '')) || 0;
+        const numB = parseInt(valB.toString().replace(/,/g, '')) || 0;
+        return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+      }
+      
+      // 處理文字排序 (股號/股名)
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
   };
   // ✨ 修改 fetchStockData 讓它支援從畫板載入指定的股號
   const fetchStockData = async (overrideSymbol = null) => {
@@ -3109,35 +3201,105 @@ const App = () => {
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
                 rankingModalContent={
-                  /* ✨ 這裡把 isRankingOpen && ( 拿掉了，直接回傳 div，並用 className 控制隱藏/顯示 */
-                  <div className={`fixed inset-0 z-[9999] items-center justify-center bg-black/70 backdrop-blur-sm px-4 pointer-events-auto ${isRankingOpen ? 'flex' : 'hidden'}`}>
-                    <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[75vh] animate-in fade-in zoom-in duration-200">
-                      <div className="flex justify-between items-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800">
-                        <h3 className="text-purple-400 font-bold text-base sm:text-lg">📸 智慧選股名單</h3>
-                        <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white text-xl px-2">✕</button>
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
-                        {isLoadingRanking ? (
-                          <div className="flex flex-col items-center justify-center py-12 gap-3">
-                            <span className="text-4xl animate-bounce">🤖</span>
-                            <div className="text-center text-purple-400 font-bold animate-pulse">正在精準讀取截圖中的股票...</div>
+                  /* ✨ 🏆 專業雙頁籤選股清單視窗 (全螢幕行李版) */
+                  isRankingOpen ? (() => {
+                    // 先決定現在要顯示哪個清單，並套用排序魔法
+                    const currentList = rankingTab === 'ranking' ? rankingList : watchlist;
+                    const displayData = getSortedData(currentList);
+
+                    return (
+                      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm px-2 sm:px-4 pointer-events-auto">
+                        <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-[0_0_40px_rgba(168,85,247,0.3)] w-full max-w-lg overflow-hidden flex flex-col h-[85vh] sm:h-[75vh] animate-in fade-in zoom-in duration-200">
+                          
+                          {/* 頂部控制列 */}
+                          <div className="flex justify-between items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0">
+                            <h3 className="text-purple-400 font-bold text-lg flex items-center gap-2"><span>📋</span> 選股中心</h3>
+                            <button onClick={() => setIsRankingOpen(false)} className="text-slate-400 hover:text-white bg-slate-900 px-3 py-1 rounded border border-slate-700">✕ 關閉</button>
                           </div>
-                        ) : (
-                          <div className="flex flex-col gap-1">
-                            {rankingList.length > 0 ? rankingList.map((stock, idx) => (
-                              /* ✨ 這裡你改得很好，加了 setIsRankingOpen(false) 讓它點了會關閉 */
-                              <div key={stock.symbol + idx} onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }} className="flex justify-between items-center p-3 rounded-lg border border-slate-800 hover:bg-slate-700/80 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]">
-                                <div className="flex items-center gap-3"><span className="text-slate-500 font-bold text-sm w-4">{idx + 1}.</span><span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol} {stock.name}</span></div>
-                                <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded">{stock.change || '熱門'}</span>
+
+                          {/* 雙頁籤切換 */}
+                          <div className="flex bg-slate-800 border-b border-slate-700 shrink-0">
+                            <button onClick={() => setRankingTab('ranking')} className={`flex-1 py-3 font-bold transition-all ${rankingTab === 'ranking' ? 'text-cyan-300 border-b-2 border-cyan-400 bg-slate-700/50' : 'text-slate-500 hover:bg-slate-700/30'}`}>
+                              🏆 AI 讀圖名單 ({rankingList.length})
+                            </button>
+                            <button onClick={() => setRankingTab('watchlist')} className={`flex-1 py-3 font-bold transition-all ${rankingTab === 'watchlist' ? 'text-amber-400 border-b-2 border-amber-400 bg-slate-700/50' : 'text-slate-500 hover:bg-slate-700/30'}`}>
+                              ⭐ 我的自選 ({watchlist.length})
+                            </button>
+                          </div>
+
+                          {/* 資料表格區域 */}
+                          <div className="flex-1 flex flex-col overflow-hidden bg-[#020617]">
+                            
+                            {/* 標題列 (可點擊排序) */}
+                            <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/80 border-b border-slate-700 text-xs text-slate-400 font-bold shrink-0">
+                              <div className="col-span-5 cursor-pointer hover:text-cyan-300 flex items-center" onClick={() => handleSort('symbol')}>
+                                股號/股名 {sortConfig.key === 'symbol' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                               </div>
-                            )) : (
-                              <div className="text-center text-slate-500 py-10 font-bold">目前無資料，請上傳截圖或貼上文字</div>
-                            )}
+                              <div className="col-span-3 cursor-pointer hover:text-pink-300 flex items-center justify-end" onClick={() => handleSort('change')}>
+                                漲幅/狀態 {sortConfig.key === 'change' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}
+                              </div>
+                              <div className="col-span-2 cursor-pointer hover:text-amber-300 flex items-center justify-end" onClick={() => handleSort('volume')}>
+                                成交量 {sortConfig.key === 'volume' ? (sortConfig.direction === 'asc' ? '▲' : '▼') : ''}
+                              </div>
+                              <div className="col-span-2 text-center">自選</div>
+                            </div>
+
+                            {/* 資料列 */}
+                            <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-900">
+                              {isLoadingRanking ? (
+                                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                                  <span className="text-5xl animate-bounce">🤖</span>
+                                  <div className="text-purple-400 font-bold animate-pulse">精準辨識截圖中...</div>
+                                </div>
+                              ) : displayData.length > 0 ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {displayData.map((stock, idx) => {
+                                    const isStarred = watchlist.some(s => s.symbol === stock.symbol);
+                                    return (
+                                      <div 
+                                        key={stock.symbol + idx}
+                                        onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }}
+                                        className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]"
+                                      >
+                                        <div className="col-span-5 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 overflow-hidden">
+                                          <span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol}</span>
+                                          <span className="text-slate-300 font-bold text-xs sm:text-sm truncate">{stock.name}</span>
+                                        </div>
+                                        <div className="col-span-3 text-right">
+                                          <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded inline-block whitespace-nowrap">
+                                            {stock.change || '熱門'}
+                                          </span>
+                                        </div>
+                                        <div className="col-span-2 text-right text-slate-400 text-xs sm:text-sm font-mono">
+                                          {stock.volume || '-'}
+                                        </div>
+                                        <div className="col-span-2 flex justify-center">
+                                          <button 
+                                            onClick={(e) => toggleWatchlist(stock, e)}
+                                            className="text-xl sm:text-2xl hover:scale-125 transition-transform"
+                                            title={isStarred ? "移除自選" : "加入自選"}
+                                          >
+                                            {isStarred ? '⭐' : '☆'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                {/*<div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
+                                  <span className="text-4xl">📭</span>
+                                  <div className="font-bold">
+                                    {rankingTab === 'ranking' ? '請點選上方「📸 AI讀圖」上傳截圖' : '您的自選股名單空空如也'}
+                                  </div>
+                                </div>*/}
+                              )}
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })() : null
                 }              
               />
             </div>
