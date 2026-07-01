@@ -2114,6 +2114,12 @@ const aggregateData = (dailyData, tf) => {
             existing.low = Math.min(existing.low, d.low);
             existing.close = d.close;
             existing.volume += d.volume;
+            // ✨ 補上：確保切換成週K/月K時，三大法人與資券也會跟著累加！
+            existing.foreign = (existing.foreign || 0) + (d.foreign || 0);
+            existing.trust = (existing.trust || 0) + (d.trust || 0);
+            existing.dealer = (existing.dealer || 0) + (d.dealer || 0);
+            existing.marginDiff = (existing.marginDiff || 0) + (d.marginDiff || 0);
+            existing.shortDiff = (existing.shortDiff || 0) + (d.shortDiff || 0);
         }
     });
     return Array.from(groupedMap.values());
@@ -2130,6 +2136,9 @@ const App = () => {
   const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('MY_STOCK_API_KEY') || '');
   const [showKeySetup, setShowKeySetup] = useState(() => !localStorage.getItem('MY_STOCK_API_KEY'));
   const [tempKey, setTempKey] = useState('');
+
+  const [finmindApiKey, setFinmindApiKey] = useState(() => localStorage.getItem('MY_STOCK_FINMIND_KEY') || '');
+  const [tempFmKey, setTempFmKey] = useState('');
 
   const [symbolInput, setSymbolInput] = useState(''); 
   const [currentViewedSymbol, setCurrentViewedSymbol] = useState(''); // ✨ 新增：用來記錄目前「成功載入並顯示在圖表上」的股號
@@ -2344,6 +2353,48 @@ const App = () => {
   const [strategyName, setStrategyName] = useState('');
   const [strategyMarker, setStrategyMarker] = useState('🎯'); 
 
+  // ==============================================
+  // ✨ 新增：處理鍵盤輸入的智能合併邏輯 (連續數字會自動連接)
+  // ==============================================
+  const handleFormulaInput = (btn) => {
+    setBuilderFormula(prev => {
+      if (prev.length === 0) return [btn];
+      const lastItem = prev[prev.length - 1];
+
+      // 判斷按下的按鈕與最後一個項目是否都是數字或小數點
+      const isBtnNumeric = /^[0-9.]+$/.test(btn);
+      const isLastNumeric = /^[0-9.]+$/.test(lastItem);
+
+      if (isBtnNumeric && isLastNumeric) {
+        // 連接數字 (例如 '1' + '0' 變成 '10')
+        const newArr = [...prev];
+        newArr[newArr.length - 1] = lastItem + btn;
+        return newArr;
+      } else {
+        // 當作新詞彙加入
+        return [...prev, btn];
+      }
+    });
+  };
+
+  // ✨ 新增：優化退格邏輯 (數字一個一個字刪，詞彙整塊刪)
+  const handleBackspace = () => {
+    setBuilderFormula(prev => {
+      if (prev.length === 0) return prev;
+      const lastItem = prev[prev.length - 1];
+      
+      // 如果最後一個是純數字字串且長度大於1，則刪除最後一個字元
+      if (/^[0-9.]+$/.test(lastItem) && lastItem.length > 1) {
+        const newArr = [...prev];
+        newArr[newArr.length - 1] = lastItem.slice(0, -1);
+        return newArr;
+      } else {
+        // 否則整個詞彙刪掉
+        return prev.slice(0, -1);
+      }
+    });
+  };
+
   // ✨ 翻譯蒟蒻：把中文陣列轉換成系統懂的 JSON 條件
   const parseFormulaToStrategy = (formulaArray, customName, customMarker) => {
     try {
@@ -2363,7 +2414,11 @@ const App = () => {
         '5日均線': { target: 'close', scope: 'avg', n: 5 },
         '10日均線': { target: 'close', scope: 'avg', n: 10 },
         '20日均線': { target: 'close', scope: 'avg', n: 20 },
-        '5日均量': { target: 'volume', scope: 'avg', n: 5 }
+        '5日均量': { target: 'volume', scope: 'avg', n: 5 },
+        '外資買賣超': { target: 'foreign', scope: 'today', n: 1 },
+        '投信買賣超': { target: 'trust', scope: 'today', n: 1 },
+        '自營商買賣超': { target: 'dealer', scope: 'today', n: 1 },
+        '融資增減': { target: 'marginDiff', scope: 'today', n: 1 }
       };
 
       // 解析邏輯
@@ -2455,13 +2510,21 @@ const App = () => {
     name: '我的新策略', marker: '🔥', matchType: 'AND', conditions: [{ left: { target: 'close', scope: 'today', n: 1 }, operator: '>', rightType: 'metric', rightMetric: { target: 'close', scope: 'ago', n: 1 }, rightMathOp: 'none', rightMathNum: 1, rightNumber: 100 }]
   });
 
-  useEffect(() => { if (showKeySetup) setTempKey(userApiKey); }, [showKeySetup, userApiKey]);
+  useEffect(() => { 
+    if (showKeySetup) {
+      setTempKey(userApiKey);
+      setTempFmKey(finmindApiKey);
+    }
+  }, [showKeySetup, userApiKey, finmindApiKey]);
 
   const handleSaveKey = () => {
-    if (!tempKey.trim()) return showAlert('金鑰不能為空！');
+    if (!tempKey.trim()) return showAlert('富果金鑰不能為空！');
     const key = tempKey.trim();
+    const fmKey = tempFmKey.trim();
     setUserApiKey(key);
-    localStorage.setItem('MY_STOCK_API_KEY', key); // 新增這行：把金鑰存在手機裡
+    setFinmindApiKey(fmKey);
+    localStorage.setItem('MY_STOCK_API_KEY', key); 
+    localStorage.setItem('MY_STOCK_FINMIND_KEY', fmKey); 
     setShowKeySetup(false);
   };
 
@@ -2724,9 +2787,93 @@ const App = () => {
         }
       } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
 
-      setRawDailyData(candles);
-      setCurrentViewedSymbol(targetInput); // ✨ 成功載入後，記錄為當前觀看的股號
-      setSymbolInput(''); // ✨ 載入後自動清空輸入框！方便馬上搜尋下一支！
+      // ==========================================
+      // ✨ [FinMind 融合區塊] 開始
+      // ==========================================
+      const fmToken = finmindApiKey; 
+      const startDateStr = fromDate.toISOString().split('T')[0];
+      const fmMap = {};
+
+      try {
+        let instUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${targetSymbol}&start_date=${startDateStr}`;
+        let marginUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${targetSymbol}&start_date=${startDateStr}`;
+        if (fmToken) {
+           instUrl += `&token=${fmToken}`;
+           marginUrl += `&token=${fmToken}`;
+        }
+
+        const [instRes, marginRes] = await Promise.all([
+          fetch(instUrl),
+          fetch(marginUrl)
+        ]);
+        
+        if (!instRes.ok || !marginRes.ok) throw new Error("FinMind API 回應異常");
+        
+        const instJson = await instRes.json();
+        const marginJson = await marginRes.json();
+
+        // 🌟 防呆：如果法人真的沒抓到，印在系統控制台讓我們知道發生什麼事
+        if (!instJson.data || instJson.data.length === 0) {
+           console.warn(`⚠️ 找不到 ${targetSymbol} 的法人資料，請確認該股是否有法人進出，或 FinMind 尚未更新。`);
+        }
+
+        // 2. 建立日期對照字典
+        if (instJson.data) {
+           instJson.data.forEach(d => {
+               if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+               
+               // ✨ 支援不同大小寫的 API 改版防呆
+               const buy = Number(d.buy || d.Buy || d.buy_vol || 0);
+               const sell = Number(d.sell || d.Sell || d.sell_vol || 0);
+               // ✨ 把名字轉成大寫，方便後面中英文一起比對
+               const name = String(d.name || d.Name || d.info || "").toUpperCase(); 
+               
+               const netLots = (buy - sell) / 1000;
+               
+               // ✨ 升級版：同時支援 FinMind V4 的英文名稱與舊版的中文名稱
+               if (name.includes('FOREIGN_INVESTOR') || name.includes('外資')) {
+                   fmMap[d.date].foreign += netLots;
+               }
+               if (name.includes('INVESTMENT_TRUST') || name.includes('投信')) {
+                   fmMap[d.date].trust += netLots;
+               }
+               if (name.includes('DEALER') || name.includes('自營')) {
+                   if (!name.includes('FOREIGN_DEALER') && !name.includes('外資自營商')) {
+                       fmMap[d.date].dealer += netLots;
+                   }
+               }
+           });
+        }
+        
+        if (marginJson.data) {
+           marginJson.data.forEach(d => {
+               if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+               fmMap[d.date].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
+               fmMap[d.date].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
+           });
+        }
+      } catch (fmErr) {
+        console.warn("FinMind 籌碼載入失敗", fmErr);
+      }
+
+      // 3. 把籌碼資料精準對齊，塞入 Fugle 的 K 線陣列中
+      const mergedCandles = candles.map(c => ({
+          ...c,
+          foreign: fmMap[c.date]?.foreign || 0,
+          trust: fmMap[c.date]?.trust || 0,
+          dealer: fmMap[c.date]?.dealer || 0,
+          marginDiff: fmMap[c.date]?.marginDiff || 0,
+          shortDiff: fmMap[c.date]?.shortDiff || 0
+      }));
+
+      // 將融合好的資料存入系統
+      setRawDailyData(mergedCandles);
+      // ==========================================
+      // ✨ [FinMind 融合區塊] 結束
+      // ==========================================
+
+      setCurrentViewedSymbol(targetInput);
+      setSymbolInput(''); 
 
     } catch (err) { 
       setError(err.message); 
@@ -2952,9 +3099,13 @@ const App = () => {
             <p className="text-slate-400 text-sm leading-relaxed">為了確保您的資料安全與隱私，系統採用本機直接連線。您需要輸入專屬於您的 <span className="font-bold text-cyan-400">API 金鑰</span> 來啟用高階看盤功能。</p>
             <div className="bg-amber-950/30 border border-amber-900/50 text-amber-500 text-xs p-3 rounded-lg flex gap-2"><span className="text-lg">🛡️</span><p>您的金鑰 <strong className="text-amber-400">只會加密儲存在您當下使用的瀏覽器中 (Local Storage)</strong>，絕對不會上傳伺服器。</p></div>
             <div className="pt-2">
-              <label className="block text-sm font-bold text-cyan-500 mb-2">請貼上您的 API 金鑰：</label>
-              <input type="password" value={tempKey} onChange={(e) => setTempKey(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-cyan-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-400 font-mono shadow-inner text-cyan-300" placeholder="例如: YzljZDBlYzYt..." />
+              <label className="block text-sm font-bold text-cyan-500 mb-2">1. 請貼上您的金鑰1：</label>
+              <input type="password" value={tempKey} onChange={(e) => setTempKey(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-cyan-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-400 font-mono shadow-inner text-cyan-300 mb-4" placeholder="例如: YzljZDBlYzYt..." />
+              
+              <label className="block text-sm font-bold text-pink-500 mb-2">2. 請貼上您的金鑰2 (用於籌碼)：</label>
+              <input type="password" value={tempFmKey} onChange={(e) => setTempFmKey(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-pink-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-pink-400 font-mono shadow-inner text-pink-300" placeholder="例如: abc123def456..." />
             </div>
+
           </div>
           <div className="flex gap-3">
             {userApiKey && <button onClick={() => setShowKeySetup(false)} className="flex-1 px-4 py-3 rounded-lg font-bold text-slate-400 bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors">取消</button>}
@@ -3125,7 +3276,7 @@ const App = () => {
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 mt-2">副圖指標：</span>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {['None', 'MACD', 'KD', 'RSI', 'OBV', 'TOWER'].map(type => (
+                  {['None', 'MACD', 'KD', 'RSI', 'OBV', 'TOWER', '外資', '投信', '自營', '投+外', '資券'].map(type => (
                     <button key={type} onClick={() => setIndicatorType(type)} className={`px-3 py-1.5 text-xs rounded font-bold ${indicatorType === type ? 'bg-cyan-700 text-white border border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
                       {type === 'None' ? '關閉' : (type === 'TOWER' ? '寶塔線' : type)}
                     </button>
@@ -3433,7 +3584,8 @@ const App = () => {
                   })}
                </div>
                <div className="flex justify-end gap-2 mt-2">
-                  <button onClick={() => setBuilderFormula(prev => prev.slice(0, -1))} className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm">⌫ 退格</button>
+                  {/* ✨ 改用新的智能退格 */}
+                  <button onClick={handleBackspace} className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm">⌫ 退格</button>
                   <button onClick={() => setBuilderFormula([])} className="px-4 py-1.5 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm">🗑️ 清除</button>
                </div>
             </div>
@@ -3461,7 +3613,7 @@ const App = () => {
                       <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">邏輯與群組</div>
                       <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                         {['而且', '或者', '(', ')', '如果', '成立取', '否則取'].map(btn => (
-                          <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-2.5 rounded font-bold text-sm bg-slate-800 border-slate-700 text-pink-400 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
+                          <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 rounded font-bold text-sm bg-slate-800 border-slate-700 text-pink-400 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
                         ))}
                       </div>
                     </div>
@@ -3471,7 +3623,7 @@ const App = () => {
                       <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">比較符號</div>
                       <div className="grid grid-cols-6 gap-2">
                         {['>', '≥', '<', '≤', '=', '≠'].map(btn => (
-                          <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-2.5 rounded font-bold text-lg bg-slate-800 border-slate-700 text-cyan-300 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
+                          <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 rounded font-bold text-lg bg-slate-800 border-slate-700 text-cyan-300 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
                         ))}
                       </div>
                     </div>
@@ -3482,19 +3634,19 @@ const App = () => {
                       <div className="grid grid-cols-4 gap-2 max-w-[280px]">
                          {/* 第 1 排 */}
                          {['7', '8', '9', '+'].map(btn => (
-                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
                          ))}
                          {/* 第 2 排 */}
                          {['4', '5', '6', '-'].map(btn => (
-                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
                          ))}
                          {/* 第 3 排 */}
                          {['1', '2', '3', '×'].map(btn => (
-                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
                          ))}
                          {/* 第 4 排 */}
                          {['.', '0', '00', '÷'].map(btn => (
-                           <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${btn === '÷' ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
+                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${btn === '÷' ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
                          ))}
                       </div>
                     </div>
@@ -3510,7 +3662,7 @@ const App = () => {
                       return (
                         <button 
                           key={btn} 
-                          onClick={() => setBuilderFormula(prev => [...prev, btn])} 
+                          onClick={() => handleFormulaInput(btn)} 
                           className={`py-3 sm:py-4 rounded font-bold text-sm sm:text-base border active:scale-95 transition-transform ${isTimeOffset ? 'bg-pink-900/30 border-pink-700/50 text-pink-300 hover:bg-pink-800/50' : 'bg-indigo-900/40 border-indigo-700/50 text-indigo-300 hover:bg-indigo-800/60'}`}
                         >
                           {btn}
@@ -3523,7 +3675,7 @@ const App = () => {
                {builderTab === '指標' && (
                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
                     {['5日均線', '10日均線', '20日均線', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OBV值', '乖離率', '威廉指標'].map(btn => (
-                      <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-4 bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 rounded font-bold hover:bg-emerald-800/60 active:scale-95 transition-transform">{btn}</button>
+                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-4 bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 rounded font-bold hover:bg-emerald-800/60 active:scale-95 transition-transform">{btn}</button>
                     ))}
                  </div>
                )}
@@ -3531,7 +3683,7 @@ const App = () => {
                {builderTab === '盤後' && (
                  <div className="grid grid-cols-2 gap-2 h-full content-start">
                     {['外資買賣超', '投信買賣超', '自營商買賣超', '主力進出', '融資增減', '融券增減', '股本(億)'].map(btn => (
-                      <button key={btn} onClick={() => setBuilderFormula(prev => [...prev, btn])} className="py-4 bg-purple-900/40 border border-purple-700/50 text-purple-300 rounded font-bold hover:bg-purple-800/60 active:scale-95 transition-transform">{btn}</button>
+                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-4 bg-purple-900/40 border border-purple-700/50 text-purple-300 rounded font-bold hover:bg-purple-800/60 active:scale-95 transition-transform">{btn}</button>
                     ))}
                  </div>
                )}
@@ -5035,6 +5187,66 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                     <text x={padding} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
                 </g>);
             })()}
+
+            {/* 👇 第四步的程式碼貼在這裡 👇 */}
+            {['外資', '投信', '自營', '投+外'].includes(indicatorType) && (() => {
+                let maxV = -Infinity, minV = Infinity;
+                data.forEach(d => {
+                    let val = 0;
+                    if (indicatorType === '外資') val = d.foreign || 0;
+                    else if (indicatorType === '投信') val = d.trust || 0;
+                    else if (indicatorType === '自營') val = d.dealer || 0;
+                    else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+
+                    if (val > maxV) maxV = val;
+                    if (val < minV) minV = val;
+                });
+                const absMax = Math.max(Math.abs(maxV), Math.abs(minV)) || 1;
+                const getInstY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
+                const zeroY = getInstY(0);
+
+                return (
+                    <g>
+                        <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                        {data.map((d, i) => {
+                            let val = 0;
+                            if (indicatorType === '外資') val = d.foreign || 0;
+                            else if (indicatorType === '投信') val = d.trust || 0;
+                            else if (indicatorType === '自營') val = d.dealer || 0;
+                            else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+
+                            const y = getInstY(val);
+                            const color = val >= 0 ? '#ef4444' : '#22c55e'; // 紅買綠賣
+                            return <rect key={`inst-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
+                        })}
+                        <text x={padding} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
+                            {indicatorType === '外資' ? '外資買賣超(張)' : indicatorType === '投信' ? '投信買賣超(張)' : indicatorType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
+                        </text>
+                    </g>
+                );
+            })()}
+
+            {indicatorType === '資券' && (() => {
+                let maxM = -Infinity, minM = Infinity; 
+                data.forEach(d => { 
+                    if (d.marginDiff > maxM) maxM = d.marginDiff; if (d.marginDiff < minM) minM = d.marginDiff; 
+                    if (d.shortDiff > maxM) maxM = d.shortDiff; if (d.shortDiff < minM) minM = d.shortDiff; 
+                });
+                const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
+                const getMarginY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
+                return (<g>
+                    <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                    {/* 用柱狀圖畫融資 */}
+                    {data.map((d, i) => {
+                        const y = getMarginY(d.marginDiff); const zeroY = getMarginY(0);
+                        return <rect key={`margin-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.marginDiff >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
+                    })}
+                    {/* 用線條畫融券 */}
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMarginY(d.shortDiff)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
+                    <text x={padding} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
+                    <text x={padding + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
+                </g>);
+            })()}
             
             {indicatorType === 'MACD' && (() => {
                     let maxM = -Infinity, minM = Infinity; data.forEach(d => { if (d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif < minM) minM = d.macd.dif; if (d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd < minM) minM = d.macd.macd; if (d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc < minM) minM = d.macd.osc; });
@@ -5137,7 +5349,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
                 } else if (indicatorType === 'TOWER') {
                     tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔頂： ${hoverD?.tower?.top?.toFixed(2)}` });
                     tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔底： ${hoverD?.tower?.bottom?.toFixed(2)}` });
+                } else if (['外資', '投信', '自營', '投+外'].includes(indicatorType)) {
+                    if (indicatorType === '外資') tooltipLines.push({ color: "#f472b6", text: `外資： ${hoverD?.foreign?.toFixed(0) || 0} 張` });
+                    if (indicatorType === '投信') tooltipLines.push({ color: "#34d399", text: `投信： ${hoverD?.trust?.toFixed(0) || 0} 張` });
+                    if (indicatorType === '自營') tooltipLines.push({ color: "#fbbf24", text: `自營： ${hoverD?.dealer?.toFixed(0) || 0} 張` });
+                    if (indicatorType === '投+外') {
+                        tooltipLines.push({ color: "#f472b6", text: `外資： ${hoverD?.foreign?.toFixed(0) || 0} 張` });
+                        tooltipLines.push({ color: "#34d399", text: `投信： ${hoverD?.trust?.toFixed(0) || 0} 張` });
+                        tooltipLines.push({ color: "#38bdf8", text: `合買： ${((hoverD?.foreign || 0) + (hoverD?.trust || 0)).toFixed(0)} 張` });
+                    }
+                } else if (indicatorType === '資券') {
+                    tooltipLines.push({ color: "#ef4444", text: `融資增減： ${hoverD?.marginDiff?.toFixed(0) || 0} 張` });
+                    tooltipLines.push({ color: "#3b82f6", text: `融券增減： ${hoverD?.shortDiff?.toFixed(0) || 0} 張` });
                 }
+
             }
 
             const boxWidth = 140; 
