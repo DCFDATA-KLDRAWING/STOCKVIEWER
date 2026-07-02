@@ -3400,15 +3400,15 @@ const App = () => {
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
                 rankingModalContent={
-                  /* ✨ 🏆 專業雙頁籤選股清單視窗 (全螢幕行李版) */
-                  isRankingOpen ? (() => {
+                  /* ✨ 🏆 專業雙頁籤選股清單視窗 (升級版：保留捲動位置) */
+                  (() => {
                     // 先決定現在要顯示哪個清單，並套用排序魔法
                     const currentList = rankingTab === 'ranking' ? rankingList : watchlist;
                     const displayData = getSortedData(currentList);
 
                     return (
-                      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm px-2 sm:px-4 pointer-events-auto">
-                        <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-[0_0_40px_rgba(168,85,247,0.3)] w-full max-w-lg overflow-hidden flex flex-col h-[85vh] sm:h-[75vh] animate-in fade-in zoom-in duration-200">
+                      <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm px-2 sm:px-4 transition-all duration-200 ${isRankingOpen ? 'visible opacity-100 pointer-events-auto' : 'invisible opacity-0 pointer-events-none'}`}>
+                        <div className={`bg-slate-900 border border-slate-700 rounded-xl shadow-[0_0_40px_rgba(168,85,247,0.3)] w-full max-w-lg overflow-hidden flex flex-col h-[85vh] sm:h-[75vh] transition-transform duration-200 ${isRankingOpen ? 'scale-100' : 'scale-95'}`}>
                           
                           {/* 頂部控制列 */}
                           <div className="flex justify-between items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0">
@@ -3486,19 +3486,19 @@ const App = () => {
                                   })}
                                 </div>
                               ) : (
-                                {/*<div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
+                                <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
                                   <span className="text-4xl">📭</span>
                                   <div className="font-bold">
-                                    {rankingTab === 'ranking' ? '請點選上方「📸 AI讀圖」上傳截圖' : '您的自選股名單空空如也'}
+                                    {rankingTab === 'ranking' ? '請點選上方「📝 貼上排行」轉成名單' : '您的自選股名單空空如也'}
                                   </div>
-                                </div>*/}
+                                </div>
                               )}
                             </div>
                           </div>
                         </div>
                       </div>
                     );
-                  })() : null
+                  })()
                 }              
               />
             </div>
