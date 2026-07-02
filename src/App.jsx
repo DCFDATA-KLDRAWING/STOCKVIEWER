@@ -2418,7 +2418,18 @@ const App = () => {
         '外資買賣超': { target: 'foreign', scope: 'today', n: 1 },
         '投信買賣超': { target: 'trust', scope: 'today', n: 1 },
         '自營商買賣超': { target: 'dealer', scope: 'today', n: 1 },
-        '融資增減': { target: 'marginDiff', scope: 'today', n: 1 }
+        '融資增減': { target: 'marginDiff', scope: 'today', n: 1 },
+        // 👇 新增這區塊：技術指標細部連結 👇
+        'K值': { target: 'kd.k', scope: 'today', n: 1 },
+        'D值': { target: 'kd.d', scope: 'today', n: 1 },
+        'RSI值': { target: 'rsi.rsi1', scope: 'today', n: 1 },
+        'MACD值': { target: 'macd.macd', scope: 'today', n: 1 },
+        'DIF值': { target: 'macd.dif', scope: 'today', n: 1 },
+        'OSC值': { target: 'macd.osc', scope: 'today', n: 1 },
+        'OBV值': { target: 'obv', scope: 'today', n: 1 },
+        '威廉指標': { target: 'willr', scope: 'today', n: 1 },
+        '布林上軌': { target: 'bbands.up', scope: 'today', n: 1 },
+        '布林下軌': { target: 'bbands.down', scope: 'today', n: 1 }
       };
 
       // 解析邏輯
@@ -2937,6 +2948,13 @@ const App = () => {
       if (target === 'changeRatio') return idx === 0 ? 0 : ((data[idx].close - data[idx-1].close) / data[idx-1].close) * 100;
       if (target === 'bodyRatio') return data[idx].open === 0 ? 0 : ((data[idx].close - data[idx].open) / data[idx].open) * 100;
       if (target === 'amplitude') return idx === 0 ? 0 : ((data[idx].high - data[idx].low) / data[idx-1].close) * 100;
+      
+      // ✨ 加入這行：支援讀取深層的指標細節 (例如把 'kd.k' 拆解開來讀取)
+      if (target.includes('.')) { 
+        const parts = target.split('.'); 
+        return data[idx][parts[0]] ? data[idx][parts[0]][parts[1]] : null; 
+      }
+      
       return data[idx][target];
     };
     
@@ -3018,6 +3036,11 @@ const App = () => {
       let k = (prevK * (indParams.kd.k - 1) + rsv) / indParams.kd.k, d = (prevD * (indParams.kd.d - 1) + k) / indParams.kd.d;
       prevK = k; prevD = d;
 
+      // ✨ [新增] 威廉指標 W%R (預設 14 日週期)
+      const wrPeriodData = data.slice(Math.max(0, i - 14 + 1), i + 1);
+      const wrH = Math.max(...wrPeriodData.map(dx => dx.high)), wrL = Math.min(...wrPeriodData.map(dx => dx.low));
+      const willr = wrH !== wrL ? ((wrH - current.close) / (wrH - wrL)) * -100 : 0;
+
       let rsi1 = null, rsi2 = null;
       if (i > 0) {
         const gain = Math.max(0, current.close - closes[i - 1]), loss = Math.max(0, closes[i - 1] - current.close);
@@ -3067,7 +3090,7 @@ const App = () => {
       return { 
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, customMarks,
-          macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },
+          macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },　willr,
           obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower 
       };
     });
@@ -3698,7 +3721,7 @@ const App = () => {
 
                {builderTab === '指標' && (
                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
-                    {['5日均線', '10日均線', '20日均線', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OBV值', '乖離率', '威廉指標'].map(btn => (
+                    {['5日均線', '10日均線', '20日均線', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OSC值', 'OBV值', '威廉指標', '布林上軌', '布林下軌'].map(btn => (
                       <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-4 bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 rounded font-bold hover:bg-emerald-800/60 active:scale-95 transition-transform">{btn}</button>
                     ))}
                  </div>
