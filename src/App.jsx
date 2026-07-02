@@ -2648,7 +2648,7 @@ const App = () => {
     }
   };
 
-  // ✨ 處理手動貼上文字排行 (防擠壓智慧升級版)
+  // ✨ 處理手動貼上文字排行 (玩股網專屬防擠壓 + 終極智慧解碼版)
   const handlePasteRanking = () => {
     if (!pasteText.trim()) return showAlert("請先貼上資料！");
     const lines = pasteText.split('\n');
@@ -2662,52 +2662,53 @@ const App = () => {
         const stockInfo = STOCKS.find(s => s.id === symbol);
         
         if (stockInfo && !newRanking.find(r => r.symbol === symbol)) {
-          const parts = line.split(/[\s\t]+/); 
           let change = '熱門';
           let volume = '-';
-          let maxVolume = 0; 
           
-          if (parts.length > 1) {
-            // 情境 A：正常有空格的排列
-            parts.forEach(p => {
-              if (p.includes('%') || p.startsWith('+') || p.startsWith('-') || p.includes('停') || p.includes('▲') || p.includes('▼')) {
-                change = p;
-              } else {
-                const cleanStr = p.replace(/,/g, ''); 
-                if (/^\d+$/.test(cleanStr) && cleanStr !== symbol) {
-                  const num = parseInt(cleanStr, 10);
-                  if (num > 100 && num > maxVolume) {
-                    maxVolume = num;
-                    volume = p; 
+          // 1. 抓取成交量 (找字串中最後一個有逗號的數字結構)
+          const volMatches = line.match(/\d{1,3}(?:,\d{3})+/g);
+          if (volMatches) {
+              volume = volMatches[volMatches.length - 1]; // 通常成交量在文字後半段
+          } else {
+              // 備用：用空格切開，找最大的數字
+              let maxVol = 0;
+              line.split(/[\s\t]+/).forEach(p => {
+                  const num = parseInt(p.replace(/,/g, ''), 10);
+                  if (num > 100 && num > maxVol && p !== symbol) {
+                      maxVol = num;
+                      volume = p;
                   }
-                }
-              }
-            });
-          }
-          
-          // 情境 B：完全沒空格擠成一團 (例如 34.10▲3.1010▲...)
-          if (change === '熱門' || change.length > 10) {
-            // 抓取 ▲ 或 ▼ 後面的金額與百分比 (例如 ▲3.1010 -> 抓出百分比 10)
-            const squashedChangeMatch = line.match(/(?:▲|▼|△|▽)\d+\.\d{2}(\d+(?:\.\d+)?)/);
-            if (squashedChangeMatch) {
-              const isUp = line.match(/(?:▲|△)/);
-              change = (isUp ? '+' : '-') + squashedChangeMatch[1] + '%';
-            } else {
-              // 備用：如果只有漲跌數字沒有百分比
-              const simpleChangeMatch = line.match(/(?:▲|▼|△|▽)\d+(\.\d+)?/);
-              if (simpleChangeMatch) {
-                 const isUp = line.match(/(?:▲|△)/);
-                 change = (isUp ? '+' : '-') + simpleChangeMatch[0].replace(/[▲▼△▽]/, '');
-              }
-            }
+              });
           }
 
-          // 針對擠成一團的成交量，尋找有逗號的數字結構 (例如 3,115)
-          if (volume === '-' || volume === 0) {
-            const squashedVolMatch = line.match(/(\d{1,3}(?:,\d{3})+)/);
-            if (squashedVolMatch) {
-              volume = squashedVolMatch[1];
-            }
+          // 2. 抓取漲跌幅 (玩股網終極解碼器：尋找被兩個符號夾住的百分比)
+          // 完美支援： ▲3.10 10 ▲14.81 或擠在一起的 ▲3.1010▲14.81
+          const wantGooMatch = line.match(/([▲▼△▽\+\-])\s*\d+\.\d+\s*(\d+(?:\.\d+)?)\s*[▲▼△▽\+\-]/);
+          if (wantGooMatch) {
+              const sign = wantGooMatch[1].match(/[▲△\+]/) ? '+' : '-';
+              change = `${sign}${wantGooMatch[2]}%`;
+          } else {
+              // 平盤特例判斷 (0.00 0 0.00)
+              if (line.match(/0\.00\s*0\s*0\.00/)) {
+                  change = '平盤';
+              } else {
+                  // 通用券商格式 (找第一個帶有 % 或 + - 且不是股號的區塊)
+                  const parts = line.split(/[\s\t]+/);
+                  let found = false;
+                  parts.forEach(p => {
+                      if (!found && p !== symbol) {
+                          if (p.includes('%') || p.includes('停') || p.match(/^[+-]\d/)) {
+                              // 把其他券商的 ▲ 轉成 +
+                              change = p.replace(/[▲△]/g, '+').replace(/[▼▽]/g, '-');
+                              found = true;
+                          } else if (p.match(/^[▲▼△▽]\d/)) {
+                              const sign = p.match(/[▲△]/) ? '+' : '-';
+                              change = sign + p.replace(/[▲▼△▽]/, '') + '%';
+                              found = true;
+                          }
+                      }
+                  });
+              }
           }
 
           newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
