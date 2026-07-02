@@ -3335,7 +3335,8 @@ const App = () => {
                 data={klineData} // ✨ 不再切斷，傳入全部資料，讓畫布可以無限往左滑！ 
                 timeframe={timeframe}
                 stockName={displayFullname} 
-                toggles={toggles} 
+                toggles={toggles}
+                onToggleCrosshair={() => handleToggle('showCrosshair')} 
                 customStrategies={customStrategies} 
                 maParams={maParams}
                 vmaParams={vmaParams}
@@ -3710,7 +3711,7 @@ const MetricSelector = ({ value, onChange }) => (
   </div>
 );
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -4804,6 +4805,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, customStrategies, maP
          <div className="flex gap-1.5 sm:gap-2 z-10 shrink-0">
            <button onClick={toggleFullscreen} className="justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
              {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
+           </button>
+           {/* 👇 貼在這裡：專屬的查價線獨立開關 👇 */}
+           <button onClick={onToggleCrosshair} className={`justify-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center border ${toggles.showCrosshair !== false ? 'bg-pink-900/80 border-pink-500 text-pink-200 shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'bg-slate-800/80 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-pink-300'}`}>
+             {toggles.showCrosshair !== false ? '🎯 關查價' : '🎯 開查價'}
            </button>
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
              📁 畫板
