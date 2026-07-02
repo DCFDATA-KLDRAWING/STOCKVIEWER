@@ -2637,7 +2637,7 @@ const App = () => {
     }
   };
 
-  // ✨ 處理手動貼上文字排行
+  // ✨ 處理手動貼上文字排行 (防擠壓智慧升級版)
   const handlePasteRanking = () => {
     if (!pasteText.trim()) return showAlert("請先貼上資料！");
     const lines = pasteText.split('\n');
@@ -2651,30 +2651,53 @@ const App = () => {
         const stockInfo = STOCKS.find(s => s.id === symbol);
         
         if (stockInfo && !newRanking.find(r => r.symbol === symbol)) {
-          // ✨ 升級版邏輯：只用空白切割，把逗號留給成交量自己處理
           const parts = line.split(/[\s\t]+/); 
           let change = '熱門';
           let volume = '-';
-          let maxVolume = 0; // 用來尋找整行最大的數字
+          let maxVolume = 0; 
           
-          parts.forEach(p => {
-            // 抓取漲跌幅 (有 %, +, -, 漲停, 跌停)
-            if (p.includes('%') || p.startsWith('+') || p.startsWith('-') || p.includes('停')) {
-              change = p;
-            } else {
-              // 抓取成交量：把逗號清掉後，看看是不是純數字
-              const cleanStr = p.replace(/,/g, ''); 
-              // 確保是純數字，且不是股號本身
-              if (/^\d+$/.test(cleanStr) && cleanStr !== symbol) {
-                const num = parseInt(cleanStr, 10);
-                // 成交量通常是整行裡最大的數字 (防呆：避開開盤價、收盤價之類的小數字)
-                if (num > 100 && num > maxVolume) {
-                  maxVolume = num;
-                  volume = p; // 保留原本有逗號的漂亮格式 (例如 45,678)
+          if (parts.length > 1) {
+            // 情境 A：正常有空格的排列
+            parts.forEach(p => {
+              if (p.includes('%') || p.startsWith('+') || p.startsWith('-') || p.includes('停') || p.includes('▲') || p.includes('▼')) {
+                change = p;
+              } else {
+                const cleanStr = p.replace(/,/g, ''); 
+                if (/^\d+$/.test(cleanStr) && cleanStr !== symbol) {
+                  const num = parseInt(cleanStr, 10);
+                  if (num > 100 && num > maxVolume) {
+                    maxVolume = num;
+                    volume = p; 
+                  }
                 }
               }
+            });
+          }
+          
+          // 情境 B：完全沒空格擠成一團 (例如 34.10▲3.1010▲...)
+          if (change === '熱門' || change.length > 10) {
+            // 抓取 ▲ 或 ▼ 後面的金額與百分比 (例如 ▲3.1010 -> 抓出百分比 10)
+            const squashedChangeMatch = line.match(/(?:▲|▼|△|▽)\d+\.\d{2}(\d+(?:\.\d+)?)/);
+            if (squashedChangeMatch) {
+              const isUp = line.match(/(?:▲|△)/);
+              change = (isUp ? '+' : '-') + squashedChangeMatch[1] + '%';
+            } else {
+              // 備用：如果只有漲跌數字沒有百分比
+              const simpleChangeMatch = line.match(/(?:▲|▼|△|▽)\d+(\.\d+)?/);
+              if (simpleChangeMatch) {
+                 const isUp = line.match(/(?:▲|△)/);
+                 change = (isUp ? '+' : '-') + simpleChangeMatch[0].replace(/[▲▼△▽]/, '');
+              }
             }
-          });
+          }
+
+          // 針對擠成一團的成交量，尋找有逗號的數字結構 (例如 3,115)
+          if (volume === '-' || volume === 0) {
+            const squashedVolMatch = line.match(/(\d{1,3}(?:,\d{3})+)/);
+            if (squashedVolMatch) {
+              volume = squashedVolMatch[1];
+            }
+          }
 
           newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
         }
