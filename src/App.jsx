@@ -2308,7 +2308,7 @@ const App = () => {
   }, [userApiKey, indicatorParams, maParams, vmaParams, customStrategies, savedLayouts, user, dbLoaded]);
 
   // ✨ AI 讀圖與排行榜狀態 (加入 localStorage 記憶功能)
-  const [isRankingOpen, setIsRankingOpen] = useState(false);
+  const [isRankingOpen, setIsRankingOpen] = useState(true); // ✨ 改為 true，一進 APP 就預設打開！
   const [isLoadingRanking, setIsLoadingRanking] = useState(false);
   const fileInputRef = useRef(null);
   // ✨ 貼上文字排行的狀態
@@ -2965,6 +2965,17 @@ const App = () => {
       setSymbolInput(''); 
     } finally { setLoading(false); }
   };
+
+  // ✨ 自動載入預設股票 (0050)，作為選股中心的墊腳石
+  const autoLoadDone = useRef(false);
+  useEffect(() => {
+    // 當系統準備好且有金鑰時，只自動載入一次 0050
+    if (dbLoaded && !showKeySetup && userApiKey && !autoLoadDone.current) {
+      autoLoadDone.current = true;
+      fetchStockData('0050');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbLoaded, showKeySetup, userApiKey]);
 
   // ✨ 處理載入雲端畫板的邏輯
   const handleLoadLayout = (layout) => {
