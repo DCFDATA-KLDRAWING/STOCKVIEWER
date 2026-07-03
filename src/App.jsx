@@ -3172,6 +3172,30 @@ const App = () => {
   const [scanResults, setScanResults] = useState({});
   const [selectedScanStrategy, setSelectedScanStrategy] = useState('');
 
+  // ✨ [新增] 手動新增自選股功能
+  const [manualStockId, setManualStockId] = useState('');
+  
+  const handleAddManualStock = () => {
+    const id = manualStockId.trim();
+    if (!id) return showAlert('請輸入股票代號！');
+    
+    // 檢查系統中有沒有這檔股票
+    const stockInfo = STOCKS.find(s => s.id === id);
+    if (!stockInfo) return showAlert(`找不到代號「${id}」的股票，請確認輸入是否正確！`);
+    
+    // 檢查是否已經在名單裡
+    if (watchlist.find(w => w.symbol === id)) {
+      showAlert(`${id} ${stockInfo.name} 已經在您的自選名單中囉！`);
+      setManualStockId('');
+      return;
+    }
+    
+    // 加入名單並清空輸入框
+    setWatchlist(prev => [...prev, { symbol: id, name: stockInfo.name }]);
+    setManualStockId('');
+    showAlert(`成功將 ${id} ${stockInfo.name} 加入自選名單！`);
+  };
+
   const handleScanWatchlist = async (strategyId) => {
     if (!strategyId) return showAlert('請先選擇一個自訂策略！');
     if (watchlist.length === 0) return showAlert('您的自選名單空空如也，請先加入股票！');
@@ -3626,6 +3650,27 @@ const App = () => {
                                   <button onClick={() => setScanResults({})} className="text-slate-400 hover:text-red-400 text-sm font-bold px-3 py-1.5 bg-slate-900 rounded border border-slate-700 whitespace-nowrap">清除</button>
                                 )}
                               </div>
+                            </div>
+                          )}
+
+                          {/* ✨ [新增] 手動加入自選股工具列 */}
+                          {rankingTab === 'watchlist' && (
+                            <div className="p-2 sm:p-3 bg-slate-800/50 border-b border-slate-700 flex items-center gap-2 shrink-0">
+                              <span className="text-amber-400/80 font-bold text-sm shrink-0">➕ 手動新增：</span>
+                              <input 
+                                type="text"
+                                value={manualStockId}
+                                onChange={(e) => setManualStockId(e.target.value)}
+                                placeholder="輸入股號 (例: 2330)"
+                                className="bg-slate-900 border border-slate-600 focus:border-amber-500 text-amber-300 px-3 py-1.5 rounded outline-none font-bold text-sm flex-1 w-full transition-colors"
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddManualStock()}
+                              />
+                              <button 
+                                onClick={handleAddManualStock}
+                                className="bg-amber-600 text-white px-4 py-1.5 rounded font-bold text-sm hover:bg-amber-500 active:scale-95 transition-all whitespace-nowrap shadow-sm"
+                              >
+                                加入名單
+                              </button>
                             </div>
                           )}
 
