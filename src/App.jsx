@@ -2701,81 +2701,101 @@ const App = () => {
     }
   };
 
-  // ✨ 處理手動貼上文字排行 (玩股網專屬防擠壓 + 終極智慧解碼版)
+  // ✨ 處理手動貼上文字排行 (玩股網專屬防擠壓 + 富邦黏巴達 雙引擎合體版)
   const handlePasteRanking = () => {
     if (!pasteText.trim()) return showAlert("請先貼上資料！");
-    const lines = pasteText.split('\n');
     const newRanking = [];
-    
-    lines.forEach(line => {
-      // 尋找 4 碼數字開頭的股號
-      const match = line.match(/([0-9]{4}[a-zA-Z]?)/);
-      if (match) {
+    const seen = new Set(); // 用來記錄已經加入的股號，避免重複
+
+    // 【模式 A】判斷是否為「富邦黏巴達」(沒有換行，且文字很長)
+    if (!pasteText.includes('\n') && pasteText.length > 100 && pasteText.includes('%')) {
+      // 專殺富邦單行黏貼格式
+      const regex = /(\d{4,6})\s+([\u4e00-\u9fa5]+[-A-Za-z0-9*]*).*?([+-]?\d+\.\d+%).*?([\d,]{4,})/g;
+      let match;
+      while ((match = regex.exec(pasteText)) !== null) {
         const symbol = match[1];
-        const stockInfo = STOCKS.find(s => s.id === symbol);
-        
-        if (stockInfo && !newRanking.find(r => r.symbol === symbol)) {
-          let change = '熱門';
-          let volume = '-';
-          
-          // 1. 抓取成交量 (找字串中最後一個有逗號的數字結構)
-          const volMatches = line.match(/\d{1,3}(?:,\d{3})+/g);
-          if (volMatches) {
-              volume = volMatches[volMatches.length - 1]; // 通常成交量在文字後半段
-          } else {
-              // 備用：用空格切開，找最大的數字
-              let maxVol = 0;
-              line.split(/[\s\t]+/).forEach(p => {
-                  const num = parseInt(p.replace(/,/g, ''), 10);
-                  if (num > 100 && num > maxVol && p !== symbol) {
-                      maxVol = num;
-                      volume = p;
-                  }
-              });
-          }
-
-          // 2. 抓取漲跌幅 (玩股網終極解碼器：尋找被兩個符號夾住的百分比)
-          // 完美支援： ▲3.10 10 ▲14.81 或擠在一起的 ▲3.1010▲14.81
-          const wantGooMatch = line.match(/([▲▼△▽\+\-])\s*\d+\.\d+\s*(\d+(?:\.\d+)?)\s*[▲▼△▽\+\-]/);
-          if (wantGooMatch) {
-              const sign = wantGooMatch[1].match(/[▲△\+]/) ? '+' : '-';
-              change = `${sign}${wantGooMatch[2]}%`;
-          } else {
-              // 平盤特例判斷 (0.00 0 0.00)
-              if (line.match(/0\.00\s*0\s*0\.00/)) {
-                  change = '平盤';
-              } else {
-                  // 通用券商格式 (找第一個帶有 % 或 + - 且不是股號的區塊)
-                  const parts = line.split(/[\s\t]+/);
-                  let found = false;
-                  parts.forEach(p => {
-                      if (!found && p !== symbol) {
-                          if (p.includes('%') || p.includes('停') || p.match(/^[+-]\d/)) {
-                              // 把其他券商的 ▲ 轉成 +
-                              change = p.replace(/[▲△]/g, '+').replace(/[▼▽]/g, '-');
-                              found = true;
-                          } else if (p.match(/^[▲▼△▽]\d/)) {
-                              const sign = p.match(/[▲△]/) ? '+' : '-';
-                              change = sign + p.replace(/[▲▼△▽]/, '') + '%';
-                              found = true;
-                          }
-                      }
-                  });
-              }
-          }
-
-          newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
+        if (!seen.has(symbol)) {
+          const stockInfo = STOCKS.find(s => s.id === symbol);
+          newRanking.push({
+            symbol: symbol,
+            name: stockInfo ? stockInfo.name : match[2].trim(),
+            change: match[3],
+            volume: match[4]
+          });
+          seen.add(symbol);
         }
       }
-    });
+    } 
+    // 【模式 B】維持您原本強大的「玩股網/多行防擠壓模式」
+    else {
+      const lines = pasteText.split('\n');
+      lines.forEach(line => {
+        const match = line.match(/([0-9]{4}[a-zA-Z]?)/);
+        if (match) {
+          const symbol = match[1];
+          const stockInfo = STOCKS.find(s => s.id === symbol);
+          
+          if (stockInfo && !seen.has(symbol)) {
+            let change = '熱門';
+            let volume = '-';
+            
+            // 1. 抓取成交量
+            const volMatches = line.match(/\d{1,3}(?:,\d{3})+/g);
+            if (volMatches) {
+                volume = volMatches[volMatches.length - 1]; 
+            } else {
+                let maxVol = 0;
+                line.split(/[\s\t]+/).forEach(p => {
+                    const num = parseInt(p.replace(/,/g, ''), 10);
+                    if (num > 100 && num > maxVol && p !== symbol) {
+                        maxVol = num;
+                        volume = p;
+                    }
+                });
+            }
 
+            // 2. 抓取漲跌幅 (玩股網終極解碼器)
+            const wantGooMatch = line.match(/([▲▼△▽\+\-])\s*\d+\.\d+\s*(\d+(?:\.\d+)?)\s*[▲▼△▽\+\-]/);
+            if (wantGooMatch) {
+                const sign = wantGooMatch[1].match(/[▲△\+]/) ? '+' : '-';
+                change = `${sign}${wantGooMatch[2]}%`;
+            } else {
+                if (line.match(/0\.00\s*0\s*0\.00/)) {
+                    change = '平盤';
+                } else {
+                    const parts = line.split(/[\s\t]+/);
+                    let found = false;
+                    parts.forEach(p => {
+                        if (!found && p !== symbol) {
+                            if (p.includes('%') || p.includes('停') || p.match(/^[+-]\d/)) {
+                                change = p.replace(/[▲△]/g, '+').replace(/[▼▽]/g, '-');
+                                found = true;
+                            } else if (p.match(/^[▲▼△▽]\d/)) {
+                                const sign = p.match(/[▲△]/) ? '+' : '-';
+                                change = sign + p.replace(/[▲▼△▽]/, '') + '%';
+                                found = true;
+                            }
+                        }
+                    });
+                }
+            }
+            newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
+            seen.add(symbol);
+          }
+        }
+      });
+    }
+
+    // 統一的結果輸出處理
     if (newRanking.length > 0) {
-      setRankingList(newRanking); 
+      setRankingList(newRanking);
+      setRankingTab('ranking'); 
       setIsPasteModalOpen(false); 
-      setPasteText(""); 
-      setIsRankingOpen(true);
-    } else { 
-      showAlert("找不到任何有效的台股代號，請確認貼上的文字格式！"); 
+      setIsRankingOpen(true); 
+      setPasteText(''); 
+      showAlert(`成功匯入 ${newRanking.length} 檔股票！`);
+    } else {
+      showAlert('無法辨識，請確認貼上的文字是否包含「股號」、「股名」與「漲跌幅%」');
     }
   };
 
@@ -3706,7 +3726,7 @@ const App = () => {
                 )}
                 {indicatorType === 'TOWER' && (
                   <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
-                    <span className="text-[10px] text-slate-400 font-bold">寶塔線參數 (N日)</span>
+                    <span classNㄣame="text-[10px] text-slate-400 font-bold">寶塔線參數 (N日)</span>
                     <input type="number" value={indicatorParams.tower?.p || 3} onChange={e => setIndicatorParams({...indicatorParams, tower: {...indicatorParams.tower, p: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
