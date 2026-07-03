@@ -2370,6 +2370,13 @@ const App = () => {
         const newArr = [...prev];
         newArr[newArr.length - 1] = lastItem + btn;
         return newArr;
+      }
+
+      // ✨ 新增：如果輸入的是時間後綴詞，且前一個是數字，直接黏起來合併！
+      if (['日前的', '日內最高', '日內最低', '日內均值'].includes(btn) && isLastNumeric) {
+        const newArr = [...prev];
+        newArr[newArr.length - 1] = lastItem + btn;
+        return newArr;
       } else {
         // 當作新詞彙加入
         return [...prev, btn];
@@ -2395,7 +2402,7 @@ const App = () => {
     });
   };
 
-  // ✨ 翻譯蒟蒻：把中文陣列轉換成系統懂的 JSON 條件
+  // ✨ 翻譯蒟蒻：把中文陣列轉換成系統懂的 JSON 條件 (升級支援四則運算與實體漲幅)
   const parseFormulaToStrategy = (formulaArray, customName, customMarker) => {
     try {
       const conditions = [];
@@ -2411,6 +2418,8 @@ const App = () => {
         '收盤價': { target: 'close', scope: 'today', n: 1 },
         '成交量': { target: 'volume', scope: 'today', n: 1 },
         '漲跌幅': { target: 'changeRatio', scope: 'today', n: 1 },
+        '實體漲幅': { target: 'bodyRatio', scope: 'today', n: 1 }, // ✨ 新增：實體K漲幅
+        '振幅': { target: 'amplitude', scope: 'today', n: 1 },     // ✨ 新增：振幅
         '5日均線': { target: 'close', scope: 'avg', n: 5 },
         '10日均線': { target: 'close', scope: 'avg', n: 10 },
         '20日均線': { target: 'close', scope: 'avg', n: 20 },
@@ -2419,7 +2428,6 @@ const App = () => {
         '投信買賣超': { target: 'trust', scope: 'today', n: 1 },
         '自營商買賣超': { target: 'dealer', scope: 'today', n: 1 },
         '融資增減': { target: 'marginDiff', scope: 'today', n: 1 },
-        // 👇 新增這區塊：技術指標細部連結 👇
         'K值': { target: 'kd.k', scope: 'today', n: 1 },
         'D值': { target: 'kd.d', scope: 'today', n: 1 },
         'RSI值': { target: 'rsi.rsi1', scope: 'today', n: 1 },
@@ -2436,24 +2444,60 @@ const App = () => {
       for (let i = 0; i < formulaArray.length; i++) {
         let token = formulaArray[i];
 
-        // 1. 處理時間偏移 (例如看到 "1日前的"，就把它跟下一個名詞組合)
+        // ✨ 0. 防呆機制：如果單獨按了後綴詞卻沒有數字，阻擋並提醒
+        if (['日前的', '日內最高', '日內最低', '日內均值'].includes(token)) {
+            throw new Error(`「${token}」前面必須加上數字！請先到「運算」點擊數字 (例如 5)，再按「${token}」。`);
+        }
+
+        // 1. 處理時間偏移
         let offset = 0;
         if (token.includes('日前的')) {
           offset = parseInt(token) || 0;
-          i++; // 跳到下一個詞
+          i++; 
           if (i >= formulaArray.length) break;
           token = formulaArray[i]; 
         }
 
-        if (token === '而且') {
-          matchType = 'AND';
-          continue;
-        } else if (token === '或者') {
-          matchType = 'OR';
+        // ✨ 1.5 處理動態區間範圍 (N日內最高 / 最低 / 均值)
+        let dynScopeMatch = token.match(/^(\d+)日內(最高|最低|均值)$/);
+        let dynScope = null;
+        let dynN = 1;
+        if (dynScopeMatch) {
+            dynN = parseInt(dynScopeMatch[1]);
+            const type = dynScopeMatch[2];
+            dynScope = type === '最高' ? 'max' : type === '最低' ? 'min' : 'avg';
+
+            i++; // 跳到下一個詞 (必須是指標，例如收盤價)
+            if (i >= formulaArray.length) throw new Error(`「${token}」後面缺少要計算的指標（例如：收盤價）！`);
+            token = formulaArray[i];
+        }
+
+        if (token === '而且') { matchType = 'AND'; continue; } 
+        else if (token === '或者') { matchType = 'OR'; continue; }
+
+        // ✨ 2. 新增：處理四則運算 (只限於修飾右邊條件，例如 1日前的 成交量 × 2)
+        if (['+', '-', '×', '÷'].includes(token)) {
+          if (conditions.length === 0 || currentLeft !== null) {
+            throw new Error("四則運算必須接在右側條件之後！例如: 收盤價 > 5日均線 + 10");
+          }
+          const lastCond = conditions[conditions.length - 1];
+          if (token === '×') lastCond.rightMathOp = '*';
+          else if (token === '÷') lastCond.rightMathOp = '/';
+          else lastCond.rightMathOp = token;
+          
+          i++;
+          if (i >= formulaArray.length) throw new Error("四則運算後面缺少數字！");
+          const nextToken = formulaArray[i];
+          if (isNaN(nextToken)) throw new Error(`四則運算後面必須是數字，不能是「${nextToken}」`);
+          lastCond.rightMathNum = parseFloat(nextToken);
           continue;
         }
 
-        // 2. 如果遇到比較符號，就把它記下來當作 Operator
+        if (['(', ')'].includes(token)) {
+          throw new Error("目前為條件比對引擎，暫不支援複雜的括號公式。已為您新增內建的『實體漲幅』按鈕，請直接使用！");
+        }
+
+        // 3. 如果遇到比較符號
         if (['>', '<', '≥', '≤', '=', '≠'].includes(token)) {
           let op = token;
           if (op === '≥') op = '>=';
@@ -2464,23 +2508,30 @@ const App = () => {
           continue;
         }
 
-        // 3. 判斷這個詞是數字還是字典裡的名詞
+        // 4. 判斷這個詞是數字還是字典裡的名詞
         let parsedValue;
         if (!isNaN(token)) {
           parsedValue = { type: 'number', value: parseFloat(token) };
         } else if (dictionary[token]) {
-          parsedValue = { type: 'metric', metric: { ...dictionary[token], offset } };
+          // ✨ 將偏移量與動態區間一併打包送給底層引擎計算
+          parsedValue = { 
+            type: 'metric', 
+            metric: { 
+              ...dictionary[token], 
+              offset: offset,
+              scope: dynScope || dictionary[token].scope,
+              n: dynScope ? dynN : dictionary[token].n
+            } 
+          };
         } else {
-          // 如果遇到還沒支援的詞(例如外資買賣超)，先丟出錯誤
           throw new Error(`目前系統尚未支援「${token}」的資料，請先移除。`);
         }
 
-        // 4. 組裝左邊與右邊
+        // 5. 組裝左邊與右邊
         if (!currentLeft) {
           if (parsedValue.type === 'number') throw new Error('公式左邊不能是純數字！');
           currentLeft = parsedValue.metric;
         } else if (currentOp) {
-          // 已經有左邊跟符號了，現在這個一定是右邊！組裝完成！
           const condition = {
             left: currentLeft,
             operator: currentOp,
@@ -2491,13 +2542,11 @@ const App = () => {
             rightMathNum: 1
           };
           conditions.push(condition);
-          // 重置狀態，準備迎接下一個條件（如果有「而且」的話）
           currentLeft = null;
           currentOp = null;
         }
       }
 
-      // 如果有沒組裝完的（例如寫了 "收盤價 > " 就結束），提醒使用者
       if (currentLeft && currentOp) {
         throw new Error('公式尚未完成，比較符號後面缺少條件！');
       }
@@ -2512,7 +2561,6 @@ const App = () => {
       };
 
     } catch (err) {
-      // 翻譯失敗，回傳錯誤訊息
       return { error: err.message };
     }
   };
@@ -3868,9 +3916,10 @@ const App = () => {
                
                {builderTab === '價量' && (
                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
-                    {['開盤價', '最高價', '最低價', '收盤價', '成交量', '均價', '均量', '漲跌幅', '1日前的', '2日前的', '3日前的', '5日前的(週)', '10日前的(雙週)'].map(btn => {
+                    {/* ✨ 將固定天數按鈕換成全新的動態後綴組合鍵 */}
+                    {['開盤價', '最高價', '最低價', '收盤價', '成交量', '漲跌幅', '實體漲幅', '振幅', '1日前的', '日前的', '日內最高', '日內最低', '日內均值'].map(btn => {
                       // 讓時間偏移的按鈕顯示粉紅色，一般價量顯示靛藍色
-                      const isTimeOffset = btn.includes('日前的');
+                      const isTimeOffset = btn.includes('日前的') || btn.includes('日內');
                       return (
                         <button 
                           key={btn} 
