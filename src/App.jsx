@@ -2428,6 +2428,11 @@ const App = () => {
         '投信買賣超': { target: 'trust', scope: 'today', n: 1 },
         '自營商買賣超': { target: 'dealer', scope: 'today', n: 1 },
         '融資增減': { target: 'marginDiff', scope: 'today', n: 1 },
+        '月營收年增率': { target: 'revYoY', scope: 'today', n: 1 },
+        '月營收月增率': { target: 'revMoM', scope: 'today', n: 1 },
+        '單季EPS': { target: 'eps', scope: 'today', n: 1 },
+        '近四季EPS': { target: 'eps4q', scope: 'today', n: 1 },
+        '單季毛利率': { target: 'grossMargin', scope: 'today', n: 1 },
         'K值': { target: 'kd.k', scope: 'today', n: 1 },
         'D值': { target: 'kd.d', scope: 'today', n: 1 },
         'RSI值': { target: 'rsi.rsi1', scope: 'today', n: 1 },
@@ -2871,36 +2876,53 @@ const App = () => {
       } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
 
       // ==========================================
-      // ✨ [FinMind 融合區塊] 開始
+      // ✨ [FinMind 融合區塊] 開始 (包含基本面)
       // ==========================================
       const fmToken = finmindApiKey; 
       const startDateStr = fromDate.toISOString().split('T')[0];
+      
+      // 財報需要往前多抓 15 個月才能算出「近四季 EPS」
+      const finStartDate = new Date(fromDate);
+      finStartDate.setDate(finStartDate.getDate() - 450);
+      const finStartDateStr = finStartDate.toISOString().split('T')[0];
+
       const fmMap = {};
+      let revData = [];
+      let finList = [];
 
       try {
         let instUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${targetSymbol}&start_date=${startDateStr}`;
         let marginUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${targetSymbol}&start_date=${startDateStr}`;
+        let revUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMonthRevenue&data_id=${targetSymbol}&start_date=${finStartDateStr}`;
+        let finUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=${targetSymbol}&start_date=${finStartDateStr}`;
+        
         if (fmToken) {
            instUrl += `&token=${fmToken}`;
            marginUrl += `&token=${fmToken}`;
+           revUrl += `&token=${fmToken}`;
+           finUrl += `&token=${fmToken}`;
         }
 
-        const [instRes, marginRes] = await Promise.all([
+        const [instRes, marginRes, revRes, finRes] = await Promise.all([
           fetch(instUrl),
-          fetch(marginUrl)
+          fetch(marginUrl),
+          fetch(revUrl),
+          fetch(finUrl)
         ]);
         
         if (!instRes.ok || !marginRes.ok) throw new Error("FinMind API 回應異常");
         
         const instJson = await instRes.json();
         const marginJson = await marginRes.json();
+        const revJson = await revRes.json();
+        const finJson = await finRes.json();
 
         // 🌟 防呆：如果法人真的沒抓到，印在系統控制台讓我們知道發生什麼事
         if (!instJson.data || instJson.data.length === 0) {
            console.warn(`⚠️ 找不到 ${targetSymbol} 的法人資料，請確認該股是否有法人進出，或 FinMind 尚未更新。`);
         }
 
-        // 2. 建立日期對照字典
+        // 1. 建立日期對照字典 (保留您的防呆升級版)
         if (instJson.data) {
            instJson.data.forEach(d => {
                if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
@@ -2935,19 +2957,69 @@ const App = () => {
                fmMap[d.date].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
            });
         }
+
+        // 2. 處理月營收資料 (預設隔月 10 號公佈)
+        if (revJson.data) {
+          revJson.data.forEach(d => {
+            const rDate = new Date(d.date); rDate.setMonth(rDate.getMonth() + 1); rDate.setDate(10);
+            revData.push({ date: rDate.toISOString().split('T')[0], yoy: parseFloat(d.revenue_YoY) || 0, mom: parseFloat(d.revenue_MoM) || 0 });
+          });
+          revData.sort((a,b) => a.date.localeCompare(b.date));
+        }
+
+        // 3. 處理財報資料 (EPS, 毛利率) 
+        let finDataMap = {};
+        if (finJson.data) {
+          finJson.data.forEach(d => {
+            if (!finDataMap[d.date]) finDataMap[d.date] = {};
+            if (d.type === 'EPS' || d.type === 'EarningsPerShare') finDataMap[d.date].EPS = parseFloat(d.value);
+            if (d.type === 'GrossProfitMargin' || d.type.includes('毛利')) finDataMap[d.date].GrossMargin = parseFloat(d.value);
+          });
+        }
+        finList = Object.keys(finDataMap).map(date => {
+          const d = new Date(date); const month = d.getMonth() + 1;
+          let releaseDate = new Date(d);
+          if (month === 3) releaseDate = new Date(d.getFullYear(), 4, 15);
+          else if (month === 6) releaseDate = new Date(d.getFullYear(), 7, 14);
+          else if (month === 9) releaseDate = new Date(d.getFullYear(), 10, 14);
+          else if (month === 12) releaseDate = new Date(d.getFullYear() + 1, 2, 31);
+          return { date: releaseDate.toISOString().split('T')[0], ...finDataMap[date] };
+        }).sort((a,b) => a.date.localeCompare(b.date));
+
+        finList.forEach((item, idx) => {
+          let eps4q = item.EPS || 0; let count = 1;
+          for (let i = idx - 1; i >= Math.max(0, idx - 3); i--) { eps4q += (finList[i].EPS || 0); count++; }
+          item.eps4q = count === 4 ? eps4q : null;
+        });
+
       } catch (fmErr) {
-        console.warn("FinMind 籌碼載入失敗", fmErr);
+        console.warn("FinMind 籌碼或財報載入失敗", fmErr);
       }
 
-      // 3. 把籌碼資料精準對齊，塞入 Fugle 的 K 線陣列中
-      const mergedCandles = candles.map(c => ({
-          ...c,
-          foreign: fmMap[c.date]?.foreign || 0,
-          trust: fmMap[c.date]?.trust || 0,
-          dealer: fmMap[c.date]?.dealer || 0,
-          marginDiff: fmMap[c.date]?.marginDiff || 0,
-          shortDiff: fmMap[c.date]?.shortDiff || 0
-      }));
+      // 4. 把籌碼與財報資料精準對齊，塞入 Fugle 的 K 線陣列中
+      let currentRev = { yoy: 0, mom: 0 };
+      let currentFin = { EPS: 0, eps4q: 0, GrossMargin: 0 };
+      let revIdx = 0; let finIdx = 0;
+
+      const mergedCandles = candles.map(c => {
+          // 往前遞延填補最新的營收與財報數據
+          while (revIdx < revData.length && revData[revIdx].date <= c.date) { currentRev = revData[revIdx]; revIdx++; }
+          while (finIdx < finList.length && finList[finIdx].date <= c.date) { currentFin = finList[finIdx]; finIdx++; }
+          
+          return {
+              ...c,
+              foreign: fmMap[c.date]?.foreign || 0,
+              trust: fmMap[c.date]?.trust || 0,
+              dealer: fmMap[c.date]?.dealer || 0,
+              marginDiff: fmMap[c.date]?.marginDiff || 0,
+              shortDiff: fmMap[c.date]?.shortDiff || 0,
+              revYoY: currentRev.yoy,
+              revMoM: currentRev.mom,
+              eps: currentFin.EPS || 0,
+              eps4q: currentFin.eps4q || 0,
+              grossMargin: currentFin.GrossMargin || 0
+          };
+      });
 
       // 將融合好的資料存入系統
       setRawDailyData(mergedCandles);
@@ -3258,48 +3330,106 @@ const App = () => {
           }
         } catch (intraErr) { /* 盤中 API 失敗就忽略，繼續用歷史 K 線 */ }
 
-        // 2. 抓取 FinMind 籌碼 (若有金鑰)
-        const fmMap = {};
-        if (finmindApiKey) {
-           const [instRes, marginRes] = await Promise.all([
-              fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stock.symbol}&start_date=${fromDateStr}&token=${finmindApiKey}`),
-              fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${stock.symbol}&start_date=${fromDateStr}&token=${finmindApiKey}`)
-           ]);
-           const instJson = await instRes.json();
-           const marginJson = await marginRes.json();
+        // ✨ 2. 抓取 FinMind 籌碼與基本面
+        const finStartDate = new Date(fromDate);
+        finStartDate.setDate(finStartDate.getDate() - 450);
+        const finStartDateStr = finStartDate.toISOString().split('T')[0];
 
-           if (instJson.data) {
-               instJson.data.forEach(d => {
-                   if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-                   const buy = Number(d.buy || d.Buy || d.buy_vol || 0);
-                   const sell = Number(d.sell || d.Sell || d.sell_vol || 0);
-                   const name = String(d.name || d.Name || d.info || "").toUpperCase();
-                   const netLots = (buy - sell) / 1000;
-                   if (name.includes('FOREIGN_INVESTOR') || name.includes('外資')) fmMap[d.date].foreign += netLots;
-                   if (name.includes('INVESTMENT_TRUST') || name.includes('投信')) fmMap[d.date].trust += netLots;
-                   if (name.includes('DEALER') || name.includes('自營')) {
-                       if (!name.includes('FOREIGN_DEALER') && !name.includes('外資自營商')) fmMap[d.date].dealer += netLots;
-                   }
-               });
-           }
-           if (marginJson.data) {
-               marginJson.data.forEach(d => {
-                   if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-                   fmMap[d.date].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
-                   fmMap[d.date].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
-               });
-           }
+        const fmMap = {};
+        let revData = [];
+        let finList = [];
+
+        if (finmindApiKey) {
+           try {
+              const [instRes, marginRes, revRes, finRes] = await Promise.all([
+                  fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stock.symbol}&start_date=${fromDateStr}&token=${finmindApiKey}`),
+                  fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${stock.symbol}&start_date=${fromDateStr}&token=${finmindApiKey}`),
+                  fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMonthRevenue&data_id=${stock.symbol}&start_date=${finStartDateStr}&token=${finmindApiKey}`),
+                  fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=${stock.symbol}&start_date=${finStartDateStr}&token=${finmindApiKey}`)
+              ]);
+              
+              const instJson = await instRes.json();
+              const marginJson = await marginRes.json();
+              const revJson = await revRes.json();
+              const finJson = await finRes.json();
+
+              // (籌碼解析)
+              if (instJson.data) {
+                 instJson.data.forEach(d => {
+                     if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+                     const netLots = ((d.buy || 0) - (d.sell || 0)) / 1000;
+                     if (d.name.includes('外資')) fmMap[d.date].foreign += netLots;
+                     if (d.name.includes('投信')) fmMap[d.date].trust += netLots;
+                     if (d.name.includes('自營')) fmMap[d.date].dealer += netLots;
+                 });
+              }
+              if (marginJson.data) {
+                 marginJson.data.forEach(d => {
+                     if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+                     fmMap[d.date].marginDiff = ((d.MarginPurchaseBuy || 0) - (d.MarginPurchaseSell || 0) - (d.MarginPurchaseCashRepayment || 0)) / 1000;
+                     fmMap[d.date].shortDiff = ((d.ShortSaleBuy || 0) - (d.ShortSaleSell || 0) - (d.ShortSaleCashRepayment || 0)) / 1000;
+                 });
+              }
+
+              // (營收解析)
+              if (revJson.data) {
+                revJson.data.forEach(d => {
+                  const rDate = new Date(d.date); rDate.setMonth(rDate.getMonth() + 1); rDate.setDate(10);
+                  revData.push({ date: rDate.toISOString().split('T')[0], yoy: parseFloat(d.revenue_YoY) || 0, mom: parseFloat(d.revenue_MoM) || 0 });
+                });
+                revData.sort((a,b) => a.date.localeCompare(b.date));
+              }
+
+              // (財報解析)
+              let finDataMap = {};
+              if (finJson.data) {
+                finJson.data.forEach(d => {
+                  if (!finDataMap[d.date]) finDataMap[d.date] = {};
+                  if (d.type === 'EPS' || d.type === 'EarningsPerShare') finDataMap[d.date].EPS = parseFloat(d.value);
+                  if (d.type === 'GrossProfitMargin' || d.type.includes('毛利')) finDataMap[d.date].GrossMargin = parseFloat(d.value);
+                });
+              }
+              finList = Object.keys(finDataMap).map(date => {
+                const d = new Date(date); const month = d.getMonth() + 1;
+                let releaseDate = new Date(d);
+                if (month === 3) releaseDate = new Date(d.getFullYear(), 4, 15);
+                else if (month === 6) releaseDate = new Date(d.getFullYear(), 7, 14);
+                else if (month === 9) releaseDate = new Date(d.getFullYear(), 10, 14);
+                else if (month === 12) releaseDate = new Date(d.getFullYear() + 1, 2, 31);
+                return { date: releaseDate.toISOString().split('T')[0], ...finDataMap[date] };
+              }).sort((a,b) => a.date.localeCompare(b.date));
+
+              finList.forEach((item, idx) => {
+                let eps4q = item.EPS || 0; let count = 1;
+                for (let i = idx - 1; i >= Math.max(0, idx - 3); i--) { eps4q += (finList[i].EPS || 0); count++; }
+                item.eps4q = count === 4 ? eps4q : null;
+              });
+
+           } catch (e) { console.warn("掃描時基本面載入失敗", e); }
         }
 
-        // 3. 組合資料並用引擎運算
-        const mergedCandles = candles.map(c => ({
-            ...c,
-            foreign: fmMap[c.date]?.foreign || 0,
-            trust: fmMap[c.date]?.trust || 0,
-            dealer: fmMap[c.date]?.dealer || 0,
-            marginDiff: fmMap[c.date]?.marginDiff || 0,
-            shortDiff: fmMap[c.date]?.shortDiff || 0
-        }));
+        // ✨ 3. 組合資料並用引擎運算
+        let currentRev = { yoy: 0, mom: 0 };
+        let currentFin = { EPS: 0, eps4q: 0, GrossMargin: 0 };
+        let revIdx = 0; let finIdx = 0;
+
+        const mergedCandles = candles.map(c => {
+            while (revIdx < revData.length && revData[revIdx].date <= c.date) { currentRev = revData[revIdx]; revIdx++; }
+            while (finIdx < finList.length && finList[finIdx].date <= c.date) { currentFin = finList[finIdx]; finIdx++; }
+            return {
+                ...c,
+                foreign: fmMap[c.date]?.foreign || 0,
+                trust: fmMap[c.date]?.trust || 0,
+                dealer: fmMap[c.date]?.dealer || 0,
+                marginDiff: fmMap[c.date]?.marginDiff || 0,
+                shortDiff: fmMap[c.date]?.shortDiff || 0,
+                revYoY: currentRev.yoy,
+                revMoM: currentRev.mom,
+                eps: currentFin.EPS || 0,
+                eps4q: currentFin.eps4q || 0,
+                grossMargin: currentFin.GrossMargin || 0
+            };
+        });
 
         // 把選定的策略「強制啟用」送進去算
         const testStrats = [{...strategy, isActive: true}];
@@ -3998,9 +4128,17 @@ const App = () => {
                )}
 
                {builderTab === '盤後' && (
-                 <div className="grid grid-cols-2 gap-2 h-full content-start">
-                    {['外資買賣超', '投信買賣超', '自營商買賣超', '主力進出', '融資增減', '融券增減', '股本(億)'].map(btn => (
-                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-4 bg-purple-900/40 border border-purple-700/50 text-purple-300 rounded font-bold hover:bg-purple-800/60 active:scale-95 transition-transform">{btn}</button>
+                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 h-full content-start overflow-y-auto pr-2 pb-10">
+                    {/* 籌碼面分類 */}
+                    <div className="col-span-full text-xs font-bold text-slate-500 mb-1 tracking-widest border-b border-slate-700/50 pb-1">籌碼面</div>
+                    {['外資買賣超', '投信買賣超', '自營商買賣超', '主力進出', '融資增減', '融券增減'].map(btn => (
+                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-3 bg-purple-900/40 border border-purple-700/50 text-purple-300 rounded font-bold hover:bg-purple-800/60 active:scale-95 transition-transform text-sm">{btn}</button>
+                    ))}
+                    
+                    {/* 基本面與估值分類 */}
+                    <div className="col-span-full text-xs font-bold text-slate-500 mt-2 mb-1 tracking-widest border-b border-slate-700/50 pb-1">基本面與估值</div>
+                    {['月營收年增率', '月營收月增率', '單季EPS', '近四季EPS', '單季毛利率'].map(btn => (
+                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-3 bg-amber-900/40 border border-amber-700/50 text-amber-300 rounded font-bold hover:bg-amber-800/60 active:scale-95 transition-transform text-sm">{btn}</button>
                     ))}
                  </div>
                )}
