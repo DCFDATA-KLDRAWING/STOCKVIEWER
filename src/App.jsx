@@ -3116,6 +3116,109 @@ const App = () => {
     }
   }
 
+  // ==========================================
+  // ✨ [新增] 自選股策略掃描引擎
+  // ==========================================
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
+  const [scanResults, setScanResults] = useState({});
+  const [selectedScanStrategy, setSelectedScanStrategy] = useState('');
+
+  const handleScanWatchlist = async (strategyId) => {
+    if (!strategyId) return showAlert('請先選擇一個自訂策略！');
+    if (watchlist.length === 0) return showAlert('您的自選名單空空如也，請先加入股票！');
+
+    const strategy = customStrategies.find(s => s.id.toString() === strategyId.toString());
+    if (!strategy) return;
+
+    setIsScanning(true);
+    setScanProgress({ current: 0, total: watchlist.length });
+    const results = {};
+
+    const toDate = new Date();
+    const fromDate = new Date();
+    fromDate.setDate(toDate.getDate() - 150); // 抓 150 天的資料供 MA 等指標計算
+    const fromDateStr = fromDate.toISOString().split('T')[0];
+    const toDateStr = toDate.toISOString().split('T')[0];
+
+    for (let i = 0; i < watchlist.length; i++) {
+      const stock = watchlist[i];
+      try {
+        // 1. 抓取富果 K 線
+        const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${stock.symbol}?timeframe=D&from=${fromDateStr}&to=${toDateStr}`;
+        const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
+        if (!histRes.ok) throw new Error('Fugle API 異常');
+        const histData = await histRes.json();
+        let candles = histData.data.reverse().map(d => ({ date: d.date, open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000) }));
+
+        // 2. 抓取 FinMind 籌碼 (若有金鑰)
+        const fmMap = {};
+        if (finmindApiKey) {
+           const [instRes, marginRes] = await Promise.all([
+              fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stock.symbol}&start_date=${fromDateStr}&token=${finmindApiKey}`),
+              fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${stock.symbol}&start_date=${fromDateStr}&token=${finmindApiKey}`)
+           ]);
+           const instJson = await instRes.json();
+           const marginJson = await marginRes.json();
+
+           if (instJson.data) {
+               instJson.data.forEach(d => {
+                   if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+                   const buy = Number(d.buy || d.Buy || d.buy_vol || 0);
+                   const sell = Number(d.sell || d.Sell || d.sell_vol || 0);
+                   const name = String(d.name || d.Name || d.info || "").toUpperCase();
+                   const netLots = (buy - sell) / 1000;
+                   if (name.includes('FOREIGN_INVESTOR') || name.includes('外資')) fmMap[d.date].foreign += netLots;
+                   if (name.includes('INVESTMENT_TRUST') || name.includes('投信')) fmMap[d.date].trust += netLots;
+                   if (name.includes('DEALER') || name.includes('自營')) {
+                       if (!name.includes('FOREIGN_DEALER') && !name.includes('外資自營商')) fmMap[d.date].dealer += netLots;
+                   }
+               });
+           }
+           if (marginJson.data) {
+               marginJson.data.forEach(d => {
+                   if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+                   fmMap[d.date].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
+                   fmMap[d.date].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
+               });
+           }
+        }
+
+        // 3. 組合資料並用引擎運算
+        const mergedCandles = candles.map(c => ({
+            ...c,
+            foreign: fmMap[c.date]?.foreign || 0,
+            trust: fmMap[c.date]?.trust || 0,
+            dealer: fmMap[c.date]?.dealer || 0,
+            marginDiff: fmMap[c.date]?.marginDiff || 0,
+            shortDiff: fmMap[c.date]?.shortDiff || 0
+        }));
+
+        // 把選定的策略「強制啟用」送進去算
+        const testStrats = [{...strategy, isActive: true}];
+        const testKlineData = analyzeSignals(mergedCandles, testStrats, 0, maParams, vmaParams, indicatorParams);
+        
+        // 4. 驗證最後一根 K 棒是否出現標記
+        const lastCandle = testKlineData[testKlineData.length - 1];
+        if (lastCandle && lastCandle.customMarks && lastCandle.customMarks.includes(strategy.marker)) {
+            results[stock.symbol] = true;
+        } else {
+            results[stock.symbol] = false;
+        }
+
+      } catch (err) {
+         console.warn(`掃描失敗: ${stock.symbol}`, err);
+         results[stock.symbol] = false;
+      }
+
+      setScanProgress({ current: i + 1, total: watchlist.length });
+      setScanResults({...results}); // 讓畫面即時更新進度
+      await new Promise(r => setTimeout(r, 400)); // ⏳ 延遲 0.4 秒，防止 API 抓太快被鎖
+    }
+
+    setIsScanning(false);
+  };
+
   // ✨ 等待雲端資料載入畫面
   if (!dbLoaded) {
     return (
@@ -3426,6 +3529,34 @@ const App = () => {
                             </button>
                           </div>
 
+                          {/* ✨ [新增] 自選股的策略掃描控制列 */}
+                          {rankingTab === 'watchlist' && (
+                            <div className="p-2 sm:p-3 bg-slate-800/80 border-b border-slate-700 flex flex-col sm:flex-row items-center gap-2 shrink-0">
+                              <span className="text-slate-400 font-bold text-sm shrink-0">🔍 掃描自選股：</span>
+                              <select 
+                                className="bg-slate-900 border border-slate-600 text-cyan-300 px-2 py-1.5 rounded outline-none font-bold text-sm flex-1 w-full"
+                                value={selectedScanStrategy}
+                                onChange={(e) => setSelectedScanStrategy(e.target.value)}
+                                disabled={isScanning}
+                              >
+                                <option value="">-- 選擇您的自訂策略 --</option>
+                                {customStrategies.map(s => <option key={s.id} value={s.id}>{s.marker} {s.name}</option>)}
+                              </select>
+                              <div className="flex gap-2 w-full sm:w-auto">
+                                <button 
+                                  onClick={() => handleScanWatchlist(selectedScanStrategy)} 
+                                  disabled={!selectedScanStrategy || isScanning || watchlist.length === 0}
+                                  className="flex-1 bg-cyan-700 text-white px-4 py-1.5 rounded font-bold text-sm hover:bg-cyan-600 disabled:opacity-50 transition-all whitespace-nowrap"
+                                >
+                                  {isScanning ? `⏳ (${scanProgress.current}/${scanProgress.total})` : '▶ 執行篩選'}
+                                </button>
+                                {Object.keys(scanResults).length > 0 && !isScanning && (
+                                  <button onClick={() => setScanResults({})} className="text-slate-400 hover:text-red-400 text-sm font-bold px-3 py-1.5 bg-slate-900 rounded border border-slate-700 whitespace-nowrap">清除</button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
                           {/* 資料表格區域 */}
                           <div className="flex-1 flex flex-col overflow-hidden bg-[#020617]">
                             
@@ -3463,6 +3594,15 @@ const App = () => {
                                         <div className="col-span-5 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 overflow-hidden">
                                           <span className="text-cyan-400 font-bold text-sm sm:text-base">{stock.symbol}</span>
                                           <span className="text-slate-300 font-bold text-xs sm:text-sm truncate">{stock.name}</span>
+                                          {/* ✨ [新增] 顯示掃描結果的標籤 */}
+                                          {rankingTab === 'watchlist' && scanResults[stock.symbol] === true && (
+                                            <span className="bg-emerald-900/60 text-emerald-400 border border-emerald-500/50 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap animate-pulse font-bold shadow-[0_0_8px_rgba(16,185,129,0.3)]">
+                                              🎯 符合
+                                            </span>
+                                          )}
+                                          {rankingTab === 'watchlist' && scanResults[stock.symbol] === false && (
+                                            <span className="text-slate-600 text-[10px] whitespace-nowrap font-bold">未符合</span>
+                                          )}
                                         </div>
                                         <div className="col-span-3 text-right">
                                           <span className="text-pink-400 font-bold text-sm bg-pink-400/10 px-2 py-1 rounded inline-block whitespace-nowrap">
