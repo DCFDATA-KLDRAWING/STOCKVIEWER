@@ -3572,7 +3572,7 @@ const App = () => {
 
           <div className="w-[1px] h-6 bg-slate-700 mx-1 shrink-0"></div>
           {/* ✨ 1. 快捷開啟排行連結 */}
-          <button onClick={() => window.open('https://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_A.djhtm', '_blank')} className="shrink-0 justify-center bg-blue-900/40 border border-blue-700 text-blue-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(59,130,246,0.2)] hover:bg-blue-800 whitespace-nowrap transition-all flex items-center">
+          <button onClick={() => window.open('https://www.wantgoo.com/stock/ranking/top-gainer', '_blank')} className="shrink-0 justify-center bg-blue-900/40 border border-blue-700 text-blue-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(59,130,246,0.2)] hover:bg-blue-800 whitespace-nowrap transition-all flex items-center">
             🔗 排行截圖點
           </button>
           
