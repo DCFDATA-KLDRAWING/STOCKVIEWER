@@ -5260,7 +5260,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const currentHoverData = data[displayIdx];
 
   return (
-    <div ref={chartContainerRef} className={isFullscreen ? "fixed inset-0 z-[100] bg-[#020617] flex flex-col w-full h-full" : `relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col`}>
+    <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col"}>
       <CustomModal modal={chartModal} />
       
       {/* ✨ 排行榜視窗被安置在全螢幕容器內部，保證絕不會被遮擋 */}
