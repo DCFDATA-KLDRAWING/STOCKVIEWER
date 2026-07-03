@@ -3151,6 +3151,30 @@ const App = () => {
         const histData = await histRes.json();
         let candles = histData.data.reverse().map(d => ({ date: d.date, open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000) }));
 
+        // ✨ [新增] 抓取盤中即時資料，確保在交易時間掃描時，用的是「當下」的最新即時價格！
+        try {
+          const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${stock.symbol}`;
+          const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': userApiKey } });
+          if (intraRes.ok) {
+            const quote = await intraRes.json();
+            if (quote) {
+              const open = quote.openPrice || quote.previousClose;
+              const high = quote.highPrice || open;
+              const low = quote.lowPrice || open;
+              const close = quote.closePrice || quote.lastPrice || quote.previousClose;
+              let volume = quote.total?.tradeVolume || 0;
+
+              if (open != null && close != null) {
+                const currentCandle = { date: quote.date || new Date().toISOString().split('T')[0], open, high, low, close, volume };
+                const lastIdx = candles.length - 1;
+                // 如果歷史陣列最新一天是今天，就覆蓋更新；如果不是，就新增今天這根即時 K 棒
+                if (lastIdx >= 0 && candles[lastIdx].date === currentCandle.date) candles[lastIdx] = currentCandle; 
+                else candles.push(currentCandle); 
+              }
+            }
+          }
+        } catch (intraErr) { /* 盤中 API 失敗就忽略，繼續用歷史 K 線 */ }
+
         // 2. 抓取 FinMind 籌碼 (若有金鑰)
         const fmMap = {};
         if (finmindApiKey) {
