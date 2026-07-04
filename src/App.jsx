@@ -3969,13 +3969,12 @@ const App = () => {
 
                 <div className="w-full h-px bg-slate-700/50 my-2"></div>
                 
-                <button onClick={handleGoogleAIAnalysis} className="w-full bg-purple-900/60 border border-purple-500 text-purple-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:bg-purple-800 transition-all flex items-center justify-center gap-2">
-                  <span className="text-lg">🤖</span> AI 產業深度診斷
-                </button>
-
                 {/* ✨ 重新鎖上的按鈕 */}
                 <button onClick={() => { setIsAdmin(false); localStorage.removeItem('MY_STOCK_ADMIN'); }} className="mt-2 w-full text-xs text-slate-500 hover:text-slate-400 font-bold py-1 transition-colors">
                   🔒 重新鎖定面板
+                </button>
+                <button onClick={handleGoogleAIAnalysis} className="w-full bg-purple-900/60 border border-purple-500 text-purple-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:bg-purple-800 transition-all flex items-center justify-center gap-2">
+                  <span className="text-lg">🤖</span> AI 產業深度診斷
                 </button>
               </div>
             </TechCard>
