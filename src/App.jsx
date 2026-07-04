@@ -3951,6 +3951,9 @@ const App = () => {
 
         {/* 右側：產業資訊與外部工具 (佔 2 格) */}
         <div className="xl:col-span-2 flex flex-col gap-4 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-cyan-900 [&::-webkit-scrollbar-track]:bg-transparent">
+          <button onClick={handleGoogleAIAnalysis} className="w-full bg-purple-900/60 border border-purple-500 text-purple-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:bg-purple-800 transition-all flex items-center justify-center gap-2">
+            <span className="text-lg">🤖</span> AI 產業深度診斷
+          </button>
           {isAdmin ? (
             <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
               <div className="flex flex-col gap-3">
@@ -3986,9 +3989,7 @@ const App = () => {
                 </button>
               </div>
             </TechCard>
-            <button onClick={handleGoogleAIAnalysis} className="w-full bg-purple-900/60 border border-purple-500 text-purple-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:bg-purple-800 transition-all flex items-center justify-center gap-2">
-              <span className="text-lg">🤖</span> AI 產業深度診斷
-            </button>
+            
           )}
         </div>
 
