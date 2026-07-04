@@ -2351,7 +2351,28 @@ const App = () => {
   const [builderTab, setBuilderTab] = useState('運算');
   // ✨ 新增：策略名稱與圖標的狀態
   const [strategyName, setStrategyName] = useState('');
-  const [strategyMarker, setStrategyMarker] = useState('🎯'); 
+  const [strategyMarker, setStrategyMarker] = useState('🎯');
+  // ✨ 新增：管理者權限狀態 (用來隱藏產業資訊)
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('MY_STOCK_ADMIN') === 'true');
+
+  // ✨ 新增：解鎖管理者的功能
+  const handleUnlockAdmin = () => {
+    setAppModal({
+      type: 'prompt',
+      message: '請輸入產業資訊解鎖密碼：',
+      onConfirm: (pwd) => {
+        if (pwd === '822168') { // 🔑 這裡的 8888 就是密碼，您可以自己改成想要的數字或英文
+          setIsAdmin(true);
+          localStorage.setItem('MY_STOCK_ADMIN', 'true'); // 記住解鎖狀態，重新整理不用重打
+          setAppModal(null);
+          showAlert('解鎖成功！');
+        } else {
+          showAlert('密碼錯誤，請重新輸入！');
+        }
+      },
+      onCancel: () => setAppModal(null)
+    });
+  }; 
 
   // ==============================================
   // ✨ 新增：處理鍵盤輸入的智能合併邏輯 (連續數字會自動連接)
@@ -3930,28 +3951,45 @@ const App = () => {
 
         {/* 右側：產業資訊與外部工具 (佔 2 格) */}
         <div className="xl:col-span-2 flex flex-col gap-4 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-cyan-900 [&::-webkit-scrollbar-track]:bg-transparent">
-          <TechCard title="產業資訊" icon="🌍" glow="purple">
-            <div className="flex flex-col gap-3">
-              <button onClick={() => window.open('https://gemini.google.com/share/5dc98f62e00c?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-indigo-500 text-indigo-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
-                <span>🧮</span> 1. DCF 估值
-              </button>
-              <button onClick={() => window.open('https://gemini.google.com/share/fc1361ef0f25?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-pink-500 text-pink-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
-                <span>📊</span> 2. 財報分析
-              </button>
-              <button onClick={() => window.open('https://gemini.google.com/share/671a85db4a96?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-blue-500 text-blue-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
-                <span>🌍</span> 3. 產業規模
-              </button>
-              <button onClick={() => window.open('https://gemini.google.com/share/cbe5a830f8a7?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-amber-500 text-amber-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
-                <span>📈</span> 4. 營收觀察
-              </button>
+          {isAdmin ? (
+            <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
+              <div className="flex flex-col gap-3">
+                <button onClick={() => window.open('https://gemini.google.com/share/5dc98f62e00c?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-indigo-500 text-indigo-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                  <span>🧮</span> 1. DCF 估值
+                </button>
+                <button onClick={() => window.open('https://gemini.google.com/share/fc1361ef0f25?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-pink-500 text-pink-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                  <span>📊</span> 2. 財報分析
+                </button>
+                <button onClick={() => window.open('https://gemini.google.com/share/671a85db4a96?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-blue-500 text-blue-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                  <span>🌍</span> 3. 產業規模
+                </button>
+                <button onClick={() => window.open('https://gemini.google.com/share/cbe5a830f8a7?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-amber-500 text-amber-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                  <span>📈</span> 4. 營收觀察
+                </button>
 
-              <div className="w-full h-px bg-slate-700/50 my-2"></div>
-              
-              <button onClick={handleGoogleAIAnalysis} className="w-full bg-purple-900/60 border border-purple-500 text-purple-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:bg-purple-800 transition-all flex items-center justify-center gap-2">
-                <span className="text-lg">🤖</span> AI 產業深度診斷
-              </button>
-            </div>
-          </TechCard>
+                <div className="w-full h-px bg-slate-700/50 my-2"></div>
+                
+                <button onClick={handleGoogleAIAnalysis} className="w-full bg-purple-900/60 border border-purple-500 text-purple-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:bg-purple-800 transition-all flex items-center justify-center gap-2">
+                  <span className="text-lg">🤖</span> AI 產業深度診斷
+                </button>
+
+                {/* ✨ 重新鎖上的按鈕 */}
+                <button onClick={() => { setIsAdmin(false); localStorage.removeItem('MY_STOCK_ADMIN'); }} className="mt-2 w-full text-xs text-slate-500 hover:text-slate-400 font-bold py-1 transition-colors">
+                  🔒 重新鎖定面板
+                </button>
+              </div>
+            </TechCard>
+          ) : (
+            <TechCard title="產業資訊" icon="🔒" glow="purple">
+              <div className="flex flex-col items-center justify-center h-48 gap-4 opacity-70">
+                <span className="text-5xl">🔐</span>
+                <span className="text-sm font-bold text-slate-400 tracking-wider">此區塊為進階權限</span>
+                <button onClick={handleUnlockAdmin} className="mt-2 text-sm font-bold bg-slate-800 border border-purple-800 text-purple-300 px-6 py-2.5 rounded-lg hover:bg-purple-900 transition-colors shadow-sm">
+                  輸入密碼解鎖
+                </button>
+              </div>
+            </TechCard>
+          )}
         </div>
 
       </div>
