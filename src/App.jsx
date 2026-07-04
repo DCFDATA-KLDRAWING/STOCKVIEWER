@@ -2917,14 +2917,14 @@ const App = () => {
       } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
 
       // ==========================================
-      // ✨ [FinMind 融合區塊] 開始 (包含基本面)
+      // ✨ [FinMind 融合區塊] 開始 (包含基本面 + 800天年增率自動計算)
       // ==========================================
       const fmToken = finmindApiKey; 
       const startDateStr = fromDate.toISOString().split('T')[0];
       
-      // 財報需要往前多抓 15 個月才能算出「近四季 EPS」
+      // ✨ 財報與營收需要往前多抓 800 天，才能算出「去年同月」與「近四季 EPS」
       const finStartDate = new Date(fromDate);
-      finStartDate.setDate(finStartDate.getDate() - 450);
+      finStartDate.setDate(finStartDate.getDate() - 800);
       const finStartDateStr = finStartDate.toISOString().split('T')[0];
 
       const fmMap = {};
@@ -2938,17 +2938,12 @@ const App = () => {
         let finUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockFinancialStatements&data_id=${targetSymbol}&start_date=${finStartDateStr}`;
         
         if (fmToken) {
-           instUrl += `&token=${fmToken}`;
-           marginUrl += `&token=${fmToken}`;
-           revUrl += `&token=${fmToken}`;
-           finUrl += `&token=${fmToken}`;
+           instUrl += `&token=${fmToken}`; marginUrl += `&token=${fmToken}`;
+           revUrl += `&token=${fmToken}`; finUrl += `&token=${fmToken}`;
         }
 
         const [instRes, marginRes, revRes, finRes] = await Promise.all([
-          fetch(instUrl),
-          fetch(marginUrl),
-          fetch(revUrl),
-          fetch(finUrl)
+          fetch(instUrl), fetch(marginUrl), fetch(revUrl), fetch(finUrl)
         ]);
         
         if (!instRes.ok || !marginRes.ok) throw new Error("FinMind API 回應異常");
@@ -2958,35 +2953,19 @@ const App = () => {
         const revJson = await revRes.json();
         const finJson = await finRes.json();
 
-        // 🌟 防呆：如果法人真的沒抓到，印在系統控制台讓我們知道發生什麼事
-        if (!instJson.data || instJson.data.length === 0) {
-           console.warn(`⚠️ 找不到 ${targetSymbol} 的法人資料，請確認該股是否有法人進出，或 FinMind 尚未更新。`);
-        }
+        if (!instJson.data || instJson.data.length === 0) console.warn(`⚠️ 找不到 ${targetSymbol} 的法人資料`);
 
-        // 1. 建立日期對照字典 (保留您的防呆升級版)
+        // 1. 籌碼資料
         if (instJson.data) {
            instJson.data.forEach(d => {
                if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-               
-               // ✨ 支援不同大小寫的 API 改版防呆
-               const buy = Number(d.buy || d.Buy || d.buy_vol || 0);
-               const sell = Number(d.sell || d.Sell || d.sell_vol || 0);
-               // ✨ 把名字轉成大寫，方便後面中英文一起比對
+               const buy = Number(d.buy || d.Buy || d.buy_vol || 0); const sell = Number(d.sell || d.Sell || d.sell_vol || 0);
                const name = String(d.name || d.Name || d.info || "").toUpperCase(); 
-               
                const netLots = (buy - sell) / 1000;
-               
-               // ✨ 升級版：同時支援 FinMind V4 的英文名稱與舊版的中文名稱
-               if (name.includes('FOREIGN_INVESTOR') || name.includes('外資')) {
-                   fmMap[d.date].foreign += netLots;
-               }
-               if (name.includes('INVESTMENT_TRUST') || name.includes('投信')) {
-                   fmMap[d.date].trust += netLots;
-               }
+               if (name.includes('FOREIGN_INVESTOR') || name.includes('外資')) fmMap[d.date].foreign += netLots;
+               if (name.includes('INVESTMENT_TRUST') || name.includes('投信')) fmMap[d.date].trust += netLots;
                if (name.includes('DEALER') || name.includes('自營')) {
-                   if (!name.includes('FOREIGN_DEALER') && !name.includes('外資自營商')) {
-                       fmMap[d.date].dealer += netLots;
-                   }
+                   if (!name.includes('FOREIGN_DEALER') && !name.includes('外資自營商')) fmMap[d.date].dealer += netLots;
                }
            });
         }
@@ -2999,13 +2978,31 @@ const App = () => {
            });
         }
 
-        // 2. 處理月營收資料 (預設隔月 10 號公佈)
+        // ✨ 2. 處理月營收資料 (自動計算 YoY 與 MoM)
         if (revJson.data) {
-          revJson.data.forEach(d => {
-            const rDate = new Date(d.date); rDate.setMonth(rDate.getMonth() + 1); rDate.setDate(10);
-            revData.push({ date: rDate.toISOString().split('T')[0], yoy: parseFloat(d.revenue_YoY) || 0, mom: parseFloat(d.revenue_MoM) || 0 });
-          });
-          revData.sort((a,b) => a.date.localeCompare(b.date));
+          revJson.data.sort((a,b) => a.date.localeCompare(b.date));
+          for (let i = 0; i < revJson.data.length; i++) {
+            const d = revJson.data[i];
+            const rDate = new Date(d.date); rDate.setMonth(rDate.getMonth() + 1); rDate.setDate(10); 
+            const currentRev = parseFloat(d.revenue) || 0;
+            let yoy = 0; let mom = 0;
+
+            if (i >= 1) {
+                const prevRev = parseFloat(revJson.data[i-1].revenue) || 0;
+                if (prevRev !== 0) mom = ((currentRev - prevRev) / prevRev) * 100;
+            }
+
+            const cDateObj = new Date(d.date);
+            for (let j = i - 1; j >= Math.max(0, i - 13); j--) {
+                const pDateObj = new Date(revJson.data[j].date);
+                if (pDateObj.getMonth() === cDateObj.getMonth() && pDateObj.getFullYear() === cDateObj.getFullYear() - 1) {
+                    const prevYearRev = parseFloat(revJson.data[j].revenue) || 0;
+                    if (prevYearRev !== 0) yoy = ((currentRev - prevYearRev) / prevYearRev) * 100;
+                    break;
+                }
+            }
+            revData.push({ date: rDate.toISOString().split('T')[0], yoy: parseFloat(yoy.toFixed(2)), mom: parseFloat(mom.toFixed(2)) });
+          }
         }
 
         // 3. 處理財報資料 (EPS, 毛利率) 
@@ -3037,13 +3034,12 @@ const App = () => {
         console.warn("FinMind 籌碼或財報載入失敗", fmErr);
       }
 
-      // 4. 把籌碼與財報資料精準對齊，塞入 Fugle 的 K 線陣列中
+      // 4. 對齊資料
       let currentRev = { yoy: 0, mom: 0 };
       let currentFin = { EPS: 0, eps4q: 0, GrossMargin: 0 };
       let revIdx = 0; let finIdx = 0;
 
       const mergedCandles = candles.map(c => {
-          // 往前遞延填補最新的營收與財報數據
           while (revIdx < revData.length && revData[revIdx].date <= c.date) { currentRev = revData[revIdx]; revIdx++; }
           while (finIdx < finList.length && finList[finIdx].date <= c.date) { currentFin = finList[finIdx]; finIdx++; }
           
@@ -3062,7 +3058,6 @@ const App = () => {
           };
       });
 
-      // 將融合好的資料存入系統
       setRawDailyData(mergedCandles);
       // ==========================================
       // ✨ [FinMind 融合區塊] 結束
