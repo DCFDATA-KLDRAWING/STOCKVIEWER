@@ -3982,9 +3982,9 @@ const App = () => {
             <TechCard title="產業資訊" icon="🔒" glow="purple">
               <div className="flex flex-col items-center justify-center h-48 gap-4 opacity-70">
                 <span className="text-5xl">🔐</span>
-                <span className="text-sm font-bold text-slate-400 tracking-wider">此區塊為進階權限</span>
+                <span className="text-sm font-bold text-slate-400 tracking-wider">此區塊待開發區</span>
                 <button onClick={handleUnlockAdmin} className="mt-2 text-sm font-bold bg-slate-800 border border-purple-800 text-purple-300 px-6 py-2.5 rounded-lg hover:bg-purple-900 transition-colors shadow-sm">
-                  輸入密碼解鎖
+                  待開發中
                 </button>
               </div>
             </TechCard>
