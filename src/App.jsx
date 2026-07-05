@@ -2100,7 +2100,8 @@ const getWeekKey = (dateStr) => {
 
 const aggregateData = (dailyData, tf) => {
     if (!dailyData || dailyData.length === 0) return [];
-    if (tf === 'D') return dailyData;
+    // ✨ 加入分K判斷：如果是分K或日K，直接回傳不聚合
+    if (['5', '15', '30', '60', 'D'].includes(tf)) return dailyData;
 
     const groupedMap = new Map();
     dailyData.forEach(d => {
@@ -2869,53 +2870,67 @@ const App = () => {
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  };
-  // ✨ 修改 fetchStockData 讓它支援從畫板載入指定的股號
-  const fetchStockData = async (overrideSymbol = null) => {
-    const targetInput = (typeof overrideSymbol === 'string' ? overrideSymbol : null) || symbolInput;
+  };  
+  // ✨ 修改 fetchStockData 讓它支援從畫板載入指定的股號與動態週期切換
+  const fetchStockData = async (overrideSymbol = null, overrideTf = null) => {
+    const targetInput = (typeof overrideSymbol === 'string' ? overrideSymbol : null) || symbolInput || currentViewedSymbol;
+    const currentTf = overrideTf || timeframe;
     if (!targetInput) return showAlert('請先輸入股號');
-    if (!userApiKey) { setShowKeySetup(true); return; }
 
     setLoading(true); setError('');
     try {
       const toDate = new Date(); 
       const fromDate = new Date(); 
-      fromDate.setDate(toDate.getDate() - 360); 
+      
+      // ✨ 判斷是否為分K，如果是分K往前抓 30 天就好 (避免資料量過大)；若是日/週/月，抓 360 天
+      const isIntra = ['5', '15', '30', '60'].includes(currentTf);
+      fromDate.setDate(toDate.getDate() - (isIntra ? 30 : 360)); 
       const targetSymbol = getRealSymbol(targetInput);
       
-      const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=D&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
+      // ✨ 動態套用 API 的 timeframe 參數
+      const apiTf = isIntra ? currentTf : 'D';
+      const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=${apiTf}&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
       const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
       
       if (histRes.status === 401 || histRes.status === 403) throw new Error("⚠️ 金鑰無效或沒有權限，請點擊右上角重新設定 API 金鑰！");
       if (!histRes.ok) throw new Error(`無法取得歷史資料 (HTTP ${histRes.status})`);
       
       const histData = await histRes.json();
-      let candles = histData.data.reverse().map(d => ({ date: d.date, open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000) }));
+      let candles = histData.data.reverse().map(d => ({ 
+          // ✨ 如果是分K，顯示精準時間 (切掉毫秒與時區)；否則顯示日期
+          date: isIntra ? d.date.replace('T', ' ').substring(0, 16) : d.date, 
+          open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000) 
+      }));
 
-      try {
-        const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${targetSymbol}`;
-        const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': userApiKey } });
-        if (intraRes.ok) {
-          const json = await intraRes.json();
-          const quote = json;
-          
-          if (quote) {
-            const open = quote.openPrice || quote.previousClose;
-            const high = quote.highPrice || open;
-            const low = quote.lowPrice || open;
-            const close = quote.closePrice || quote.lastPrice || quote.previousClose;
-            let volume = quote.total?.tradeVolume || 0;
+      // ✨ 日K/週K/月K 才需要去抓當日即時報價來補最後一根，分K本身就已經很即時了
+      if (!isIntra) {
+        try {
+          const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${targetSymbol}`;
+          const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': userApiKey } });
+          if (intraRes.ok) {
+            const json = await intraRes.json();
+            const quote = json;
+            
+            if (quote) {
+              const open = quote.openPrice || quote.previousClose;
+              const high = quote.highPrice || open;
+              const low = quote.lowPrice || open;
+              const close = quote.closePrice || quote.lastPrice || quote.previousClose;
+              let volume = quote.total?.tradeVolume || 0;
 
-            if (open != null && close != null) {
-              const currentCandle = { date: quote.date || new Date().toISOString().split('T')[0], open, high, low, close, volume };
-              const lastIdx = candles.length - 1;
-              if (lastIdx >= 0 && candles[lastIdx].date === currentCandle.date) candles[lastIdx] = currentCandle; 
-              else candles.push(currentCandle); 
+              if (open != null && close != null) {
+                const currentCandle = { date: quote.date || new Date().toISOString().split('T')[0], open, high, low, close, volume };
+                const lastIdx = candles.length - 1;
+                if (lastIdx >= 0 && candles[lastIdx].date === currentCandle.date) candles[lastIdx] = currentCandle; 
+                else candles.push(currentCandle); 
+              }
             }
           }
-        }
-      } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
+        } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
+      } // ✨ 就是缺了這個右括號！！已經幫您補上了！
 
+      // ==========================================
+      // ✨ [FinMind 融合區塊] 開始 (包含基本面)
       // ==========================================
       // ✨ [FinMind 融合區塊] 開始 (包含基本面 + 800天年增率自動計算)
       // ==========================================
@@ -3040,16 +3055,20 @@ const App = () => {
       let revIdx = 0; let finIdx = 0;
 
       const mergedCandles = candles.map(c => {
-          while (revIdx < revData.length && revData[revIdx].date <= c.date) { currentRev = revData[revIdx]; revIdx++; }
-          while (finIdx < finList.length && finList[finIdx].date <= c.date) { currentFin = finList[finIdx]; finIdx++; }
+          // ✨ 關鍵：因為分K的 date 會帶有時間 (如 2024-05-10 13:25)，
+          // 但 FinMind 資料只有日期 (2024-05-10)，所以我們只取前 10 碼的字串來核對！
+          const dateKey = c.date.substring(0, 10);
+
+          while (revIdx < revData.length && revData[revIdx].date <= dateKey) { currentRev = revData[revIdx]; revIdx++; }
+          while (finIdx < finList.length && finList[finIdx].date <= dateKey) { currentFin = finList[finIdx]; finIdx++; }
           
           return {
               ...c,
-              foreign: fmMap[c.date]?.foreign || 0,
-              trust: fmMap[c.date]?.trust || 0,
-              dealer: fmMap[c.date]?.dealer || 0,
-              marginDiff: fmMap[c.date]?.marginDiff || 0,
-              shortDiff: fmMap[c.date]?.shortDiff || 0,
+              foreign: fmMap[dateKey]?.foreign || 0,
+              trust: fmMap[dateKey]?.trust || 0,
+              dealer: fmMap[dateKey]?.dealer || 0,
+              marginDiff: fmMap[dateKey]?.marginDiff || 0,
+              shortDiff: fmMap[dateKey]?.shortDiff || 0,
               revYoY: currentRev.yoy,
               revMoM: currentRev.mom,
               eps: currentFin.EPS || 0,
@@ -3093,8 +3112,8 @@ const App = () => {
     // 2. 切換狀態 (不再設定 symbolInput)
     setTimeframe(layout.timeframe);
     
-    // 3. 觸發重新抓取資料
-    fetchStockData(layout.symbolFullName);
+    // 3. 觸發重新抓取資料 (同時傳入週期參數，確保資料同步)
+    fetchStockData(layout.symbolFullName, layout.timeframe);
   };
 
   useEffect(() => { 
@@ -3594,8 +3613,17 @@ const App = () => {
             <input type="text" list="stock-list" value={symbolInput} onChange={(e) => setSymbolInput(e.target.value)} className="px-3 py-1.5 border border-cyan-800 bg-slate-900 rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-500 w-20 sm:w-24 font-bold text-center text-sm text-cyan-300 placeholder-slate-600 shadow-inner shrink-0" placeholder={currentViewedSymbol ? displayFullname : "股號/股名"} onKeyDown={(e) => e.key === 'Enter' && fetchStockData()} />
             
 
-            <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} className="px-2 py-1.5 border border-cyan-800 bg-slate-900 rounded-lg text-sm font-bold text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer shadow-inner shrink-0">
-              <option value="D">日</option><option value="W">週</option><option value="M">月</option>
+            <select value={timeframe} onChange={(e) => {
+              setTimeframe(e.target.value);
+              if (symbolInput || currentViewedSymbol) fetchStockData(null, e.target.value);
+            }} className="px-2 py-1.5 border border-cyan-800 bg-slate-900 rounded-lg text-sm font-bold text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer shadow-inner shrink-0">
+              <option value="5">5分</option>
+              <option value="15">15分</option>
+              <option value="30">30分</option>
+              <option value="60">60分</option>
+              <option value="D">日</option>
+              <option value="W">週</option>
+              <option value="M">月</option>
             </select>
 
               <button onClick={() => fetchStockData()} disabled={loading} className="bg-cyan-700 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-cyan-600 disabled:opacity-50 text-sm whitespace-nowrap shadow-[0_0_15px_rgba(8,145,178,0.4)] flex items-center gap-1 transition-all shrink-0">K</button>
@@ -5312,8 +5340,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     heidunText: '#f8fafc'
   };
 
-  // ✨ 週期文字標籤
-  const tfLabel = timeframe === 'W' ? '週' : timeframe === 'M' ? '月' : '日';
+  // ✨ 週期文字標籤升級
+  const tfLabel = timeframe === 'W' ? '週K' : timeframe === 'M' ? '月K' : timeframe === 'D' ? '日K' : timeframe + '分K';
   
   // ✨ 抓取當前應顯示的 MA 數值
   const displayIdx = crosshair && crosshair.idx >= 0 && crosshair.idx < data.length ? crosshair.idx : data.length - 1;
@@ -5556,7 +5584,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
           <text id="chart-title" x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85" textAnchor="middle" pointerEvents="none">
-            {stockName} ({timeframe === 'D' ? '日K' : timeframe === 'W' ? '週K' : '月K'})
+            {stockName} ({tfLabel})
           </text>
           
           <g clipPath="url(#chartClip)">
