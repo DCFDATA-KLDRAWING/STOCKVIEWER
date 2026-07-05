@@ -3368,7 +3368,8 @@ const App = () => {
 
         // ✨ 2. 抓取 FinMind 籌碼與基本面
         const finStartDate = new Date(fromDate);
-        finStartDate.setDate(finStartDate.getDate() - 450);
+        // ✨ 改為往回抓 800 天，確保有「去年同月」的營收可以對比
+        finStartDate.setDate(finStartDate.getDate() - 800);
         const finStartDateStr = finStartDate.toISOString().split('T')[0];
 
         const fmMap = {};
@@ -3407,13 +3408,38 @@ const App = () => {
                  });
               }
 
-              // (營收解析)
+              // ✨ (營收解析 - 智慧手動計算 YoY 與 MoM)
               if (revJson.data) {
-                revJson.data.forEach(d => {
-                  const rDate = new Date(d.date); rDate.setMonth(rDate.getMonth() + 1); rDate.setDate(10);
-                  revData.push({ date: rDate.toISOString().split('T')[0], yoy: parseFloat(d.revenue_YoY) || 0, mom: parseFloat(d.revenue_MoM) || 0 });
-                });
-                revData.sort((a,b) => a.date.localeCompare(b.date));
+                // 確保日期由舊到新排序
+                revJson.data.sort((a,b) => a.date.localeCompare(b.date));
+                for (let i = 0; i < revJson.data.length; i++) {
+                  const d = revJson.data[i];
+                  // 營收公告日設為次月 10 號
+                  const rDate = new Date(d.date); 
+                  rDate.setMonth(rDate.getMonth() + 1); 
+                  rDate.setDate(10); 
+                  
+                  const currentRev = parseFloat(d.revenue) || 0;
+                  let yoy = 0; let mom = 0;
+
+                  // 算月增率 (MoM)
+                  if (i >= 1) {
+                      const prevRev = parseFloat(revJson.data[i-1].revenue) || 0;
+                      if (prevRev !== 0) mom = ((currentRev - prevRev) / prevRev) * 100;
+                  }
+
+                  // 算年增率 (YoY) - 往回尋找「去年同月」
+                  const cDateObj = new Date(d.date);
+                  for (let j = i - 1; j >= Math.max(0, i - 13); j--) {
+                      const pDateObj = new Date(revJson.data[j].date);
+                      if (pDateObj.getMonth() === cDateObj.getMonth() && pDateObj.getFullYear() === cDateObj.getFullYear() - 1) {
+                          const prevYearRev = parseFloat(revJson.data[j].revenue) || 0;
+                          if (prevYearRev !== 0) yoy = ((currentRev - prevYearRev) / prevYearRev) * 100;
+                          break;
+                      }
+                  }
+                  revData.push({ date: rDate.toISOString().split('T')[0], yoy: parseFloat(yoy.toFixed(2)), mom: parseFloat(mom.toFixed(2)) });
+                }
               }
 
               // (財報解析)
