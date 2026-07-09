@@ -4598,7 +4598,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   
   // ✨ 將間距計算改為包含未來空白區的 totalSlots
   const spacing = (width - padding * 2) / totalSlots; 
-  const candleWidth = Math.max(0.5, spacing * 0.7); // ✨ 將最小寬度改為 0.5px，讓全圖壓縮時 K 棒不會糊成一團
+  const candleWidth = Math.max(0.5, spacing * 0.88); // ✨ 將最小寬度改為 0.5px，讓全圖壓縮時 K 棒不會糊成一團
 
   const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${padding + i * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
 
