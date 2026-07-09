@@ -2903,14 +2903,46 @@ const App = () => {
       }));
 
       // ✨ 日K/週K/月K 才需要去抓當日即時報價來補最後一根，分K本身就已經很即時了
-      if (!isIntra) {
+      // ✨ 根據分K或日K，分別去抓取當日的「即時K線」或「即時報價」來補齊
+      if (isIntra) {
+        // ✨ 分K專用：歷史API不包含當天盤中分K，必須呼叫 Intraday API 抓取並縫合
+        try {
+          const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/candles/${targetSymbol}?timeframe=${apiTf}`;
+          const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': userApiKey } });
+          if (intraRes.ok) {
+            const intraJson = await intraRes.json();
+            // 確保有抓到今天的盤中資料
+            if (intraJson && intraJson.data && intraJson.data.length > 0) {
+              let todayCandles = intraJson.data.map(d => ({
+                date: d.date.replace('T', ' ').substring(0, 16),
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close,
+                volume: d.volume // 盤中 API 的成交量已經是「張」數，直接套用
+              }));
+              
+              // 確保盤中時間是由舊到新排序 (09:00 -> 13:30)
+              todayCandles.sort((a, b) => a.date.localeCompare(b.date));
+              
+              // 找出盤中資料的日期 (例如 "2026-07-09")
+              const intraDatePrefix = intraJson.data[0].date.split('T')[0];
+              
+              // 為了防止歷史資料與今天盤中資料打架，先把歷史庫裡「今天」的殘留資料刪除
+              candles = candles.filter(c => !c.date.startsWith(intraDatePrefix));
+              
+              // ✨ 關鍵一步：把歷史分K與今天即時分K完美接合！
+              candles = [...candles, ...todayCandles];
+            }
+          }
+        } catch (intraErr) { console.warn("盤中分K資料解析失敗", intraErr); }
+      } else {
+        // ✨ 日K/週K/月K 專用：只抓當日即時的「最後一筆報價」來當作今天的最後一根K棒
         try {
           const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${targetSymbol}`;
           const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': userApiKey } });
           if (intraRes.ok) {
-            const json = await intraRes.json();
-            const quote = json;
-            
+            const quote = await intraRes.json();
             if (quote) {
               const open = quote.openPrice || quote.previousClose;
               const high = quote.highPrice || open;
