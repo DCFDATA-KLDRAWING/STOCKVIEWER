@@ -5426,7 +5426,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             <span className="font-bold tracking-widest">🛠️ DRAWING TOOLS</span>
             <button onClick={()=>setIsToolbarOpen(false)} className="text-slate-400 hover:text-cyan-300 font-bold px-1 transition-colors">➖ 收起</button>
           </div>
-          <div className="p-3 flex flex-col gap-3">
+          {/* ✨ 加上 max-height 與 overflow-y-auto 讓內部按鈕區塊可以滾動！ */}
+          <div className="p-3 flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-60px)] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-800/50">
             <div className="flex flex-wrap gap-1.5">
               <button onClick={()=> {setActiveTool('cursor'); setDraftPoints([]);}} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'cursor' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🖱️ 游標</button>
 
@@ -5981,7 +5982,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     <text x={width - 27} y={crosshair.y + 4} fill="#0f172a" fontSize="13" fontWeight="bold" textAnchor="middle">{crosshair.priceHover.toFixed(2)}</text>
                   </g>
                 )}
-                <g transform={`translate(${tooltipX}, ${tooltipY})`} opacity="0.6">
+                <g transform={`translate(${tooltipX}, ${tooltipY})`} opacity="0.8">
                   <rect x={0} y={0} width={boxWidth} height={boxHeight} fill="rgba(15, 23, 42, 0.30)" stroke="#0ea5e9" rx="8" />
                   {tooltipLines.map((l, i) => (
                       <text key={i} x={12} y={22 + i * 22} fontSize="13" fill={l.color} fontWeight="bold" opacity="0.4">{l.text}</text>
