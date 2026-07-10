@@ -4590,7 +4590,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
   data.forEach((d) => { if (d.high > actualMax) { actualMax = d.high; } if (d.low < actualMin) { actualMin = d.low; } });
   const minPrice = Math.min(actualMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.99; 
-  const maxPrice = actualMax * 1; 
+  const maxPrice = actualMax * 1.01; 
   const maxVol = Math.max(...data.map(d => d.volume)) * 1.02;
 
   const getY = (p) => mainHeight - padding - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - padding - chartPaddingTop);
@@ -4598,7 +4598,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   
   // ✨ 將間距計算改為包含未來空白區的 totalSlots
   const spacing = (width - padding * 2) / totalSlots; 
-  const candleWidth = Math.max(0.5, spacing * 0.88); // ✨ 將最小寬度改為 0.5px，讓全圖壓縮時 K 棒不會糊成一團
+  const candleWidth = Math.max(0.5, spacing * 0.90); // ✨ 將最小寬度改為 0.5px，讓全圖壓縮時 K 棒不會糊成一團
 
   const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${padding + i * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
 
