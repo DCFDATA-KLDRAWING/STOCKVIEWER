@@ -4567,9 +4567,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const indPadding = 15;
   
   // ✨ 動態分配高度 (完美分流版)：只有橫向放大時才撐滿螢幕，直式恢復原本的舒服高度！
-  const volHeight = isFullscreen ? 70 : 120;
-  const indicatorHeight = indicatorType !== 'None' ? (isFullscreen ? 70 : 120) : 0;
-  const chartPaddingTop = isFullscreen ? 35 : 80;
+  const volHeight = isFullscreen ? 40 : 80;
+  const indicatorHeight = indicatorType !== 'None' ? (isFullscreen ? 55 : 100) : 0;
+  const chartPaddingTop = isFullscreen ? 25 : 80;
   const bottomLegendHeight = 40; 
   
   let mainHeight = 400; // 直式預設主圖高度 (固定)
