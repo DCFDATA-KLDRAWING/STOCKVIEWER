@@ -4591,10 +4591,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   data.forEach((d) => { if (d.high > actualMax) { actualMax = d.high; } if (d.low < actualMin) { actualMin = d.low; } });
   const minPrice = Math.min(actualMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.99; 
   const maxPrice = actualMax * 1.01; 
-  const maxVol = Math.max(...data.map(d => d.volume)) * 1.1;
+  const maxVol = Math.max(...data.map(d => d.volume)) * 1.02;
 
   const getY = (p) => mainHeight - padding - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - padding - chartPaddingTop);
-  const getVolY = (v) => volHeight - (v / maxVol) * (volHeight - 10);
+  const getVolY = (v) => volHeight - (v / maxVol) * (volHeight - 2);
   
   // ✨ 將間距計算改為包含未來空白區的 totalSlots
   const spacing = (width - padding * 2) / totalSlots; 
