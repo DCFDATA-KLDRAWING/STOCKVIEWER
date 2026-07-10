@@ -5428,6 +5428,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           </div>
           {/* ✨ 加上 max-height 與 overflow-y-auto 讓內部按鈕區塊可以滾動！ */}
           <div className="p-3 flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-60px)] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-slate-800/50">
+            
+            {/* ✨ 升級：將「上一步、下一步、全清」移至最頂端，並精簡化 */}
+            <div className="flex justify-between items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
+              <div className="flex gap-2">
+                <button onClick={handleUndo} disabled={historyStep <= 0} className="px-3 py-1.5 bg-slate-700 rounded text-slate-300 font-bold hover:bg-slate-600 disabled:opacity-30 transition-colors" title="上一步">↩️</button>
+                <button onClick={handleRedo} disabled={historyStep >= history.length - 1} className="px-3 py-1.5 bg-slate-700 rounded text-slate-300 font-bold hover:bg-slate-600 disabled:opacity-30 transition-colors" title="下一步">↪️</button>
+              </div>
+              <button onClick={handleClearAll} className="px-3 py-1.5 bg-red-950/40 border border-red-900/60 rounded text-red-400 font-bold hover:bg-red-900 hover:text-red-200 transition-colors" title="清除全部畫線">🗑️</button>
+            </div>
+            
             <div className="flex flex-wrap gap-1.5">
               <button onClick={()=> {setActiveTool('cursor'); setDraftPoints([]);}} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'cursor' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🖱️ 游標</button>
 
@@ -5485,14 +5495,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 <span className="text-[10px] text-slate-300 w-8 text-right font-bold">{Math.round(drawOpacity * 100)}%</span>
               </div>
             </div>
-
-            <div className="flex justify-between items-center mt-2">
-              <div className="flex gap-2">
-                <button onClick={handleUndo} disabled={historyStep <= 0} className="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-700 disabled:opacity-30 transition-colors">↩️ 上一步</button>
-                <button onClick={handleRedo} disabled={historyStep >= history.length - 1} className="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-700 disabled:opacity-30 transition-colors">↪️ 下一步</button>
-              </div>
-              <button onClick={handleClearAll} className="text-sm text-red-400 hover:text-red-300 font-bold bg-red-950/30 border border-red-900/50 px-2 py-1 rounded transition-colors">🗑️ 全清</button>
-            </div>
+            
           </div>
         </div>
       ) : (
