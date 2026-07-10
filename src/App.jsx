@@ -4437,7 +4437,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         // 1. 抓出你目前的 K 棒總數與留白數量
         const currentDataLen = data ? data.length : 0;
         // 💡 這裡的 0.25 (25%) 或 0.15 (15%) 要跟你畫布計算寬度的留白比例一致
-        const extraSlots = Math.floor(displayCount * 0.25) || 15; 
+        const extraSlots = Math.floor(displayCount * 0.05) || 5; 
         const totalSlots = currentDataLen + extraSlots;
         
         if (totalSlots === 0) return;
@@ -4582,15 +4582,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   }
 
   // ✨ 動態計算額外的空白 K 棒數 (預留 15% 空間給未來畫線用)
-  const extraCandles = Math.floor(data.length * 0.15) || 15; 
+  const extraCandles = Math.floor(data.length * 0.05) || 5; 
   const totalSlots = data.length + extraCandles;
 
   let actualMax = -Infinity; let actualMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
   data.forEach((d) => { if (d.high > actualMax) { actualMax = d.high; } if (d.low < actualMin) { actualMin = d.low; } });
-  const minPrice = Math.min(actualMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.95; 
-  const maxPrice = actualMax * 1.05; 
+  const minPrice = Math.min(actualMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.99; 
+  const maxPrice = actualMax * 1.01; 
   const maxVol = Math.max(...data.map(d => d.volume)) * 1.1;
 
   const getY = (p) => mainHeight - padding - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - padding - chartPaddingTop);
@@ -5722,7 +5722,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
               const color = d.close >= d.open ? '#ef4444' : '#22c55e';
               return (
                 <g key={`candle-${i}`}>
-                  <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1" />
+                  <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
                   <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
                   {/* ✨ 補回：黑頓與自訂策略標記 */}
                   <g textAnchor="middle" fontSize="12" fontWeight="bold">
