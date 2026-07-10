@@ -5401,7 +5401,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
              {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
            </button>
            {/* 👇 貼在這裡：專屬的查價線獨立開關 👇 */}
-           <button onClick={onToggleCrosshair} className={`justify-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center border ${toggles.showCrosshair !== false ? 'bg-pink-900/80 border-pink-500 text-pink-200 shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'bg-slate-800/80 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-pink-300'}`}>
+           <button onClick={onToggleCrosshair} className={`justify-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center border ${toggles.showCrosshair !== false ? 'bg-pink-900/80 border-pink-500 text-pink-200 shadow-[0_0_10px_rgba(236,72,153,0.6)]' : 'bg-slate-800/80 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-pink-300'}`}>
              {toggles.showCrosshair !== false ? '🎯 關查價' : '🎯 開查價'}
            </button>
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
