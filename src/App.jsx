@@ -2213,7 +2213,8 @@ const App = () => {
     showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
     showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
     showBBandsCompress: false, // ✨ 新增：布林壓縮區塊 開關
-    showTooltipDetail: false // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
+    showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
+    showMaxVolLines: false // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
   });
 
   // 4. 自訂策略清單記憶
@@ -3151,9 +3152,9 @@ const App = () => {
   useEffect(() => { 
     if (rawDailyData.length > 0) {
         const aggregated = aggregateData(rawDailyData, timeframe);
-        setKlineData(analyzeSignals(aggregated, customStrategies, issuedShares, maParams, vmaParams, indicatorParams)); 
+        setKlineData(analyzeSignals(aggregated, customStrategies, issuedShares, maParams, vmaParams, indicatorParams, toggles.maxVolDays)); 
     }
-  }, [rawDailyData, timeframe, customStrategies, issuedShares, maParams, vmaParams, indicatorParams]);
+  }, [rawDailyData, timeframe, customStrategies, issuedShares, maParams, vmaParams, indicatorParams, toggles.maxVolDays]);
 
   const getMetricValue = (data, index, metricDef) => {
     // ✨ 升級：取出 offset (往前推幾天)，並計算出基準日 baseIndex
@@ -3201,12 +3202,35 @@ const App = () => {
     switch (condition.operator) { case '>': return leftVal > rightVal; case '<': return leftVal < rightVal; case '>=': return leftVal >= rightVal; case '<=': return leftVal <= rightVal; case '==': return leftVal === rightVal; case '!=': return leftVal !== rightVal; default: return false; }
   };
 
-  const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams) => {
+  const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams, maxVolDaysParam = 180) => {
     const closes = data.map(d => d.close); const volumes = data.map(d => d.volume);
     const ma1 = calculateSMA(closes, maParams.ma1.p); const ma2 = calculateSMA(closes, maParams.ma2.p); const ma3 = calculateSMA(closes, maParams.ma3.p); 
     const vma1 = calculateSMA(volumes, vmaParams.vma1.p); const vma2 = calculateSMA(volumes, vmaParams.vma2.p); const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0; 
     
+    // ✨ 新增：找出自訂天數內的最大量與次大量
+    const maxDays = maxVolDaysParam || 180;
+    const lookbackData = data.slice(Math.max(0, data.length - maxDays));
+    
+    let topVol = 0, secVol = 0;
+    let topVolPrice = null, secVolPrice = null;
+    let topVolIdx = null, secVolIdx = null;
+
+    lookbackData.forEach((d, idx) => {
+        if (d.volume > topVol) {
+            topVol = d.volume;
+            topVolPrice = d.close; // 取該根K棒的收盤價作為撐壓線
+            topVolIdx = data.length - lookbackData.length + idx;
+        }
+    });
+    lookbackData.forEach((d, idx) => {
+        if (d.volume > secVol && d.volume < topVol) {
+            secVol = d.volume;
+            secVolPrice = d.close;
+            secVolIdx = data.length - lookbackData.length + idx;
+        }
+    });
+
     const bbPeriod = 20; const bbStdDev = 2; const bbMa = calculateSMA(closes, bbPeriod);
     const bbStd = data.map((d, i) => {
         if (i < bbPeriod - 1) return null;
@@ -3305,12 +3329,18 @@ const App = () => {
       
       prevTowerColor = tColor; // 把今天的顏色存起來，留給明天判斷用
       let tower = { top: tTop, bottom: tBottom, color: tColor };
+      const isLastDay = i === data.length - 1; // ✨ 就是漏了這一行！用來判斷是不是最後一天
 
       return { 
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, customMarks,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },　willr,
-          obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower 
+          obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower,
+          // ✨ 把算好的最大量與次大量塞給最後一天，讓畫布讀取
+          maxVolPrice: isLastDay ? topVolPrice : undefined,
+          secondVolPrice: isLastDay ? secVolPrice : undefined,
+          topVolIdx: isLastDay ? topVolIdx : undefined,
+          secondVolIdx: isLastDay ? secVolIdx : undefined 
       };
     });
   };
@@ -3546,7 +3576,7 @@ const App = () => {
 
         // 把選定的策略「強制啟用」送進去算
         const testStrats = [{...strategy, isActive: true}];
-        const testKlineData = analyzeSignals(mergedCandles, testStrats, 0, maParams, vmaParams, indicatorParams);
+        const testKlineData = analyzeSignals(mergedCandles, testStrats, 0, maParams, vmaParams, indicatorParams, toggles.maxVolDays);
         
         // 4. 驗證最後一根 K 棒是否出現標記
         const lastCandle = testKlineData[testKlineData.length - 1];
@@ -3724,7 +3754,7 @@ const App = () => {
                       <input type="checkbox" checked={maParams[`ma${n}`].show !== false} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
                       <input type="color" value={maParams[`ma${n}`].c} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
                       <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA {n}</span>
-                      <input type="number" value={maParams[`ma${n}`].p} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: maParams[`ma${n}`].c}} />
+                      <input type="number" value={maParams[`ma${n}`]?.p ?? ''} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: maParams[`ma${n}`].c}} />
                       <select value={maParams[`ma${n}`].w} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
                         <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
                       </select>
@@ -3738,7 +3768,7 @@ const App = () => {
                       <input type="checkbox" checked={vmaParams[`vma${n}`].show !== false} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
                       <input type="color" value={vmaParams[`vma${n}`].c} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
                       <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">VMA {n}</span>
-                      <input type="number" value={vmaParams[`vma${n}`].p} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams[`vma${n}`].c}} />
+                      <input type="number" value={vmaParams[`vma${n}`]?.p ?? ''} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams[`vma${n}`].c}} />
                       <select value={vmaParams[`vma${n}`].w} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
                         <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
                       </select>
@@ -3760,7 +3790,36 @@ const App = () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBandsCompress} onChange={() => handleToggle('showBBandsCompress')} className="w-3.5 h-3.5 text-yellow-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-yellow-400 font-bold">布林壓縮</span></label>
                   {/* ✨ 新增：詳細資訊分流勾選鍵 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showTooltipDetail} onChange={() => handleToggle('showTooltipDetail')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-amber-400 font-bold">查價詳細資訊</span></label>
+
+              
                   
+                  {/* ✨ 升級：天量撐壓線開關 + 參數與樣式設定 */}
+                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
+                      <input type="checkbox" checked={toggles.showMaxVolLines} onChange={() => handleToggle('showMaxVolLines')} className="w-3.5 h-3.5 text-red-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-xs text-red-400 font-bold">近</span>
+                    </label>
+                    <input type="number" min="1" max="999" value={toggles.maxVolDays ?? 180} onChange={(e) => setToggles(p => ({...p, maxVolDays: Number(e.target.value)}))} className="w-10 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="天數" />
+                    <span className="text-xs text-red-400 font-bold">日大量線</span>
+                    
+                    {/* 樣式選擇下拉選單 */}
+                    <select 
+                      className="bg-slate-900 border border-slate-600 text-slate-300 text-[10px] rounded px-1 py-0.5 ml-1 outline-none"
+                      value={`${toggles.maxVolLineStyle?.type || 'solid'}-${toggles.maxVolLineStyle?.width || 1.5}`}
+                      onChange={(e) => {
+                        const [type, width] = e.target.value.split('-');
+                        setToggles(p => ({ ...p, maxVolLineStyle: { type, width: Number(width) } }));
+                      }}
+                    >
+                      <option value="solid-1">細實線</option>
+                      <option value="solid-1.5">中實線</option>
+                      <option value="solid-2.5">粗實線</option>
+                      <option value="dashed-1">細虛線</option>
+                      <option value="dashed-1.5">中虛線</option>
+                      <option value="dashed-2.5">粗虛線</option>
+                    </select>
+                  </div>
+ 
                   {/* ✨ 補回：量能標記、起漲、黑頓 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showVolSignal} onChange={() => handleToggle('showVolSignal')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">量能標記</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showTrend} onChange={() => handleToggle('showTrend')} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-emerald-400 font-bold">🔺起漲</span></label>
@@ -5719,6 +5778,54 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 })()}
               </g>
             )}
+
+            {/* ✨ 升級：讀取樣式設定的動態撐壓線 (加入防呆機制) */}
+            {toggles.showMaxVolLines && data.length > 0 && (() => {
+               const lastDay = data[data.length - 1];
+               
+               // ✨ 加入防呆：如果這檔股票根本沒有產生天量資料，就直接不畫，防止當機！
+               if (!lastDay || lastDay.maxVolPrice === undefined || lastDay.maxVolPrice === null) return null;
+
+               const maxP = lastDay.maxVolPrice;
+               const secP = lastDay.secondVolPrice;
+               const maxStartX = padding + (lastDay.topVolIdx || 0) * spacing + spacing / 2;
+               const secStartX = padding + (lastDay.secondVolIdx || 0) * spacing + spacing / 2;
+               const lineStyle = toggles.maxVolLineStyle || { width: 1.5, type: 'solid' };
+
+               return (
+                 <g pointerEvents="none">
+                    {/* 最大量水平線 (橘色 #f97316) */}
+                    {maxP !== null && typeof maxP === 'number' && !isNaN(maxP) && (
+                      <g>
+                        <line 
+                          x1={maxStartX} y1={getY(maxP)} 
+                          x2={width} y2={getY(maxP)} 
+                          stroke="#f97316" 
+                          strokeWidth={lineStyle.width} 
+                          strokeDasharray={lineStyle.type === 'dashed' ? "4,4" : ""} 
+                          opacity="0.8" 
+                        />
+                        <text x={maxStartX} y={getY(maxP) - 5} fill="#f97316" fontSize="11" fontWeight="bold">最大量: {maxP.toFixed(2)}</text>
+                      </g>
+                    )}
+                    
+                    {/* 次大量水平線 (粉紅色 #f472b6) */}
+                    {secP !== null && typeof secP === 'number' && !isNaN(secP) && (
+                      <g>
+                        <line 
+                          x1={secStartX} y1={getY(secP)} 
+                          x2={width} y2={getY(secP)} 
+                          stroke="#f472b6" 
+                          strokeWidth={lineStyle.width} 
+                          strokeDasharray={lineStyle.type === 'dashed' ? "4,4" : ""} 
+                          opacity="0.8" 
+                        />
+                        <text x={secStartX} y={getY(secP) - 5} fill="#f472b6" fontSize="11" fontWeight="bold">次大量: {secP.toFixed(2)}</text>
+                      </g>
+                    )}
+                 </g>
+               );
+            })()}
 
             {/* 標準 K 線 (拔除了與寶塔線衝突的邏輯) */}
             {data.map((d, i) => {
