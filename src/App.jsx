@@ -4790,7 +4790,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       setChartModal({
         type: 'prompt', message: '請輸入要標註的文字：',
         onConfirm: (txt) => {
-          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity }]); // ✨ 加入 opacity
+          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity }]); 
           setActiveTool('cursor'); setChartModal(null);
         },
         onCancel: () => { setActiveTool('cursor'); setChartModal(null); }
@@ -4804,6 +4804,45 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       } else if (draftPoints.length >= 1) {
         setIsDrawingDrag(true);
       }
+    } else if (activeTool.startsWith('pattern-')) {
+      // 👇 從這裡開始是第二步新增的程式碼 👇
+      const dx = 5; 
+      const dy = snap.price * 0.05; 
+      const idx = snap.idxFromEnd; 
+      const P = snap.price; 
+      let newPts = [];
+
+      if (activeTool === 'pattern-w') {
+          newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-dx, price: P-dy}, {idxFromEnd: idx-2*dx, price: P-dy*0.5}, {idxFromEnd: idx-3*dx, price: P-dy}, {idxFromEnd: idx-4*dx, price: P} ];
+      } else if (activeTool === 'pattern-multibottom') {
+          newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-dx, price: P-dy}, {idxFromEnd: idx-2*dx, price: P}, {idxFromEnd: idx-3*dx, price: P-dy}, {idxFromEnd: idx-4*dx, price: P}, {idxFromEnd: idx-5*dx, price: P-dy}, {idxFromEnd: idx-6*dx, price: P} ];
+      } else if (activeTool === 'pattern-megaphone') {
+          newPts = [
+            {idxFromEnd: idx, price: P+dy}, {idxFromEnd: idx-6*dx, price: P+2*dy},    
+            {idxFromEnd: idx, price: P-dy}, {idxFromEnd: idx-6*dx, price: P-2*dy},    
+            {idxFromEnd: idx-dx, price: P+dy}, {idxFromEnd: idx-5*dx, price: P+dy*1.5},
+            {idxFromEnd: idx-dx, price: P-dy}, {idxFromEnd: idx-5*dx, price: P-dy*1.5} 
+          ];
+      } else if (activeTool === 'pattern-diamond') {
+          newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-2*dx, price: P+dy}, {idxFromEnd: idx-4*dx, price: P}, {idxFromEnd: idx-2*dx, price: P-dy} ];
+      } else if (activeTool === 'pattern-triangle') {
+          newPts = [ {idxFromEnd: idx, price: P+dy}, {idxFromEnd: idx-6*dx, price: P}, {idxFromEnd: idx, price: P-dy}, {idxFromEnd: idx-6*dx, price: P} ];
+      } else if (activeTool === 'pattern-arc') {
+          newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-3*dx, price: P-dy*1.5}, {idxFromEnd: idx-6*dx, price: P} ];
+      } else if (activeTool === 'pattern-double-arc') {
+          newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-2*dx, price: P-dy}, {idxFromEnd: idx-4*dx, price: P}, {idxFromEnd: idx-6*dx, price: P-dy}, {idxFromEnd: idx-8*dx, price: P} ];
+      } else if (activeTool === 'pattern-head-shoulders') {
+          newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-dx, price: P-dy}, {idxFromEnd: idx-2*dx, price: P}, {idxFromEnd: idx-3*dx, price: P-dy*2}, {idxFromEnd: idx-4*dx, price: P}, {idxFromEnd: idx-5*dx, price: P-dy}, {idxFromEnd: idx-6*dx, price: P} ];
+      } else if (activeTool === 'pattern-cup-handle') {
+          newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-4*dx, price: P-dy*2}, {idxFromEnd: idx-8*dx, price: P}, {idxFromEnd: idx-10*dx, price: P-dy*0.8}, {idxFromEnd: idx-12*dx, price: P} ];
+      }
+
+      if (newPts.length > 0) {
+          commitDrawings([...drawings, { id: Date.now(), type: activeTool, points: newPts, color: drawColor, width: drawWidth, opacity: drawOpacity }]);
+          setActiveTool('edit'); 
+          setHoverPoint(null);
+      }
+      return; 
     }
   };
 
@@ -5210,6 +5249,81 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
          </g>
        );
     }
+     
+    // === 📊 經典型態渲染區塊 ===
+    if (['pattern-w', 'pattern-multibottom', 'pattern-head-shoulders'].includes(drawObj.type)) {
+       // 這三種都是連續折線
+       return (
+         <g key={idKey}>
+           <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={drawObj.color} strokeWidth={drawObj.width} strokeLinecap="round" strokeLinejoin="round" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
+           {renderDots()}
+         </g>
+       );
+    }
+
+    if (drawObj.type === 'pattern-diamond') {
+       // 菱型：封閉多邊形，帶有微弱的半透明填色
+       return (
+         <g key={idKey}>
+           <polygon points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill={drawObj.color} fillOpacity={0.1} stroke={drawObj.color} strokeWidth={drawObj.width} strokeLinejoin="round" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
+           {renderDots()}
+         </g>
+       );
+    }
+
+    if (drawObj.type === 'pattern-triangle') {
+       // 三角型：上下兩條獨立的收斂趨勢線
+       return (
+         <g key={idKey}>
+           {pts.length >= 4 && (
+             <>
+               <line x1={pts[0].x} y1={pts[0].y} x2={pts[1].x} y2={pts[1].y} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />
+               <line x1={pts[2].x} y1={pts[2].y} x2={pts[3].x} y2={pts[3].y} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />
+             </>
+           )}
+           {renderDots()}
+         </g>
+       );
+    }
+
+    if (drawObj.type === 'pattern-megaphone') {
+       // 喇叭型：上下兩條發散趨勢線 + 內部兩條虛線平行通道
+       return (
+         <g key={idKey}>
+           {pts.length >= 8 && (
+             <>
+               {/* 外側發散線 */}
+               <line x1={pts[0].x} y1={pts[0].y} x2={pts[1].x} y2={pts[1].y} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />
+               <line x1={pts[2].x} y1={pts[2].y} x2={pts[3].x} y2={pts[3].y} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />
+               {/* 內側平行輔助線 (虛線) */}
+               <line x1={pts[4].x} y1={pts[4].y} x2={pts[5].x} y2={pts[5].y} stroke={drawObj.color} strokeWidth={Math.max(1, drawObj.width - 1)} strokeDasharray="4,4" opacity={baseOpacity * 0.7} pointerEvents="none" />
+               <line x1={pts[6].x} y1={pts[6].y} x2={pts[7].x} y2={pts[7].y} stroke={drawObj.color} strokeWidth={Math.max(1, drawObj.width - 1)} strokeDasharray="4,4" opacity={baseOpacity * 0.7} pointerEvents="none" />
+             </>
+           )}
+           {renderDots()}
+         </g>
+       );
+    }
+
+    if (drawObj.type === 'pattern-arc') {
+       // 圓弧型：透過 Q (二次貝茲曲線) 讓中間節點變成控制弧度的錨點
+       return (
+         <g key={idKey}>
+           {pts.length >= 3 && <path d={`M ${pts[0].x},${pts[0].y} Q ${pts[1].x},${pts[1].y} ${pts[2].x},${pts[2].y}`} fill="none" stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />}
+           {renderDots()}
+         </g>
+       );
+    }
+
+    if (['pattern-double-arc', 'pattern-cup-handle'].includes(drawObj.type)) {
+       // 雙弧 / 杯柄：兩段相連的貝茲曲線
+       return (
+         <g key={idKey}>
+           {pts.length >= 5 && <path d={`M ${pts[0].x},${pts[0].y} Q ${pts[1].x},${pts[1].y} ${pts[2].x},${pts[2].y} Q ${pts[3].x},${pts[3].y} ${pts[4].x},${pts[4].y}`} fill="none" stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />}
+           {renderDots()}
+         </g>
+       );
+    }
 
     if (drawObj.type === 'segment') {
        return (
@@ -5548,6 +5662,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
               <button onClick={()=> {setActiveTool('edit'); setDraftPoints([]);}} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'edit' ? 'bg-amber-600 text-white border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🖐️ 微調</button>
               <button onClick={()=> {setActiveTool('eraser'); setDraftPoints([]);}} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'eraser' ? 'bg-red-600 text-white border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🧽 橡皮擦</button>
 
+              {/* ✨ 經典型態庫專區 */}
+              <div className="w-full flex flex-col gap-1 mt-1 mb-1 bg-slate-900/50 p-1.5 rounded border border-slate-700/50">
+                <span className="text-[10px] text-indigo-400 font-bold tracking-widest mb-0.5">📊 經典型態 (點擊後在圖上放置)</span>
+                <div className="flex flex-wrap gap-1">
+                  <button onClick={()=>setActiveTool('pattern-w')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-w' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>W型(5點)</button>
+                  <button onClick={()=>setActiveTool('pattern-multibottom')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-multibottom' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>多重底(7點)</button>
+                  <button onClick={()=>setActiveTool('pattern-megaphone')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-megaphone' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>喇叭型(8點)</button>
+                  <button onClick={()=>setActiveTool('pattern-diamond')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-diamond' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>菱型(4點)</button>
+                  <button onClick={()=>setActiveTool('pattern-triangle')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-triangle' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>三角型(4點)</button>
+                  <button onClick={()=>setActiveTool('pattern-arc')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-arc' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>圓弧(3點)</button>
+                  <button onClick={()=>setActiveTool('pattern-double-arc')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-double-arc' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>雙弧(5點)</button>
+                  <button onClick={()=>setActiveTool('pattern-head-shoulders')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-head-shoulders' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>頭肩底(7點)</button>
+                  <button onClick={()=>setActiveTool('pattern-cup-handle')} className={`px-2 py-1 text-xs rounded font-bold border transition-colors ${activeTool === 'pattern-cup-handle' ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>杯柄(5點)</button>
+                </div>
+              </div>
               <div className="w-[1px] h-6 bg-slate-700 mx-1 self-center"></div>
 
               <button onClick={() => setIsMagnetOn(!isMagnetOn)} className={`px-2 py-1 text-sm rounded font-bold border flex items-center gap-1 transition-colors ${isMagnetOn ? 'bg-red-900/50 text-red-400 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`} title="開啟後強制吸附K棒最高/最低點">
