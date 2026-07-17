@@ -3152,9 +3152,9 @@ const App = () => {
   useEffect(() => { 
     if (rawDailyData.length > 0) {
         const aggregated = aggregateData(rawDailyData, timeframe);
-        setKlineData(analyzeSignals(aggregated, customStrategies, issuedShares, maParams, vmaParams, indicatorParams, toggles.maxVolDays)); 
+        setKlineData(analyzeSignals(aggregated, customStrategies, issuedShares, maParams, vmaParams, indicatorParams, toggles.maxVolDays, toggles.volLineAnchor)); 
     }
-  }, [rawDailyData, timeframe, customStrategies, issuedShares, maParams, vmaParams, indicatorParams, toggles.maxVolDays]);
+  }, [rawDailyData, timeframe, customStrategies, issuedShares, maParams, vmaParams, indicatorParams, toggles.maxVolDays, toggles.volLineAnchor]);
 
   const getMetricValue = (data, index, metricDef) => {
     // ✨ 升級：取出 offset (往前推幾天)，並計算出基準日 baseIndex
@@ -3202,31 +3202,43 @@ const App = () => {
     switch (condition.operator) { case '>': return leftVal > rightVal; case '<': return leftVal < rightVal; case '>=': return leftVal >= rightVal; case '<=': return leftVal <= rightVal; case '==': return leftVal === rightVal; case '!=': return leftVal !== rightVal; default: return false; }
   };
 
-  const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams, maxVolDaysParam = 180) => {
+  const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams, maxVolDaysParam = 90, volLineAnchorParam = 'close') => {
     const closes = data.map(d => d.close); const volumes = data.map(d => d.volume);
     const ma1 = calculateSMA(closes, maParams.ma1.p); const ma2 = calculateSMA(closes, maParams.ma2.p); const ma3 = calculateSMA(closes, maParams.ma3.p); 
     const vma1 = calculateSMA(volumes, vmaParams.vma1.p); const vma2 = calculateSMA(volumes, vmaParams.vma2.p); const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0; 
     
     // ✨ 新增：找出自訂天數內的最大量與次大量
-    const maxDays = maxVolDaysParam || 180;
+    const maxDays = maxVolDaysParam || 90;
     const lookbackData = data.slice(Math.max(0, data.length - maxDays));
     
     let topVol = 0, secVol = 0;
     let topVolPrice = null, secVolPrice = null;
     let topVolIdx = null, secVolIdx = null;
 
+    // ✨ 新增：根據使用者的選擇，決定要用 K 棒的哪個價格當作畫線基準
+    const getAnchorPrice = (candle, anchor) => {
+        switch(anchor) {
+            case 'open': return candle.open;
+            case 'high': return candle.high;
+            case 'low': return candle.low;
+            case 'low0.9': return candle.low * 0.9;
+            case 'close':
+            default: return candle.close;
+        }
+    };
+
     lookbackData.forEach((d, idx) => {
         if (d.volume > topVol) {
             topVol = d.volume;
-            topVolPrice = d.close; // 取該根K棒的收盤價作為撐壓線
+            topVolPrice = getAnchorPrice(d, volLineAnchorParam);
             topVolIdx = data.length - lookbackData.length + idx;
         }
     });
     lookbackData.forEach((d, idx) => {
         if (d.volume > secVol && d.volume < topVol) {
             secVol = d.volume;
-            secVolPrice = d.close;
+            secVolPrice = getAnchorPrice(d, volLineAnchorParam);
             secVolIdx = data.length - lookbackData.length + idx;
         }
     });
@@ -3576,7 +3588,7 @@ const App = () => {
 
         // 把選定的策略「強制啟用」送進去算
         const testStrats = [{...strategy, isActive: true}];
-        const testKlineData = analyzeSignals(mergedCandles, testStrats, 0, maParams, vmaParams, indicatorParams, toggles.maxVolDays);
+        const testKlineData = analyzeSignals(mergedCandles, testStrats, 0, maParams, vmaParams, indicatorParams, toggles.maxVolDays, toggles.volLineAnchor);
         
         // 4. 驗證最後一根 K 棒是否出現標記
         const lastCandle = testKlineData[testKlineData.length - 1];
@@ -3799,9 +3811,23 @@ const App = () => {
                       <input type="checkbox" checked={toggles.showMaxVolLines} onChange={() => handleToggle('showMaxVolLines')} className="w-3.5 h-3.5 text-red-500 rounded bg-slate-900 border-slate-600" />
                       <span className="text-xs text-red-400 font-bold">近</span>
                     </label>
-                    <input type="number" min="1" max="999" value={toggles.maxVolDays ?? 180} onChange={(e) => setToggles(p => ({...p, maxVolDays: Number(e.target.value)}))} className="w-10 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="天數" />
+                    <input type="number" min="1" max="999" value={toggles.maxVolDays ?? 120} onChange={(e) => setToggles(p => ({...p, maxVolDays: Number(e.target.value)}))} className="w-10 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="天數" />
                     <span className="text-xs text-red-400 font-bold">日大量線</span>
                     
+                    
+                    {/* ✨ 新增：價格基準下拉選單 */}
+                    <select
+                      className="bg-slate-900 border border-slate-600 text-amber-300 text-[10px] rounded px-1 py-0.5 outline-none font-bold"
+                      value={toggles.volLineAnchor || 'close'}
+                      onChange={(e) => setToggles(p => ({ ...p, volLineAnchor: e.target.value }))}
+                    >
+                      <option value="close">收盤價</option>
+                      <option value="open">開盤價</option>
+                      <option value="high">最高價</option>
+                      <option value="low">最低價</option>
+                      <option value="low0.9">最低價 × 0.9</option>
+                    </select>
+
                     {/* 樣式選擇下拉選單 */}
                     <select 
                       className="bg-slate-900 border border-slate-600 text-slate-300 text-[10px] rounded px-1 py-0.5 ml-1 outline-none"
