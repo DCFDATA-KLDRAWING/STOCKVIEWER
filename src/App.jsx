@@ -3308,21 +3308,17 @@ const App = () => {
     let gainSum1 = 0, lossSum1 = 0, avgGain1 = 0, avgLoss1 = 0, gainSum2 = 0, lossSum2 = 0, avgGain2 = 0, avgLoss2 = 0;
     let prevTowerColor = '#ef4444'; // ✨ 記錄寶塔線顏色的狀態變數
 
+    const enrichedData = []; // ✨ 新增：用來存放「已算好所有指標」的完整 K 棒陣列
+
     return data.map((current, i) => {
-      let volType = null, isHeidun = false, isStartTrend = false, customMarks = [];
+      let volType = null, isHeidun = false, isStartTrend = false;
       const turnover = numShares > 0 ? (current.volume / numShares) * 100 : 0;
       if (turnover >= 50) volType = '天量'; else if (turnover >= 10) volType = '巨量'; else if (i > 0 && fixedMv5[i-1] && current.volume >= fixedMv5[i-1] * 1.6) volType = '極限大量';
 
       if (i >= 2 && ma1[i] !== null) { const k1 = data[i-2], k2 = data[i-1], k3 = current; if (k1.close > k1.open && k2.close < k2.open && k2.high > k1.high && k2.low > k1.low && k3.high < k2.high && k3.close >= Math.min(k1.low, k2.low) && k3.close > ma1[i]) isHeidun = true; }
       if (i >= 14 && ma1[i] !== null) { if (current.close >= current.open && current.close > ma1[i] && current.close > data[i-1].high && current.volume > data[i-5].volume && current.volume > data[i-13].volume) isStartTrend = true; }
 
-      if (customStrats && Array.isArray(customStrats)) {
-        customStrats.forEach(strat => {
-          if (!strat.isActive) return;
-          const results = strat.conditions.map(cond => evaluateCondition(data, i, cond));
-          if (strat.matchType === 'AND' ? results.every(r => r) : results.some(r => r)) customMarks.push(strat.marker);
-        });
-      }
+      
 
       if (i > 0) { emaFast = current.close * (2/13) + emaFast * (1 - 2/13); emaSlow = current.close * (2/27) + emaSlow * (1 - 2/27); }
       const dif = emaFast - emaSlow; if (i === 0) macdSig = dif; else macdSig = dif * (2/10) + macdSig * (1 - 2/10);
@@ -3392,18 +3388,34 @@ const App = () => {
       const bias20 = fixedMa20[i] ? ((current.close - fixedMa20[i]) / fixedMa20[i]) * 100 : null;
       const bias60 = fixedMa60[i] ? ((current.close - fixedMa60[i]) / fixedMa60[i]) * 100 : null;
       
-      return { 
+      // ✨ 1. 先把計算好所有指標的 K 棒物件建立出來
+      const enrichedCandle = { 
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i],bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           fixedMa5: fixedMa5[i], fixedMa10: fixedMa10[i], fixedMa20: fixedMa20[i], fixedMa28: fixedMa28[i], fixedMa60: fixedMa60[i], fixedMv5: fixedMv5[i],
-          signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, customMarks,
-          macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },　willr,
+          signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null,
+          macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 }, willr,
           obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower,
-          // ✨ 把算好的最大量與次大量塞給最後一天，讓畫布讀取
           maxVolPrice: isLastDay ? topVolPrice : undefined,
           secondVolPrice: isLastDay ? secVolPrice : undefined,
           topVolIdx: isLastDay ? topVolIdx : undefined,
           secondVolIdx: isLastDay ? secVolIdx : undefined 
       };
+      // ✨ 2. 推入準備好的陣列中
+      enrichedData.push(enrichedCandle);
+
+      // ✨ 3. 現在才把包含了「所有指標」的 enrichedData 餵給策略引擎去檢查！
+      let finalCustomMarks = [];
+      if (customStrats && Array.isArray(customStrats)) {
+        customStrats.forEach(strat => {
+          if (!strat.isActive) return;
+          // 注意：這裡改傳 enrichedData 而不是 data
+          const results = strat.conditions.map(cond => evaluateCondition(enrichedData, i, cond));
+          if (strat.matchType === 'AND' ? results.every(r => r) : results.some(r => r)) finalCustomMarks.push(strat.marker);
+        });
+      }
+
+      enrichedCandle.customMarks = finalCustomMarks;
+      return enrichedCandle;
     });
   };
 
