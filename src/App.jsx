@@ -3963,7 +3963,7 @@ const App = () => {
                 )}
                 {indicatorType === 'TOWER' && (
                   <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
-                    <span classNㄣame="text-[10px] text-slate-400 font-bold">寶塔線參數 (N日)</span>
+                    <span className="text-[10px] text-slate-400 font-bold">寶塔線參數 (N日)</span>
                     <input type="number" value={indicatorParams.tower?.p || 3} onChange={e => setIndicatorParams({...indicatorParams, tower: {...indicatorParams.tower, p: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
@@ -4317,30 +4317,46 @@ const App = () => {
                </div>
                
                <div className="flex justify-between items-center mt-2">
-                  {/* ✨ 升級 2：一鍵貼上 / 匯入公式按鈕 */}
-                  <button 
-                    onClick={() => {
-                      setAppModal({
-                        type: 'prompt',
-                        message: '📝 請貼上策略公式 (每個詞彙之間請用「空白鍵」隔開，例如：收盤價 > 60日均線) ：',
-                        onConfirm: (text) => {
-                          if (text && text.trim()) {
-                            // 自動把連續的空白過濾掉，切成乾淨的積木陣列
-                            setBuilderFormula(text.trim().split(/\s+/));
-                          }
-                          setAppModal(null);
-                        },
-                        onCancel: () => setAppModal(null)
-                      });
-                    }} 
-                    className="px-4 py-1.5 bg-indigo-900/50 border border-indigo-700 hover:bg-indigo-800 text-indigo-200 rounded font-bold shadow-sm flex items-center gap-2"
-                  >
-                    📋 貼上公式
-                  </button>
+                  <div className="flex gap-2">
+                    {/* ✨ 一鍵貼上 / 匯入公式按鈕 */}
+                    <button 
+                      onClick={() => {
+                        setAppModal({
+                          type: 'prompt',
+                          message: '📝 請貼上策略公式 (每個詞彙之間請用「空白鍵」隔開，例如：收盤價 > 60日均線) ：',
+                          onConfirm: (text) => {
+                            if (text && text.trim()) {
+                              setBuilderFormula(text.trim().split(/\s+/));
+                            }
+                            setAppModal(null);
+                          },
+                          onCancel: () => setAppModal(null)
+                        });
+                      }} 
+                      className="px-3 sm:px-4 py-1.5 bg-indigo-900/50 border border-indigo-700 hover:bg-indigo-800 text-indigo-200 rounded font-bold shadow-sm flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base"
+                    >
+                      📋 貼上
+                    </button>
+
+                    {/* ✨ 新增：一鍵複製 / 匯出公式按鈕 */}
+                    <button 
+                      onClick={() => {
+                        if (builderFormula.length === 0) return showAlert('公式是空的，沒東西可以複製喔！');
+                        // 把陣列裡的積木用「空白鍵」串接成一段乾淨的純文字
+                        const formulaText = builderFormula.join(' ');
+                        navigator.clipboard.writeText(formulaText)
+                          .then(() => showAlert('✅ 公式已成功複製到剪貼簿！您可以直接貼給朋友了！'))
+                          .catch(() => showAlert('❌ 瀏覽器阻擋了複製功能，請手動圈選文字複製。'));
+                      }} 
+                      className="px-3 sm:px-4 py-1.5 bg-emerald-900/50 border border-emerald-700 hover:bg-emerald-800 text-emerald-200 rounded font-bold shadow-sm flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base"
+                    >
+                      📄 複製
+                    </button>
+                  </div>
 
                   <div className="flex gap-2">
-                    <button onClick={handleBackspace} className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm">⌫ 退格</button>
-                    <button onClick={() => setBuilderFormula([])} className="px-4 py-1.5 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm">🗑️ 清除</button>
+                    <button onClick={handleBackspace} className="px-3 sm:px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm text-sm sm:text-base">⌫ 退格</button>
+                    <button onClick={() => setBuilderFormula([])} className="px-3 sm:px-4 py-1.5 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm text-sm sm:text-base">🗑️ 清除</button>
                   </div>
                </div>
             </div>
