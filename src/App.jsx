@@ -4294,20 +4294,54 @@ const App = () => {
 
             {/* 公式顯示螢幕 */}
             <div className="p-3 bg-[#020617] shrink-0 border-b border-slate-700">
-               <div className="w-full h-32 sm:h-40 bg-slate-800 border-2 border-slate-600 rounded-lg p-3 overflow-y-auto text-lg leading-relaxed flex flex-wrap content-start gap-1">
-                  {builderFormula.length === 0 && <span className="text-slate-500 italic">請使用下方鍵盤輸入公式...</span>}
+               <div className="w-full h-32 sm:h-40 bg-slate-800 border-2 border-slate-600 rounded-lg p-3 overflow-y-auto text-lg leading-relaxed flex flex-wrap content-start gap-x-1.5 gap-y-1">
+                  {builderFormula.length === 0 && <span className="text-slate-500 italic">請使用下方鍵盤輸入公式，或點擊右下角貼上別人分享的策略...</span>}
                   {builderFormula.map((token, idx) => {
                      // 讓邏輯字眼變紅色，數字變黃色，其他變藍色
                      let colorClass = "text-cyan-300";
                      if (['而且', '或者', '>', '<', '≥', '≤', '=', '+', '-', '×', '÷'].includes(token)) colorClass = "text-red-400 font-bold";
                      else if (!isNaN(token)) colorClass = "text-amber-400 font-mono";
-                     return <span key={idx} className={colorClass}>{token}</span>;
+                     
+                     // ✨ 升級 1：加入「點擊刪除」功能與視覺特效 (hover 時出現刪除線)
+                     return (
+                        <span 
+                          key={idx} 
+                          className={`${colorClass} cursor-pointer hover:line-through hover:opacity-70 hover:text-red-400 transition-all px-1 rounded hover:bg-red-900/30`}
+                          onClick={() => setBuilderFormula(prev => prev.filter((_, i) => i !== idx))}
+                          title="點擊移除此條件"
+                        >
+                          {token}
+                        </span>
+                     );
                   })}
                </div>
-               <div className="flex justify-end gap-2 mt-2">
-                  {/* ✨ 改用新的智能退格 */}
-                  <button onClick={handleBackspace} className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm">⌫ 退格</button>
-                  <button onClick={() => setBuilderFormula([])} className="px-4 py-1.5 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm">🗑️ 清除</button>
+               
+               <div className="flex justify-between items-center mt-2">
+                  {/* ✨ 升級 2：一鍵貼上 / 匯入公式按鈕 */}
+                  <button 
+                    onClick={() => {
+                      setAppModal({
+                        type: 'prompt',
+                        message: '📝 請貼上策略公式 (每個詞彙之間請用「空白鍵」隔開，例如：收盤價 > 60日均線) ：',
+                        onConfirm: (text) => {
+                          if (text && text.trim()) {
+                            // 自動把連續的空白過濾掉，切成乾淨的積木陣列
+                            setBuilderFormula(text.trim().split(/\s+/));
+                          }
+                          setAppModal(null);
+                        },
+                        onCancel: () => setAppModal(null)
+                      });
+                    }} 
+                    className="px-4 py-1.5 bg-indigo-900/50 border border-indigo-700 hover:bg-indigo-800 text-indigo-200 rounded font-bold shadow-sm flex items-center gap-2"
+                  >
+                    📋 貼上公式
+                  </button>
+
+                  <div className="flex gap-2">
+                    <button onClick={handleBackspace} className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm">⌫ 退格</button>
+                    <button onClick={() => setBuilderFormula([])} className="px-4 py-1.5 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm">🗑️ 清除</button>
+                  </div>
                </div>
             </div>
 
