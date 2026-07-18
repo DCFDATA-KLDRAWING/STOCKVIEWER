@@ -2377,44 +2377,60 @@ const App = () => {
   }; 
 
   // ==============================================
-  // ✨ 新增：處理鍵盤輸入的智能合併邏輯 (連續數字會自動連接)
+  // ✨ 新增：處理鍵盤輸入的智能合併邏輯 (支援自動判斷「負號」與「減號」)
   // ==============================================
   const handleFormulaInput = (btn) => {
     setBuilderFormula(prev => {
       if (prev.length === 0) return [btn];
       const lastItem = prev[prev.length - 1];
 
-      // 判斷按下的按鈕與最後一個項目是否都是數字或小數點
+      // 判斷按下的按鈕是否為純數字或小數點
       const isBtnNumeric = /^[0-9.]+$/.test(btn);
-      const isLastNumeric = /^[0-9.]+$/.test(lastItem);
 
-      if (isBtnNumeric && isLastNumeric) {
-        // 連接數字 (例如 '1' + '0' 變成 '10')
+      if (isBtnNumeric) {
+        // 情況 A：前面已經是數字 (包含負數)，直接合併 (例如 '1' + '0' -> '10')
+        if (/^-?[0-9.]+$/.test(lastItem)) {
+          const newArr = [...prev];
+          newArr[newArr.length - 1] = lastItem + btn;
+          return newArr;
+        }
+        
+        // 情況 B：前面是 '-'，我們要判斷它是不是「負號」
+        if (lastItem === '-') {
+          // 💡 判斷秘訣：如果 '-' 前面是比較符號，那它一定就是「負號」！
+          const isNegativeSign = prev.length === 1 || ['>', '<', '≥', '≤', '=', '≠', '而且', '或者'].includes(prev[prev.length - 2]);
+          if (isNegativeSign) {
+            const newArr = [...prev];
+            newArr[newArr.length - 1] = lastItem + btn; // 把 '-' 和 '2' 黏成 '-2'
+            return newArr;
+          }
+        }
+      }
+
+      // ✨ 處理時間後綴詞合併 (N日內...)
+      if (['日前的', '日內最高', '日內最低', '日內均值'].includes(btn) && /^-?[0-9.]+$/.test(lastItem)) {
         const newArr = [...prev];
         newArr[newArr.length - 1] = lastItem + btn;
         return newArr;
       }
 
-      // ✨ 新增：如果輸入的是時間後綴詞，且前一個是數字，直接黏起來合併！
-      if (['日前的', '日內最高', '日內最低', '日內均值'].includes(btn) && isLastNumeric) {
-        const newArr = [...prev];
-        newArr[newArr.length - 1] = lastItem + btn;
-        return newArr;
-      } else {
-        // 當作新詞彙加入
-        return [...prev, btn];
-      }
+      // 其他情況當作新詞彙加入
+      return [...prev, btn];
     });
   };
 
-  // ✨ 新增：優化退格邏輯 (數字一個一個字刪，詞彙整塊刪)
+  // ✨ 新增：優化退格邏輯 (支援負號的精準刪除)
   const handleBackspace = () => {
     setBuilderFormula(prev => {
       if (prev.length === 0) return prev;
       const lastItem = prev[prev.length - 1];
       
-      // 如果最後一個是純數字字串且長度大於1，則刪除最後一個字元
-      if (/^[0-9.]+$/.test(lastItem) && lastItem.length > 1) {
+      // 如果最後一個是數字字串(包含負號)且長度大於1，則刪除最後一個字元
+      if (/^-?[0-9.]+$/.test(lastItem) && lastItem.length > 1) {
+        // 💡 如果刪到最後只剩下單一個 '-' 符號，就乾脆整個詞彙刪掉
+        if (lastItem.length === 2 && lastItem.startsWith('-')) {
+            return prev.slice(0, -1);
+        }
         const newArr = [...prev];
         newArr[newArr.length - 1] = lastItem.slice(0, -1);
         return newArr;
@@ -3175,22 +3191,36 @@ const App = () => {
       if (target === 'bodyRatio') return data[idx].open === 0 ? 0 : ((data[idx].close - data[idx].open) / data[idx].open) * 100;
       if (target === 'amplitude') return idx === 0 ? 0 : ((data[idx].high - data[idx].low) / data[idx-1].close) * 100;
       
-      // ✨ 加入這行：支援讀取深層的指標細節 (例如把 'kd.k' 拆解開來讀取)
+      // ✨ 支援讀取深層的指標細節 (例如把 'kd.k' 拆解開來讀取)
       if (target.includes('.')) { 
         const parts = target.split('.'); 
         return data[idx][parts[0]] ? data[idx][parts[0]][parts[1]] : null; 
       }
       
-      return data[idx][target];
+      return data[idx][target] !== undefined ? data[idx][target] : null;
     };
     
     // ✨ 將原本所有的 index 都改成平移過後的 baseIndex
     if (scope === 'today') return getValue(baseIndex);
     if (scope === 'ago') { const targetIdx = baseIndex - n; return targetIdx < 0 ? null : getValue(targetIdx); }
-    const numN = parseInt(n) || 1; if (baseIndex - numN + 1 < 0) return null; 
-    const sliceValues = []; for (let i = baseIndex - numN + 1; i <= baseIndex; i++) sliceValues.push(getValue(i));
-    if (scope === 'max') return Math.max(...sliceValues); if (scope === 'min') return Math.min(...sliceValues);
-    if (scope === 'sum') return sliceValues.reduce((a, b) => a + b, 0); if (scope === 'avg') return sliceValues.reduce((a, b) => a + b, 0) / numN;
+    
+    const numN = parseInt(n) || 1; 
+    if (baseIndex - numN + 1 < 0) return null; 
+    
+    // 🛡️ 安全過濾掉空值 (例如剛上市不到 60 天的股票，其 60日均線會是 null)
+    const sliceValues = []; 
+    for (let i = baseIndex - numN + 1; i <= baseIndex; i++) {
+        const val = getValue(i);
+        if (val !== null && !isNaN(val)) sliceValues.push(val);
+    }
+
+    // 如果全部都是空值，就直接回傳 null，不要拿去算 min/max
+    if (sliceValues.length === 0) return null;
+
+    if (scope === 'max') return Math.max(...sliceValues); 
+    if (scope === 'min') return Math.min(...sliceValues);
+    if (scope === 'sum') return sliceValues.reduce((a, b) => a + b, 0); 
+    if (scope === 'avg') return sliceValues.reduce((a, b) => a + b, 0) / sliceValues.length;
     return null;
   };
   const evaluateCondition = (data, index, condition) => {
