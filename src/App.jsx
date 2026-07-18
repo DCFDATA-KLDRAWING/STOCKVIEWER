@@ -4835,12 +4835,24 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       } else if (activeTool === 'pattern-multibottom') {
           newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-dx, price: P-dy}, {idxFromEnd: idx-2*dx, price: P}, {idxFromEnd: idx-3*dx, price: P-dy}, {idxFromEnd: idx-4*dx, price: P}, {idxFromEnd: idx-5*dx, price: P-dy}, {idxFromEnd: idx-6*dx, price: P} ];
       } else if (activeTool === 'pattern-megaphone') {
-          newPts = [
+          // ✨ 將喇叭型拆解為「外圍」與「內部」兩個獨立圖形，這樣就能分開移動了！
+          const outerPts = [
             {idxFromEnd: idx, price: P+dy}, {idxFromEnd: idx-6*dx, price: P+2*dy},    
-            {idxFromEnd: idx, price: P-dy}, {idxFromEnd: idx-6*dx, price: P-2*dy},    
-            {idxFromEnd: idx-dx, price: P+dy}, {idxFromEnd: idx-5*dx, price: P+dy*1.5},
-            {idxFromEnd: idx-dx, price: P-dy}, {idxFromEnd: idx-5*dx, price: P-dy*1.5} 
+            {idxFromEnd: idx, price: P-dy}, {idxFromEnd: idx-6*dx, price: P-2*dy}
           ];
+          const innerPts = [
+            {idxFromEnd: idx-dx, price: P+dy}, {idxFromEnd: idx-5*dx, price: P+dy}, // ✨ 內部改為完美的純水平線
+            {idxFromEnd: idx-dx, price: P-dy}, {idxFromEnd: idx-5*dx, price: P-dy}
+          ];
+
+          commitDrawings([
+              ...drawings, 
+              { id: Date.now(), type: 'pattern-mega-outer', points: outerPts, color: drawColor, width: drawWidth, opacity: drawOpacity },
+              { id: Date.now() + 1, type: 'pattern-mega-inner', points: innerPts, color: drawColor, width: drawWidth, opacity: drawOpacity }
+          ]);
+          setActiveTool('edit'); 
+          setHoverPoint(null);
+          return; // 提早結束，避免跑到底下的單一儲存邏輯
       } else if (activeTool === 'pattern-diamond') {
           newPts = [ {idxFromEnd: idx, price: P}, {idxFromEnd: idx-2*dx, price: P+dy}, {idxFromEnd: idx-4*dx, price: P}, {idxFromEnd: idx-2*dx, price: P-dy} ];
       } else if (activeTool === 'pattern-triangle') {
@@ -5289,8 +5301,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
        );
     }
 
-    if (drawObj.type === 'pattern-triangle') {
-       // 三角型：上下兩條獨立的收斂趨勢線
+    if (['pattern-triangle', 'pattern-mega-outer'].includes(drawObj.type)) {
+       // 三角型與喇叭型外圍：上下兩條獨立的收斂/發散趨勢線
        return (
          <g key={idKey}>
            {pts.length >= 4 && (
@@ -5304,18 +5316,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
        );
     }
 
-    if (drawObj.type === 'pattern-megaphone') {
-       // 喇叭型：上下兩條發散趨勢線 + 內部兩條虛線平行通道
+    if (drawObj.type === 'pattern-mega-inner') {
+       // 喇叭型內部水平線：上下兩條虛線平行通道
        return (
          <g key={idKey}>
-           {pts.length >= 8 && (
+           {pts.length >= 4 && (
              <>
-               {/* 外側發散線 */}
-               <line x1={pts[0].x} y1={pts[0].y} x2={pts[1].x} y2={pts[1].y} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />
-               <line x1={pts[2].x} y1={pts[2].y} x2={pts[3].x} y2={pts[3].y} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={baseOpacity} pointerEvents="none" />
-               {/* 內側平行輔助線 (虛線) */}
-               <line x1={pts[4].x} y1={pts[4].y} x2={pts[5].x} y2={pts[5].y} stroke={drawObj.color} strokeWidth={Math.max(1, drawObj.width - 1)} strokeDasharray="4,4" opacity={baseOpacity * 0.7} pointerEvents="none" />
-               <line x1={pts[6].x} y1={pts[6].y} x2={pts[7].x} y2={pts[7].y} stroke={drawObj.color} strokeWidth={Math.max(1, drawObj.width - 1)} strokeDasharray="4,4" opacity={baseOpacity * 0.7} pointerEvents="none" />
+               <line x1={pts[0].x} y1={pts[0].y} x2={pts[1].x} y2={pts[1].y} stroke={drawObj.color} strokeWidth={Math.max(1, drawObj.width - 1)} strokeDasharray="4,4" opacity={baseOpacity * 0.7} pointerEvents="none" />
+               <line x1={pts[2].x} y1={pts[2].y} x2={pts[3].x} y2={pts[3].y} stroke={drawObj.color} strokeWidth={Math.max(1, drawObj.width - 1)} strokeDasharray="4,4" opacity={baseOpacity * 0.7} pointerEvents="none" />
              </>
            )}
            {renderDots()}
