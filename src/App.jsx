@@ -2459,16 +2459,16 @@ const App = () => {
         '漲跌幅': { target: 'changeRatio', scope: 'today', n: 1 },
         '實體漲幅': { target: 'bodyRatio', scope: 'today', n: 1 }, // ✨ 新增：實體K漲幅
         '振幅': { target: 'amplitude', scope: 'today', n: 1 },     // ✨ 新增：振幅
-        '5日均線': { target: 'close', scope: 'avg', n: 5 },
-        '10日均線': { target: 'close', scope: 'avg', n: 10 },
-        '20日均線': { target: 'close', scope: 'avg', n: 20 },
-        '28日均線': { target: 'close', scope: 'avg', n: 28 },
-        '60日均線': { target: 'close', scope: 'avg', n: 60 }, // ✨ 補上60日均線
-        '5日均線乖離': { target: 'bias5', scope: 'today', n: 1 }, // ✨ 乖離率家族
+        '5日均線': { target: 'fixedMa5', scope: 'today', n: 1 },
+        '10日均線': { target: 'fixedMa10', scope: 'today', n: 1 },
+        '20日均線': { target: 'fixedMa20', scope: 'today', n: 1 },
+        '28日均線': { target: 'fixedMa28', scope: 'today', n: 1 },
+        '60日均線': { target: 'fixedMa60', scope: 'today', n: 1 }, 
+        '5日均線乖離': { target: 'bias5', scope: 'today', n: 1 }, 
         '10日均線乖離': { target: 'bias10', scope: 'today', n: 1 },
         '20日均線乖離': { target: 'bias20', scope: 'today', n: 1 },
         '60日均線乖離': { target: 'bias60', scope: 'today', n: 1 },
-        '5日均量': { target: 'volume', scope: 'avg', n: 5 },
+        '5日均量': { target: 'fixedMv5', scope: 'today', n: 1 },
         '外資買賣超': { target: 'foreign', scope: 'today', n: 1 },
         '投信買賣超': { target: 'trust', scope: 'today', n: 1 },
         '自營商買賣超': { target: 'dealer', scope: 'today', n: 1 },
@@ -3244,10 +3244,11 @@ const App = () => {
     const vma1 = calculateSMA(volumes, vmaParams.vma1.p); const vma2 = calculateSMA(volumes, vmaParams.vma2.p); const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
 
-    // ✨ 新增固定的 MA 計算，專供策略的「乖離」使用
+    // ✨ 新增固定的 MA 計算，專供策略的「乖離」與「動態均線區間」使用
     const fixedMa5 = calculateSMA(closes, 5);
     const fixedMa10 = calculateSMA(closes, 10);
     const fixedMa20 = calculateSMA(closes, 20);
+    const fixedMa28 = calculateSMA(closes, 28); // ✨ 補上 28日均線
     const fixedMa60 = calculateSMA(closes, 60); 
     
     // ✨ 新增：找出自訂天數內的最大量與次大量
@@ -3393,6 +3394,7 @@ const App = () => {
       
       return { 
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i],bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
+          fixedMa5: fixedMa5[i], fixedMa10: fixedMa10[i], fixedMa20: fixedMa20[i], fixedMa28: fixedMa28[i], fixedMa60: fixedMa60[i], fixedMv5: fixedMv5[i],
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, customMarks,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },　willr,
           obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower,
