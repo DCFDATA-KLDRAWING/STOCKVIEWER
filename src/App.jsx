@@ -2446,6 +2446,12 @@ const App = () => {
         '5日均線': { target: 'close', scope: 'avg', n: 5 },
         '10日均線': { target: 'close', scope: 'avg', n: 10 },
         '20日均線': { target: 'close', scope: 'avg', n: 20 },
+        '28日均線': { target: 'close', scope: 'avg', n: 28 },
+        '60日均線': { target: 'close', scope: 'avg', n: 60 }, // ✨ 補上60日均線
+        '5日均線乖離': { target: 'bias5', scope: 'today', n: 1 }, // ✨ 乖離率家族
+        '10日均線乖離': { target: 'bias10', scope: 'today', n: 1 },
+        '20日均線乖離': { target: 'bias20', scope: 'today', n: 1 },
+        '60日均線乖離': { target: 'bias60', scope: 'today', n: 1 },
         '5日均量': { target: 'volume', scope: 'avg', n: 5 },
         '外資買賣超': { target: 'foreign', scope: 'today', n: 1 },
         '投信買賣超': { target: 'trust', scope: 'today', n: 1 },
@@ -3206,7 +3212,13 @@ const App = () => {
     const closes = data.map(d => d.close); const volumes = data.map(d => d.volume);
     const ma1 = calculateSMA(closes, maParams.ma1.p); const ma2 = calculateSMA(closes, maParams.ma2.p); const ma3 = calculateSMA(closes, maParams.ma3.p); 
     const vma1 = calculateSMA(volumes, vmaParams.vma1.p); const vma2 = calculateSMA(volumes, vmaParams.vma2.p); const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
-    const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0; 
+    const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
+
+    // ✨ 新增固定的 MA 計算，專供策略的「乖離」使用
+    const fixedMa5 = calculateSMA(closes, 5);
+    const fixedMa10 = calculateSMA(closes, 10);
+    const fixedMa20 = calculateSMA(closes, 20);
+    const fixedMa60 = calculateSMA(closes, 60); 
     
     // ✨ 新增：找出自訂天數內的最大量與次大量
     const maxDays = maxVolDaysParam || 90;
@@ -3343,8 +3355,14 @@ const App = () => {
       let tower = { top: tTop, bottom: tBottom, color: tColor };
       const isLastDay = i === data.length - 1; // ✨ 就是漏了這一行！用來判斷是不是最後一天
 
+      // ✨ 計算各種乖離率 (百分比)
+      const bias5 = fixedMa5[i] ? ((current.close - fixedMa5[i]) / fixedMa5[i]) * 100 : null;
+      const bias10 = fixedMa10[i] ? ((current.close - fixedMa10[i]) / fixedMa10[i]) * 100 : null;
+      const bias20 = fixedMa20[i] ? ((current.close - fixedMa20[i]) / fixedMa20[i]) * 100 : null;
+      const bias60 = fixedMa60[i] ? ((current.close - fixedMa60[i]) / fixedMa60[i]) * 100 : null;
+      
       return { 
-          ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
+          ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i],bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null, customMarks,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 },　willr,
           obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower,
@@ -4346,7 +4364,7 @@ const App = () => {
 
                {builderTab === '指標' && (
                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
-                    {['5日均線', '10日均線', '20日均線', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OSC值', 'OBV值', '威廉指標', '布林上軌', '布林下軌'].map(btn => (
+                    {['5日均線', '10日均線', '20日均線', '28日均線', '60日均線', '5日均線乖離', '10日均線乖離', '20日均線乖離', '60日均線乖離', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OSC值', 'OBV值', '威廉指標', '布林上軌', '布林下軌'].map(btn => (
                       <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-4 bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 rounded font-bold hover:bg-emerald-800/60 active:scale-95 transition-transform">{btn}</button>
                     ))}
                  </div>
