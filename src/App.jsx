@@ -6134,7 +6134,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                               const py = getY(p.price);
                               return `${i === 0 ? 'M' : 'L'} ${px} ${py}`;
                           }).join(' ')} 
-                          stroke="#ffffff" 
+                          stroke="#facc15" 
                           strokeWidth="1.5" 
                           fill="none" 
                           opacity="0.8"
@@ -6148,7 +6148,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                           y1={getY(pivots[pivots.length - 1].price)}
                           x2={padding + floatPoint.idx * spacing + spacing / 2}
                           y2={getY(floatPoint.price)}
-                          stroke="#ffffff"
+                          stroke="#facc15"
                           strokeWidth="1.5"
                           strokeDasharray="4,4"
                           opacity="0.5"
@@ -6160,7 +6160,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                         const px = padding + p.idx * spacing + spacing / 2;
                         const py = getY(p.price);
                         const isUp = p.type === 'High';
-                        const color = isUp ? '#22c55e' : '#ef4444'; // 高點綠色, 低點紅色
+                        const color = isUp ? '#facc15' : '#facc15'; // 高點綠色, 低點紅色
                         return <circle key={`zz-pt-${i}`} cx={px} cy={py} r={3.5} fill={color} />;
                     })}
 
@@ -6170,7 +6170,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                           cx={padding + floatPoint.idx * spacing + spacing / 2} 
                           cy={getY(floatPoint.price)} 
                           r={3} 
-                          fill={floatPoint.type === 'High' ? '#22c55e' : '#ef4444'} 
+                          fill={floatPoint.type === 'High' ? '#facc15' : '#facc15'} 
                           opacity="0.5" 
                         />
                     )}
