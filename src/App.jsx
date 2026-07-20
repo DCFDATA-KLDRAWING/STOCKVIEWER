@@ -5100,8 +5100,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
       if (activeTool === 'pen' || activeTool === 'eraser') {
         if (draftPoints.length > 1) {
-          // ✨ 橡皮擦的寬度給它預設乘上 8 倍，擦起來比較爽快！
-          commitDrawings([...drawings, { id: Date.now(), type: activeTool, points: draftPoints, color: activeTool === 'eraser' ? '#000000' : drawColor, width: activeTool === 'eraser' ? drawWidth * 8 : drawWidth, opacity: activeTool === 'eraser' ? 1 : drawOpacity }]);
+          // ✨ 把橡皮擦寬度倍數放大到 15，擦拭範圍更大更容易命中！
+          commitDrawings([...drawings, { id: Date.now(), type: activeTool, points: draftPoints, color: activeTool === 'eraser' ? '#000000' : drawColor, width: activeTool === 'eraser' ? drawWidth * 15 : drawWidth, opacity: activeTool === 'eraser' ? 1 : drawOpacity }]);
         }
         setDraftPoints([]); setIsDrawingDrag(false);
       } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'measure'].includes(activeTool)) {
@@ -6056,7 +6056,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                  <polyline key={`mask-${d.id}`} points={d.points.map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} stroke="black" strokeWidth={d.width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               ))}
               {activeTool === 'eraser' && draftPoints.length > 0 && hoverPoint && (
-                 <polyline points={[...draftPoints, hoverPoint].map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} stroke="black" strokeWidth={drawWidth * 8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                 <polyline points={[...draftPoints, hoverPoint].map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} stroke="black" strokeWidth={drawWidth * 15} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               )}
             </mask>
           </defs>
@@ -6439,6 +6439,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             }
           </g>
 
+          {/* ✨ 新增：橡皮擦視覺追蹤器 (紅圈圈準心)，讓您精準看見擦到哪裡！ */}
+          {activeTool === 'eraser' && hoverPoint && (() => {
+             const pt = resolvePoint(hoverPoint);
+             const r = (drawWidth * 15) / 2; // 半徑跟遮罩的粗度保持一致
+             return (
+               <g pointerEvents="none">
+                 <circle cx={pt.x} cy={pt.y} r={r} fill="#ef4444" opacity="0.3" />
+                 <circle cx={pt.x} cy={pt.y} r={r} stroke="#ef4444" strokeWidth="2" fill="none" />
+                 <text x={pt.x} y={pt.y - r - 8} fill="#ef4444" fontSize="12" fontWeight="bold" textAnchor="middle">擦除中</text>
+               </g>
+             );
+          })()}
           {/* ✨ 全新智慧查價線 (自動排版與縮放) */}
           {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && (() => {
             const hoverD = data[crosshair.idx];
