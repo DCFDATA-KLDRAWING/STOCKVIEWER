@@ -2214,7 +2214,8 @@ const App = () => {
     showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
     showBBandsCompress: false, // ✨ 新增：布林壓縮區塊 開關
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
-    showMaxVolLines: false // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
+    showMaxVolLines: false, // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
+    showZigZag: false // ✨ 新增：細折線開關
   });
 
   // 4. 自訂策略清單記憶
@@ -3286,6 +3287,64 @@ const App = () => {
         }
     });
 
+    // === ✨ 新增：ZigZag 細折線 (轉折指標) 核心運算 ===
+    let seekingHigh = true;
+    let lastHigh = null, lastHighIdx = null;
+    let lastLow = null, lastLowIdx = null;
+    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
+    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
+    const zigzagPivots = []; 
+
+    for (let i = 0; i < data.length; i++) {
+        const d = data[i];
+        // 從第 10 根開始算 (對應 PineScript 的 length)
+        if (i > 10) { 
+            if (seekingHigh) {
+                if (tempHigh === null || d.high > tempHigh) {
+                    tempHigh = d.high;
+                    tempHighLow = d.low;
+                    tempHighIdx = i;
+                }
+                // 當收盤價跌破最高點當根的最低價時，確認轉折向下
+                if (tempHighLow !== null && d.close < tempHighLow) {
+                    zigzagPivots.push({ idx: tempHighIdx, price: tempHigh, type: 'High' });
+                    lastHigh = tempHigh;
+                    lastHighIdx = tempHighIdx;
+                    tempLow = d.low;
+                    tempLowHigh = d.high;
+                    tempLowIdx = i;
+                    seekingHigh = false;
+                }
+            } else {
+                if (tempLow === null || d.low < tempLow) {
+                    tempLow = d.low;
+                    tempLowHigh = d.high;
+                    tempLowIdx = i;
+                }
+                // 當收盤價突破最低點當根的最高價時，確認轉折向上
+                if (tempLowHigh !== null && d.close > tempLowHigh) {
+                    zigzagPivots.push({ idx: tempLowIdx, price: tempLow, type: 'Low' });
+                    lastLow = tempLow;
+                    lastLowIdx = tempLowIdx;
+                    tempHigh = d.high;
+                    tempHighLow = d.low;
+                    tempHighIdx = i;
+                    seekingHigh = true;
+                }
+            }
+        }
+    }
+
+    // 處理尚未確認的最後一段「浮動線」
+    let floatPoint = null;
+    if (lastHigh !== null || lastLow !== null) {
+        if (seekingHigh) {
+            floatPoint = { idx: tempHighIdx, price: tempHigh, type: 'High', isFloat: true };
+        } else {
+            floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
+        }
+    }
+
     const bbPeriod = 20; const bbStdDev = 2; const bbMa = calculateSMA(closes, bbPeriod);
     const bbStd = data.map((d, i) => {
         if (i < bbPeriod - 1) return null;
@@ -3398,7 +3457,8 @@ const App = () => {
           maxVolPrice: isLastDay ? topVolPrice : undefined,
           secondVolPrice: isLastDay ? secVolPrice : undefined,
           topVolIdx: isLastDay ? topVolIdx : undefined,
-          secondVolIdx: isLastDay ? secVolIdx : undefined 
+          secondVolIdx: isLastDay ? secVolIdx : undefined,
+          zigzag: isLastDay ? { pivots: zigzagPivots, floatPoint } : undefined // ✨ 傳出 ZigZag 資料 
       };
       // ✨ 2. 推入準備好的陣列中
       enrichedData.push(enrichedCandle);
@@ -3857,6 +3917,9 @@ const App = () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMA} onChange={() => handleToggle('showMA')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均線總開關</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線總開關</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
+
+                  {/* ✨ 新增：細折線 (ZigZag) 打勾按鈕 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showZigZag} onChange={() => handleToggle('showZigZag')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">細折線</span></label>
                   {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
@@ -6053,6 +6116,67 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 })()}
               </g>
             )}
+
+            {/* ✨ 新增：ZigZag 細折線繪製 */}
+            {toggles.showZigZag && data.length > 0 && (() => {
+               const lastDay = data[data.length - 1];
+               if (!lastDay || !lastDay.zigzag) return null;
+               
+               const { pivots, floatPoint } = lastDay.zigzag;
+               
+               return (
+                 <g pointerEvents="none">
+                    {/* 畫已確認的轉折線 */}
+                    {pivots.length >= 2 && (
+                        <path 
+                          d={pivots.map((p, i) => {
+                              const px = padding + p.idx * spacing + spacing / 2;
+                              const py = getY(p.price);
+                              return `${i === 0 ? 'M' : 'L'} ${px} ${py}`;
+                          }).join(' ')} 
+                          stroke="#ffffff" 
+                          strokeWidth="1.5" 
+                          fill="none" 
+                          opacity="0.8"
+                        />
+                    )}
+
+                    {/* 畫未確認的浮動尾段 (虛線) */}
+                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (
+                        <line
+                          x1={padding + pivots[pivots.length - 1].idx * spacing + spacing / 2}
+                          y1={getY(pivots[pivots.length - 1].price)}
+                          x2={padding + floatPoint.idx * spacing + spacing / 2}
+                          y2={getY(floatPoint.price)}
+                          stroke="#ffffff"
+                          strokeWidth="1.5"
+                          strokeDasharray="4,4"
+                          opacity="0.5"
+                        />
+                    )}
+                    
+                    {/* 畫轉折點標記圓點 */}
+                    {pivots.map((p, i) => {
+                        const px = padding + p.idx * spacing + spacing / 2;
+                        const py = getY(p.price);
+                        const isUp = p.type === 'High';
+                        const color = isUp ? '#22c55e' : '#ef4444'; // 高點綠色, 低點紅色
+                        return <circle key={`zz-pt-${i}`} cx={px} cy={py} r={3.5} fill={color} />;
+                    })}
+
+                    {/* 畫浮動點標記圓點 */}
+                    {floatPoint && floatPoint.idx !== null && (
+                        <circle 
+                          cx={padding + floatPoint.idx * spacing + spacing / 2} 
+                          cy={getY(floatPoint.price)} 
+                          r={3} 
+                          fill={floatPoint.type === 'High' ? '#22c55e' : '#ef4444'} 
+                          opacity="0.5" 
+                        />
+                    )}
+                 </g>
+               );
+            })()}
 
             {/* ✨ 升級：讀取樣式設定的動態撐壓線 (加入防呆機制) */}
             {toggles.showMaxVolLines && data.length > 0 && (() => {
