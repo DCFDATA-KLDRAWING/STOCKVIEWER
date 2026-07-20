@@ -5285,7 +5285,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                  onTouchStart={(e) => handleDragWholeStart(e, drawObj)}
               >
                 <rect x="-45" y="-14" width="45" height="28" fill="transparent" />
-                <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️移動</text>
+                <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️</text>
               </g>
 
               {/* 分隔線 */}
@@ -5297,7 +5297,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                  onTouchStart={(e) => onCloneClick(e, drawObj)}
               >
                 <rect x="0" y="-14" width="45" height="28" fill="transparent" />
-                <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄複製</text>
+                <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄</text>
               </g>
             </g>
           )}
@@ -5332,12 +5332,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                <rect x="-45" y="-14" width="90" height="28" fill="#1e293b" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1.5" />
                <g className="cursor-move" onMouseDown={(e) => handleDragWholeStart(e, drawObj)} onTouchStart={(e) => handleDragWholeStart(e, drawObj)}>
                  <rect x="-45" y="-14" width="45" height="28" fill="transparent" />
-                 <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️移動</text>
+                 <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️</text>
                </g>
                <line x1="0" y1="-10" x2="0" y2="10" stroke="#475569" strokeWidth="1" />
                <g className="cursor-pointer" onMouseDown={(e) => onCloneClick(e, drawObj)} onTouchStart={(e) => onCloneClick(e, drawObj)}>
                  <rect x="0" y="-14" width="45" height="28" fill="transparent" />
-                 <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄複製</text>
+                 <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄</text>
                </g>
              </g>
            )}
