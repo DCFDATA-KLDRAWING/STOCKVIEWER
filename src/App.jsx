@@ -6049,15 +6049,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         >
           <defs>
             <clipPath id="chartClip"><rect x={padding} y={0} width={width - padding * 2} height={totalSVGHeight} /></clipPath>
-            {/* ✨ 新增：橡皮擦魔法遮罩 */}
+            {/* ✨ 新增：橡皮擦魔法遮罩 (這裡只負責已經存檔的橡皮擦) */}
             <mask id="eraser-mask">
               <rect x="0" y="0" width={width} height={totalSVGHeight} fill="white" />
               {drawings.filter(d => d.type === 'eraser').map(d => (
                  <polyline key={`mask-${d.id}`} points={d.points.map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} stroke="black" strokeWidth={d.width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               ))}
-              {activeTool === 'eraser' && draftPoints.length > 0 && hoverPoint && (
-                 <polyline points={[...draftPoints, hoverPoint].map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} stroke="black" strokeWidth={drawWidth * 15} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              )}
             </mask>
           </defs>
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
@@ -6439,18 +6436,33 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             }
           </g>
 
-          {/* ✨ 新增：橡皮擦視覺追蹤器 (紅圈圈準心)，讓您精準看見擦到哪裡！ */}
+          {/* ✨ 新增：橡皮擦實時視覺特效 (紅圈圈準心 + 半透明紅色擦拭軌跡) */}
           {activeTool === 'eraser' && hoverPoint && (() => {
              const pt = resolvePoint(hoverPoint);
              const r = (drawWidth * 15) / 2; // 半徑跟遮罩的粗度保持一致
              return (
                <g pointerEvents="none">
+                 {/* 1. 正在拖曳中的「半透明紅色軌跡」 */}
+                 {isDrawingDrag && draftPoints.length > 0 && (
+                    <polyline 
+                      points={[...draftPoints, hoverPoint].map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} 
+                      stroke="#ef4444" 
+                      strokeWidth={drawWidth * 15} 
+                      fill="none" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      opacity="0.4" 
+                    />
+                 )}
+                 {/* 2. 紅圈圈追蹤準心 */}
                  <circle cx={pt.x} cy={pt.y} r={r} fill="#ef4444" opacity="0.3" />
                  <circle cx={pt.x} cy={pt.y} r={r} stroke="#ef4444" strokeWidth="2" fill="none" />
                  <text x={pt.x} y={pt.y - r - 8} fill="#ef4444" fontSize="12" fontWeight="bold" textAnchor="middle">擦除中</text>
                </g>
              );
           })()}
+
+          
           {/* ✨ 全新智慧查價線 (自動排版與縮放) */}
           {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && (() => {
             const hoverD = data[crosshair.idx];
