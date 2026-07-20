@@ -4970,7 +4970,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         },
         onCancel: () => { setActiveTool('cursor'); setChartModal(null); }
       });
-    } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'crossline', 'measure', 'pen', 'eraser'].includes(activeTool)) {
+    } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'crossline', 'measure', 'pen'].includes(activeTool)) {
       setDraftPoints([newPt]);
       setIsDrawingDrag(true);
     } else if (activeTool === 'n-shape' || activeTool === 'wave') {
@@ -5075,7 +5075,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
 
       // ✨ 處理畫筆連續作圖
-      if ((activeTool === 'pen' || activeTool === 'eraser') && isDrawingDrag) {
+      if (activeTool === 'pen' && isDrawingDrag) {
          setDraftPoints(prev => {
             const lastPt = prev[prev.length - 1];
             // 💡 效能優化防呆：防止加入距離太近的點（如果沒移動超過 0.001 就忽略），避免消耗過多效能導致卡頓
@@ -5098,10 +5098,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     if (isDrawingDrag && hoverPoint && draftPoints.length > 0) {
       const isSamePoint = (p1, p2) => p1.idxFromEnd === p2.idxFromEnd && Math.abs(p1.price - p2.price) < 0.0001;
 
-      if (activeTool === 'pen' || activeTool === 'eraser') {
+      if (activeTool === 'pen') {
         if (draftPoints.length > 1) {
-          // ✨ 把橡皮擦寬度倍數放大到 15，擦拭範圍更大更容易命中！
-          commitDrawings([...drawings, { id: Date.now(), type: activeTool, points: draftPoints, color: activeTool === 'eraser' ? '#000000' : drawColor, width: activeTool === 'eraser' ? drawWidth * 15 : drawWidth, opacity: activeTool === 'eraser' ? 1 : drawOpacity }]);
+          commitDrawings([...drawings, { id: Date.now(), type: 'pen', points: draftPoints, color: drawColor, width: drawWidth, opacity: drawOpacity }]);
         }
         setDraftPoints([]); setIsDrawingDrag(false);
       } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'measure'].includes(activeTool)) {
@@ -5224,13 +5223,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   };
 
   const renderDrawingObject = (drawObj, isDraft = false) => {
-    if (drawObj.type === 'eraser') return null; // ✨ 橡皮擦不直接畫出來，它負責在 Mask 遮罩裡面運作！
-    
     const isSinglePointDrag = isDraft && drawObj.type === 'crossline';
     const pts = isSinglePointDrag ? [resolvePoint(hoverPoint)] : drawObj.points.map(resolvePoint);
     const rawPts = isSinglePointDrag ? [hoverPoint] : drawObj.points;
     const idKey = drawObj.id || 'draft';
-    const baseOpacity = drawObj.opacity ?? 1; 
+    const baseOpacity = drawObj.opacity ?? 1; // ✨ 讀取圖形專屬透明度 (舊圖形預設為 1)
     
     const renderDots = () => {
       if (drawObj.type === 'pen') return null;
@@ -5261,84 +5258,52 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                   }}
                 />
               )}
+
+              {/* ✨ 當橡皮擦工具啟用時，在控制點顯示刪除按鈕 */}
+              {activeTool === 'eraser' && !isDraft && (
+                <g
+                  className="cursor-pointer"
+                  pointerEvents="all"
+                  onMouseDown={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}
+                  onTouchStart={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}
+                >
+                  <circle cx={pt.x} cy={pt.y} r={14} fill="#ef4444" opacity={0.6} className="hover:opacity-100 transition-opacity" />
+                  <text x={pt.x} y={pt.y + 4} fontSize="12" fontWeight="bold" fill="#ffffff" textAnchor="middle" pointerEvents="none">✕</text>
+                </g>
+              )}
             </g>
           ))}
           
-          {/* ✨ 整塊拖曳、複製與刪除的工具列 (微調模式專屬升級版) */}
+          {/* ✨ 整塊拖曳與複製的工具列 (微調模式專屬) */}
           {activeTool === 'edit' && !isDraft && pts.length > 0 && (
-            <g transform={`translate(${pts[0].x}, ${pts[0].y - 35})`} pointerEvents="all">
-              <rect x="-70" y="-14" width="140" height="28" fill="#1e293b" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1.5" />
+            <g transform={`translate(${pts[0].x}, ${pts[0].y - 30})`} pointerEvents="all">
+              <rect x="-45" y="-14" width="90" height="28" fill="#1e293b" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1.5" />
               
-              {/* 🖐️ 移動整塊 */}
-              <g className="cursor-move" onMouseDown={(e) => handleDragWholeStart(e, drawObj)} onTouchStart={(e) => handleDragWholeStart(e, drawObj)}>
-                <rect x="-70" y="-14" width="46" height="28" fill="transparent" />
-                <text x="-47" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️</text>
+              {/* 🖐️ 移動整塊按鈕 */}
+              <g className="cursor-move" 
+                 onMouseDown={(e) => handleDragWholeStart(e, drawObj)}
+                 onTouchStart={(e) => handleDragWholeStart(e, drawObj)}
+              >
+                <rect x="-45" y="-14" width="45" height="28" fill="transparent" />
+                <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️移動</text>
               </g>
 
-              <line x1="-24" y1="-10" x2="-24" y2="10" stroke="#475569" strokeWidth="1" />
+              {/* 分隔線 */}
+              <line x1="0" y1="-10" x2="0" y2="10" stroke="#475569" strokeWidth="1" />
               
               {/* 📄 複製按鈕 */}
-              <g className="cursor-pointer" onMouseDown={(e) => onCloneClick(e, drawObj)} onTouchStart={(e) => onCloneClick(e, drawObj)}>
-                <rect x="-24" y="-14" width="46" height="28" fill="transparent" />
-                <text x="-1" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄</text>
-              </g>
-
-              <line x1="22" y1="-10" x2="22" y2="10" stroke="#475569" strokeWidth="1" />
-
-              {/* 🗑️ 刪除按鈕 */}
-              <g className="cursor-pointer" onMouseDown={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }} onTouchStart={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}>
-                <rect x="22" y="-14" width="46" height="28" fill="transparent" />
-                <text x="45" y="4" fill="#ef4444" fontSize="13" fontWeight="bold" textAnchor="middle">🗑️</text>
+              <g className="cursor-pointer"
+                 onMouseDown={(e) => onCloneClick(e, drawObj)}
+                 onTouchStart={(e) => onCloneClick(e, drawObj)}
+              >
+                <rect x="0" y="-14" width="45" height="28" fill="transparent" />
+                <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄複製</text>
               </g>
             </g>
           )}
         </>
       );
     };
-
-    // 👇👇👇 畫筆邏輯同樣加上刪除按鈕 👇👇👇
-    if (drawObj.type === 'pen') {
-       return (
-         <g key={idKey}>
-           {pts.length > 1 && (
-             <polyline 
-               points={pts.map(p => `${p.x},${p.y}`).join(' ')} 
-               fill="none" 
-               stroke={drawObj.color} 
-               strokeWidth={drawObj.width} 
-               strokeLinecap="round" 
-               strokeLinejoin="round" 
-               opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} 
-               pointerEvents="none" 
-             />
-           )}
-           {!isDraft && activeTool === 'edit' && pts.length > 0 && (
-             <g transform={`translate(${pts[Math.floor(pts.length/2)].x}, ${pts[Math.floor(pts.length/2)].y - 35})`} pointerEvents="all">
-               <rect x="-70" y="-14" width="140" height="28" fill="#1e293b" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1.5" />
-               
-               <g className="cursor-move" onMouseDown={(e) => handleDragWholeStart(e, drawObj)} onTouchStart={(e) => handleDragWholeStart(e, drawObj)}>
-                 <rect x="-70" y="-14" width="46" height="28" fill="transparent" />
-                 <text x="-47" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️</text>
-               </g>
-
-               <line x1="-24" y1="-10" x2="-24" y2="10" stroke="#475569" strokeWidth="1" />
-               
-               <g className="cursor-pointer" onMouseDown={(e) => onCloneClick(e, drawObj)} onTouchStart={(e) => onCloneClick(e, drawObj)}>
-                 <rect x="-24" y="-14" width="46" height="28" fill="transparent" />
-                 <text x="-1" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄</text>
-               </g>
-
-               <line x1="22" y1="-10" x2="22" y2="10" stroke="#475569" strokeWidth="1" />
-
-               <g className="cursor-pointer" onMouseDown={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }} onTouchStart={(e) => { e.stopPropagation(); handleDeleteDrawing(drawObj.id); }}>
-                 <rect x="22" y="-14" width="46" height="28" fill="transparent" />
-                 <text x="45" y="4" fill="#ef4444" fontSize="13" fontWeight="bold" textAnchor="middle">🗑️</text>
-               </g>
-             </g>
-           )}
-         </g>
-       );
-    }
 
     // 👇👇👇 貼在這裡：渲染畫筆的邏輯 👇👇👇
     if (drawObj.type === 'pen') {
@@ -5367,12 +5332,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                <rect x="-45" y="-14" width="90" height="28" fill="#1e293b" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1.5" />
                <g className="cursor-move" onMouseDown={(e) => handleDragWholeStart(e, drawObj)} onTouchStart={(e) => handleDragWholeStart(e, drawObj)}>
                  <rect x="-45" y="-14" width="45" height="28" fill="transparent" />
-                 <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️</text>
+                 <text x="-22.5" y="4" fill="#38bdf8" fontSize="13" fontWeight="bold" textAnchor="middle">🖐️移動</text>
                </g>
                <line x1="0" y1="-10" x2="0" y2="10" stroke="#475569" strokeWidth="1" />
                <g className="cursor-pointer" onMouseDown={(e) => onCloneClick(e, drawObj)} onTouchStart={(e) => onCloneClick(e, drawObj)}>
                  <rect x="0" y="-14" width="45" height="28" fill="transparent" />
-                 <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄</text>
+                 <text x="22.5" y="4" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">📄複製</text>
                </g>
              </g>
            )}
@@ -6047,16 +6012,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           onTouchEnd={handlePointerUp}
           onTouchCancel={handlePointerUp}
         >
-          <defs>
-            <clipPath id="chartClip"><rect x={padding} y={0} width={width - padding * 2} height={totalSVGHeight} /></clipPath>
-            {/* ✨ 新增：橡皮擦魔法遮罩 (這裡只負責已經存檔的橡皮擦) */}
-            <mask id="eraser-mask">
-              <rect x="0" y="0" width={width} height={totalSVGHeight} fill="white" />
-              {drawings.filter(d => d.type === 'eraser').map(d => (
-                 <polyline key={`mask-${d.id}`} points={d.points.map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} stroke="black" strokeWidth={d.width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              ))}
-            </mask>
-          </defs>
+          <defs><clipPath id="chartClip"><rect x={padding} y={0} width={width - padding * 2} height={totalSVGHeight} /></clipPath></defs>
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
@@ -6064,7 +6020,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {stockName} ({tfLabel})
           </text>
           
-          <g clipPath="url(#chartClip)" mask="url(#eraser-mask)">
+          <g clipPath="url(#chartClip)">
             
             {/* ✨ 補回：最高最低價參考線與天量防守線 */}
             <line x1={0} y1={getY(minPrice)} x2={width} y2={getY(minPrice)} stroke="#1e293b" strokeDasharray="4,4" />
@@ -6429,40 +6385,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             })()}
           </g>
 
-          <g clipPath="url(#chartClip)" mask="url(#eraser-mask)">
+          <g clipPath="url(#chartClip)">
             {drawings.map(d => renderDrawingObject(d))}
             {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && draftPoints.length > 0 && hoverPoint &&
               renderDrawingObject({ type: activeTool, points: activeTool === 'crossline' ? [hoverPoint] : [...draftPoints, hoverPoint], color: drawColor, width: drawWidth, opacity: drawOpacity }, true)
             }
           </g>
 
-          {/* ✨ 新增：橡皮擦實時視覺特效 (紅圈圈準心 + 半透明紅色擦拭軌跡) */}
-          {activeTool === 'eraser' && hoverPoint && (() => {
-             const pt = resolvePoint(hoverPoint);
-             const r = (drawWidth * 15) / 2; // 半徑跟遮罩的粗度保持一致
-             return (
-               <g pointerEvents="none">
-                 {/* 1. 正在拖曳中的「半透明紅色軌跡」 */}
-                 {isDrawingDrag && draftPoints.length > 0 && (
-                    <polyline 
-                      points={[...draftPoints, hoverPoint].map(resolvePoint).map(p => `${p.x},${p.y}`).join(' ')} 
-                      stroke="#ef4444" 
-                      strokeWidth={drawWidth * 15} 
-                      fill="none" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      opacity="0.4" 
-                    />
-                 )}
-                 {/* 2. 紅圈圈追蹤準心 */}
-                 <circle cx={pt.x} cy={pt.y} r={r} fill="#ef4444" opacity="0.3" />
-                 <circle cx={pt.x} cy={pt.y} r={r} stroke="#ef4444" strokeWidth="2" fill="none" />
-                 <text x={pt.x} y={pt.y - r - 8} fill="#ef4444" fontSize="12" fontWeight="bold" textAnchor="middle">擦除中</text>
-               </g>
-             );
-          })()}
-
-          
           {/* ✨ 全新智慧查價線 (自動排版與縮放) */}
           {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && (() => {
             const hoverD = data[crosshair.idx];
