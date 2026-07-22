@@ -3376,13 +3376,21 @@ const App = () => {
       if (turnover >= 50) volType = '天量'; else if (turnover >= 10) volType = '巨量'; else if (i > 0 && fixedMv5[i-1] && current.volume >= fixedMv5[i-1] * 1.6) volType = '極限大量';
 
       if (i >= 2 && ma1[i] !== null && ma2[i] !== null) { const k1 = data[i-2], k2 = data[i-1], k3 = current; if (k1.close > k1.open && k2.close < k2.open && k2.high > k1.high && k2.low > k1.low && k3.high < k2.high && k3.close >= Math.min(k1.low, k2.low) && k3.close > ma1[i] && ma1[i] > ma2[i]) isHeidun = true; }
+      // ✨ 升級版起漲條件：加入 8MA 乖離限制，且排除連續訊號
       if (i >= 14 && ma1[i] !== null && fixedMa8[i] !== null) { 
-          // 算出 8MA 的乖離率絕對值 (例如 0.05 代表 5%)
           const bias8 = Math.abs((current.close - fixedMa8[i]) / fixedMa8[i]); 
           
-          // 如果符合原本的量價條件，而且 bias8 小於等於 0.1 (10%以內)，才亮起漲訊號！
           if (current.close >= current.open && current.close > ma1[i] && current.close > data[i-1].high && current.volume > data[i-5].volume && current.volume > data[i-13].volume && bias8 <= 0.1) {
-              isStartTrend = true; 
+              
+              // ✨ 新增檢查：昨天是否有標記過起漲？
+              // 因為 enrichedData 裡面還沒有存入 isStartTrend，所以我們直接查前一根 K 棒的狀態
+              // 我們的系統是透過 enrichedData 陣列一根一根把 K 棒推進去的，所以 i-1 就是最新推進去的那根
+              const isYesterdayTrend = i > 0 && enrichedData.length > 0 && enrichedData[enrichedData.length - 1].signalTrend === '起漲K';
+              
+              // 如果昨天沒有標記過，今天才允許亮燈！
+              if (!isYesterdayTrend) {
+                  isStartTrend = true; 
+              }
           }
       }
 
