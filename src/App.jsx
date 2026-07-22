@@ -3374,7 +3374,7 @@ const App = () => {
       const turnover = numShares > 0 ? (current.volume / numShares) * 100 : 0;
       if (turnover >= 50) volType = '天量'; else if (turnover >= 10) volType = '巨量'; else if (i > 0 && fixedMv5[i-1] && current.volume >= fixedMv5[i-1] * 1.6) volType = '極限大量';
 
-      if (i >= 2 && ma1[i] !== null) { const k1 = data[i-2], k2 = data[i-1], k3 = current; if (k1.close > k1.open && k2.close < k2.open && k2.high > k1.high && k2.low > k1.low && k3.high < k2.high && k3.close >= Math.min(k1.low, k2.low) && k3.close > ma1[i]) isHeidun = true; }
+      if (i >= 2 && ma1[i] !== null && ma2[i] !== null) { const k1 = data[i-2], k2 = data[i-1], k3 = current; if (k1.close > k1.open && k2.close < k2.open && k2.high > k1.high && k2.low > k1.low && k3.high < k2.high && k3.close >= Math.min(k1.low, k2.low) && k3.close > ma1[i] && ma1[i] > ma2[i]) isHeidun = true; }
       if (i >= 14 && ma1[i] !== null) { if (current.close >= current.open && current.close > ma1[i] && current.close > data[i-1].high && current.volume > data[i-5].volume && current.volume > data[i-13].volume) isStartTrend = true; }
 
       
