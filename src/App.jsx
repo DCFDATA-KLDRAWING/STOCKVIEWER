@@ -4282,12 +4282,14 @@ const App = () => {
                 
                 // ✨ 第一步：請在這裡補上這段「切換自選股」的邏輯 ✨
                 watchlist={watchlist}
-                onToggleWatchlist={() => {
-                  const isExist = watchlist.some(s => s.symbol === currentRealSymbol);
+                onToggleWatchlist={(clickedSymbol, clickedName) => {
+                  const isExist = watchlist.some(s => s.symbol === clickedSymbol);
                   if (isExist) {
-                    setWatchlist(watchlist.filter(s => s.symbol !== currentRealSymbol));
+                    setWatchlist(watchlist.filter(s => s.symbol !== clickedSymbol));
                   } else {
-                    setWatchlist([...watchlist, { symbol: currentRealSymbol, name: stockName }]);
+                    // ✨ 成功接收圖表傳來的名字，並存入名單中
+                    setWatchlist([...watchlist, { symbol: clickedSymbol, name: clickedName }]);
+                    showAlert(`已將 ${clickedSymbol} 加入自選！`); // 加個小提示
                   }
                 }}              
               />
@@ -5880,20 +5882,22 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
               </button>
             )}
            {/* ✨ 新增：智慧自選按鈕 */}
-              {watchlist && onToggleWatchlist && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onToggleWatchlist(); }}
-                  className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all border ${
-                    watchlist.some(s => s.symbol === realSymbol)
-                      ? 'bg-amber-900/40 text-amber-300 border-amber-700/50 hover:bg-amber-800/60'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'
-                  }`}
-                  title={watchlist.some(s => s.symbol === realSymbol) ? "點擊移除自選" : "點擊加入自選"}
-                >
-                  <span>{watchlist.some(s => s.symbol === realSymbol) ? '🌟' : '⭐'}</span>
-                  <span className="hidden sm:inline">{watchlist.some(s => s.symbol === realSymbol) ? '已在自選' : '加入自選'}</span>
-                </button>
-              )} 
+           {watchlist && onToggleWatchlist && (
+             <button 
+               // 👇 就是改這一行！把 realSymbol 和 stockName 傳進去 👇
+               onClick={(e) => { e.stopPropagation(); onToggleWatchlist(realSymbol, stockName); }}
+               
+               className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all border ${
+                 watchlist.some(s => s.symbol === realSymbol)
+                   ? 'bg-amber-900/40 text-amber-300 border-amber-700/50 hover:bg-amber-800/60'
+                   : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'
+               }`}
+               title={watchlist.some(s => s.symbol === realSymbol) ? "點擊移除自選" : "點擊加入自選"}
+             >
+               <span>{watchlist.some(s => s.symbol === realSymbol) ? '🌟' : '⭐'}</span>
+               <span className="hidden sm:inline">{watchlist.some(s => s.symbol === realSymbol) ? '已在自選' : '加入自選'}</span>
+             </button>
+           )} 
          </div>         
       </div>
 
