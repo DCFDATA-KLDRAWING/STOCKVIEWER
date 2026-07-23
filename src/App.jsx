@@ -4278,7 +4278,18 @@ const App = () => {
                 }
                 // 👇 請在這最後面補上這兩行 👇
                 hasListData={(rankingTab === 'ranking' ? rankingList.length : watchlist.length) > 0}
-                onNavigateList={handleNavigateList}              
+                onNavigateList={handleNavigateList}
+                
+                // ✨ 第一步：請在這裡補上這段「切換自選股」的邏輯 ✨
+                watchlist={watchlist}
+                onToggleWatchlist={() => {
+                  const isExist = watchlist.some(s => s.symbol === currentRealSymbol);
+                  if (isExist) {
+                    setWatchlist(watchlist.filter(s => s.symbol !== currentRealSymbol));
+                  } else {
+                    setWatchlist([...watchlist, { symbol: currentRealSymbol, name: stockName }]);
+                  }
+                }}              
               />
             </div>
           ) : (
@@ -4614,7 +4625,7 @@ const MetricSelector = ({ value, onChange }) => (
   </div>
 );
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -5868,6 +5879,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 🏆 漲幅排行
               </button>
             )}
+           {/* ✨ 新增：智慧自選按鈕 */}
+              {watchlist && onToggleWatchlist && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onToggleWatchlist(); }}
+                  className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all border ${
+                    watchlist.some(s => s.symbol === realSymbol)
+                      ? 'bg-amber-900/40 text-amber-300 border-amber-700/50 hover:bg-amber-800/60'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'
+                  }`}
+                  title={watchlist.some(s => s.symbol === realSymbol) ? "點擊移除自選" : "點擊加入自選"}
+                >
+                  <span>{watchlist.some(s => s.symbol === realSymbol) ? '🌟' : '⭐'}</span>
+                  <span className="hidden sm:inline">{watchlist.some(s => s.symbol === realSymbol) ? '已在自選' : '加入自選'}</span>
+                </button>
+              )} 
          </div>         
       </div>
 
@@ -6086,7 +6112,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
-          <text id="chart-title" x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.20" textAnchor="middle" pointerEvents="none">
+          <text id="chart-title" x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85" textAnchor="middle" pointerEvents="none">
             {stockName} ({tfLabel})
           </text>
           
