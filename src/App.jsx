@@ -2018,6 +2018,7 @@ const getFullName = (input) => {
 };
 
 // === 客製化無敵彈窗 ===
+// === 客製化無敵彈窗 ===
 const CustomModal = ({ modal }) => {
   if (!modal) return null;
   return (
@@ -5812,7 +5813,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   return (
     // ✨ 加入 group 讓滑鼠移進圖表時箭頭才會亮起
     <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}>
-      <CustomModal modal="{chartModal}"/>
+      <CustomModal modal={chartModal}/>
       
       {/* ✨ 排行榜視窗被安置在全螢幕容器內部，保證絕不會被遮擋 */}
       {rankingModalContent}
