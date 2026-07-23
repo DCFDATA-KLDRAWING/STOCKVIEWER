@@ -2894,7 +2894,35 @@ const App = () => {
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  };  
+  };
+     
+  // ✨ 邏輯 4：快速切換上一檔/下一檔 (無縫排行榜導航)
+  const handleNavigateList = (direction) => {
+    // 1. 決定目前要看的是「排行榜」還是「自選名單」
+    const currentList = rankingTab === 'ranking' ? rankingList : watchlist;
+    if (currentList.length === 0) return showAlert(`目前的${rankingTab === 'ranking' ? '排行榜' : '自選'}名單是空的喔！`);
+    
+    // 2. 取得已經套用「排序」的完整名單
+    const sortedList = getSortedData(currentList);
+    const currentReal = getRealSymbol(currentViewedSymbol);
+    
+    // 3. 找出目前觀看的股票在名單中的第幾個位置
+    const currentIndex = sortedList.findIndex(s => s.symbol === currentReal);
+
+    let nextIndex;
+    if (currentIndex === -1) {
+      // 如果現在看的股票不在名單內（例如手動輸入的），預設跳到名單的第一檔或最後一檔
+      nextIndex = direction === 1 ? 0 : sortedList.length - 1;
+    } else {
+      nextIndex = currentIndex + direction;
+      // ✨ 無縫循環：看到最後一檔再按下一檔，會自動繞回第一檔！
+      if (nextIndex < 0) nextIndex = sortedList.length - 1;
+      if (nextIndex >= sortedList.length) nextIndex = 0;
+    }
+
+    // 4. 觸發抓取 K 線資料！
+    fetchStockData(sortedList[nextIndex].symbol);
+  };
   // ✨ 修改 fetchStockData 讓它支援從畫板載入指定的股號與動態週期切換
   const fetchStockData = async (overrideSymbol = null, overrideTf = null) => {
     const targetInput = (typeof overrideSymbol === 'string' ? overrideSymbol : null) || symbolInput || currentViewedSymbol;
@@ -4246,7 +4274,10 @@ const App = () => {
                       </div>
                     );
                   })()
-                }              
+                }
+                // 👇 請在這最後面補上這兩行 👇
+                hasListData={(rankingTab === 'ranking' ? rankingList.length : watchlist.length) > 0}
+                onNavigateList={handleNavigateList}              
               />
             </div>
           ) : (
@@ -4582,7 +4613,7 @@ const MetricSelector = ({ value, onChange }) => (
   </div>
 );
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -5779,11 +5810,32 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const currentHoverData = data[displayIdx];
 
   return (
-    <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col"}>
-      <CustomModal modal={chartModal} />
+    // ✨ 加入 group 讓滑鼠移進圖表時箭頭才會亮起
+    <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}>
+      <CustomModal modal="{chartModal}"/>
       
       {/* ✨ 排行榜視窗被安置在全螢幕容器內部，保證絕不會被遮擋 */}
       {rankingModalContent}
+
+      {/* ✨ 新增：透明的左右切換箭頭 (智慧名單導航) */}
+      {hasListData && onNavigateList && (
+        <>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onNavigateList(-1); }}
+            className="absolute left-2 sm:left-4 top-[40%] -translate-y-1/2 z-[120] bg-slate-800/30 text-slate-400 hover:bg-cyan-800/80 hover:text-cyan-100 w-10 h-20 sm:w-12 sm:h-24 rounded-xl shadow-lg backdrop-blur-sm transition-all opacity-0 group-hover:opacity-60 hover:!opacity-100 flex items-center justify-center pointer-events-auto border border-slate-600/30 hover:border-cyan-500/50"
+            title="切換上一檔"
+          >
+            <span className="text-xl sm:text-3xl font-bold -ml-1">◀</span>
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onNavigateList(1); }}
+            className="absolute right-2 sm:right-4 top-[40%] -translate-y-1/2 z-[120] bg-slate-800/30 text-slate-400 hover:bg-cyan-800/80 hover:text-cyan-100 w-10 h-20 sm:w-12 sm:h-24 rounded-xl shadow-lg backdrop-blur-sm transition-all opacity-0 group-hover:opacity-60 hover:!opacity-100 flex items-center justify-center pointer-events-auto border border-slate-600/30 hover:border-cyan-500/50"
+            title="切換下一檔"
+          >
+            <span className="text-xl sm:text-3xl font-bold -mr-1">▶</span>
+          </button>
+        </>
+      )}
 
       {/* ✨ 2. 次級功能列 (滑桿、翻轉、畫板、存圖) */}
       <div className="flex items-center justify-between px-2 sm:px-3 py-2 shrink-0 border-b border-cyan-900/50 bg-slate-900/60 relative z-20 shadow-sm overflow-x-auto [&::-webkit-scrollbar]:hidden w-full">
