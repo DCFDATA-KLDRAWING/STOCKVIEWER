@@ -2362,6 +2362,7 @@ const App = () => {
   const [lineStyle, setLineStyle] = useState('dashed');
   const [customText, setCustomText] = useState('');
   const [customTextSize, setCustomTextSize] = useState(12);
+  const [textPlacement, setTextPlacement] = useState('auto'); // ✨ 新增這行：記錄上下位置
   // ✨ 新增：管理者權限狀態 (用來隱藏產業資訊)
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('MY_STOCK_ADMIN') === 'true');
 
@@ -3534,7 +3535,8 @@ const App = () => {
               priceTarget: strat.priceTarget || 'close',
               priceVal: current[strat.priceTarget || 'close'], // 抓取當下的 開/高/低/收 價格
               customText: strat.customText || '',         // 👈 補上這行
-              customTextSize: strat.customTextSize || 12  // 👈 補上這行
+              customTextSize: strat.customTextSize || 12,  // 👈 補上這行
+              textPlacement: strat.textPlacement || 'auto'
             });
           }
         });
@@ -4442,6 +4444,12 @@ const App = () => {
                       <option value={14}>大 (14px)</option>
                       <option value={18}>特大 (18px)</option>
                     </select>
+                    {/* ✨ 新增這段：位置選擇選單 */}
+                    <select value={textPlacement} onChange={e => setTextPlacement(e.target.value)} className="bg-slate-800 border border-slate-600 text-purple-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                      <option value="auto">🤖 自動避讓</option>
+                      <option value="above">⬆️ 強制上方</option>
+                      <option value="below">⬇️ 強制下方</option>
+                    </select>
                     <select value={lineColor} onChange={e => setLineColor(e.target.value)} className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer" style={{ color: lineColor }}>
                       <option value="#f8fafc">純白色</option>
                       <option value="#f472b6">粉紅色</option>
@@ -4500,7 +4508,8 @@ const App = () => {
                          lineColor,
                          lineStyle,
                          customText,      // 👈 新增這行：儲存走圖用語
-                         customTextSize   // 👈 新增這行：儲存字體大小
+                         customTextSize,   // 👈 新增這行：儲存字體大小
+                         textPlacement
                        };
 
                        setCustomStrategies(prev => {
@@ -6454,7 +6463,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                       } else if (markObj.displayStyle === 'customText') {
                         // ✨ 走圖用語 (支援自動換行與智慧避讓！)
                         const text = markObj.customText || '';
-                        const chunkSize = 3; // 👈 這裡可以設定「每行最多幾個字」，超過就自動換下一行
+                        const chunkSize = 6; 
                         const chunks = [];
                         for (let j = 0; j < text.length; j += chunkSize) {
                           chunks.push(text.slice(j, j + chunkSize));
@@ -6462,25 +6471,27 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                         
                         const textSize = markObj.customTextSize || 12;
                         const lineHeight = textSize + 2; 
-                        // 計算這串文字總共需要多少高度 (標記 1 行 + 文字 N 行)
                         const totalHeight = (chunks.length + 1) * lineHeight; 
                         
-                        // 智慧避讓：若是紅K(收>=開)，往上長，不能蓋到K棒；若是綠K，往下長
-                        const textY = d.close >= d.open 
+                        // ✨ 升級：智慧避讓與強制位置邏輯
+                        let isAbove = d.close >= d.open; // 預設 auto 邏輯 (紅K上/綠K下)
+                        if (markObj.textPlacement === 'above') isAbove = true;
+                        if (markObj.textPlacement === 'below') isAbove = false;
+
+                        // 根據最後決定的 isAbove，計算文字的 Y 軸位置
+                        const textY = isAbove 
                           ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
                           : getY(d.low) + 20 + (mIdx * totalHeight);
 
                         return (
                           <text key={`s-ctxt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor} fontSize={textSize} fontWeight="bold" textAnchor="middle">
-                            {/* 第一行：畫上 Emoji 標記 */}
                             <tspan x={x} dy="0">{markObj.marker}</tspan>
-                            
-                            {/* 第二行開始：把裁切好的文字一行一行畫出來 */}
                             {chunks.map((chunk, cIdx) => (
                               <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
                             ))}
                           </text>
                         );
+
                       } else {
                         // 傳統 Emoji 標籤 (向下相容)
                         const textY = getY(d.high) - 10 - (toggles.showHeidun && d.signalHeidun ? 15 : 0) - (mIdx * 15);
