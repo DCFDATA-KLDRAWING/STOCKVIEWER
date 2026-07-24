@@ -6463,7 +6463,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                       } else if (markObj.displayStyle === 'customText') {
                         // ✨ 走圖用語 (支援自動換行與智慧避讓！)
                         const text = markObj.customText || '';
-                        const chunkSize = 6; 
+                        const chunkSize = 3; 
                         const chunks = [];
                         for (let j = 0; j < text.length; j += chunkSize) {
                           chunks.push(text.slice(j, j + chunkSize));
