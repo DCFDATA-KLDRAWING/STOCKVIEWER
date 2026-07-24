@@ -2360,6 +2360,8 @@ const App = () => {
   const [priceTarget, setPriceTarget] = useState('close');
   const [lineColor, setLineColor] = useState('#f472b6');
   const [lineStyle, setLineStyle] = useState('dashed');
+  const [customText, setCustomText] = useState('');
+  const [customTextSize, setCustomTextSize] = useState(12);
   // ✨ 新增：管理者權限狀態 (用來隱藏產業資訊)
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('MY_STOCK_ADMIN') === 'true');
 
@@ -3530,7 +3532,9 @@ const App = () => {
               lineStyle: strat.lineStyle || 'dashed',
               lineColor: strat.lineColor || '#f472b6',
               priceTarget: strat.priceTarget || 'close',
-              priceVal: current[strat.priceTarget || 'close'] // 抓取當下的 開/高/低/收 價格
+              priceVal: current[strat.priceTarget || 'close'], // 抓取當下的 開/高/低/收 價格
+              customText: strat.customText || '',         // 👈 補上這行
+              customTextSize: strat.customTextSize || 12  // 👈 補上這行
             });
           }
         });
@@ -4421,7 +4425,32 @@ const App = () => {
                    <option value="marker">📍 圖示標籤</option>
                    <option value="line">➖ 橫線延展</option>
                    <option value="text">🏷️ 價格數字</option>
+                   {/* 👇 新增這個選項 👇 */}
+                   <option value="customText">💬 走圖用語</option>
                 </select>
+                {/* 如果選「走圖用語」，顯示輸入框、大小與顏色 */}
+                {displayStyle === 'customText' && (
+                  <>
+                    <input 
+                      type="text" placeholder="例如: 大量後不過高" 
+                      value={customText} onChange={e => setCustomText(e.target.value)} 
+                      className="bg-slate-800 border border-slate-600 text-amber-300 px-2 py-1 rounded text-xs font-bold outline-none placeholder-slate-500 w-32 sm:w-48"
+                    />
+                    <select value={customTextSize} onChange={e => setCustomTextSize(Number(e.target.value))} className="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                      <option value={10}>小 (10px)</option>
+                      <option value={12}>中 (12px)</option>
+                      <option value={14}>大 (14px)</option>
+                      <option value={18}>特大 (18px)</option>
+                    </select>
+                    <select value={lineColor} onChange={e => setLineColor(e.target.value)} className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer" style={{ color: lineColor }}>
+                      <option value="#f8fafc">純白色</option>
+                      <option value="#f472b6">粉紅色</option>
+                      <option value="#34d399">翠綠色</option>
+                      <option value="#60a5fa">亮藍色</option>
+                      <option value="#fbbf24">金黃色</option>
+                    </select>
+                  </>
+                )}
                 
                 {/* 如果不是選「圖示」，就秀出 價格與顏色 的選項 */}
                 {displayStyle !== 'marker' && (
@@ -4470,6 +4499,8 @@ const App = () => {
                          priceTarget,
                          lineColor,
                          lineStyle
+                         customText,      // 👈 新增這行：儲存走圖用語
+                         customTextSize   // 👈 新增這行：儲存字體大小
                        };
 
                        setCustomStrategies(prev => {
@@ -6418,6 +6449,36 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                         return (
                           <text key={`s-txt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor} fontSize="12" fontWeight="bold" textAnchor="middle">
                             {markObj.marker} {markObj.priceVal}
+                          </text>
+                        );
+                      } else if (markObj.displayStyle === 'customText') {
+                        // ✨ 走圖用語 (支援自動換行與智慧避讓！)
+                        const text = markObj.customText || '';
+                        const chunkSize = 6; // 👈 這裡可以設定「每行最多幾個字」，超過就自動換下一行
+                        const chunks = [];
+                        for (let j = 0; j < text.length; j += chunkSize) {
+                          chunks.push(text.slice(j, j + chunkSize));
+                        }
+                        
+                        const textSize = markObj.customTextSize || 12;
+                        const lineHeight = textSize + 2; 
+                        // 計算這串文字總共需要多少高度 (標記 1 行 + 文字 N 行)
+                        const totalHeight = (chunks.length + 1) * lineHeight; 
+                        
+                        // 智慧避讓：若是紅K(收>=開)，往上長，不能蓋到K棒；若是綠K，往下長
+                        const textY = d.close >= d.open 
+                          ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
+                          : getY(d.low) + 20 + (mIdx * totalHeight);
+
+                        return (
+                          <text key={`s-ctxt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor} fontSize={textSize} fontWeight="bold" textAnchor="middle">
+                            {/* 第一行：畫上 Emoji 標記 */}
+                            <tspan x={x} dy="0">{markObj.marker}</tspan>
+                            
+                            {/* 第二行開始：把裁切好的文字一行一行畫出來 */}
+                            {chunks.map((chunk, cIdx) => (
+                              <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
+                            ))}
                           </text>
                         );
                       } else {
