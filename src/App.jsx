@@ -4428,7 +4428,7 @@ const App = () => {
                    {/* 👇 新增這個選項 👇 */}
                    <option value="customText">💬 走圖用語</option>
                 </select>
-                {/* 如果選「走圖用語」，顯示輸入框、大小與顏色 */}
+                {/* 🎯 如果選「走圖用語」，顯示輸入框、大小與顏色 */}
                 {displayStyle === 'customText' && (
                   <>
                     <input 
@@ -4452,8 +4452,8 @@ const App = () => {
                   </>
                 )}
                 
-                {/* 如果不是選「圖示」，就秀出 價格與顏色 的選項 */}
-                {displayStyle !== 'marker' && (
+                {/* 🎯 如果選「橫線」或「價格數字」，秀出 價格對齊與顏色 的選項 */}
+                {(displayStyle === 'line' || displayStyle === 'text') && (
                   <>
                     <select value={priceTarget} onChange={e => setPriceTarget(e.target.value)} className="bg-slate-800 border border-slate-600 text-amber-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
                       <option value="close">收盤價</option>
@@ -4472,7 +4472,7 @@ const App = () => {
                   </>
                 )}
                 
-                {/* 如果選「橫線延展」，就多出 實線/虛線 的選項 */}
+                {/* 🎯 如果選「橫線延展」，就多出 實線/虛線 的選項 */}
                 {displayStyle === 'line' && (
                   <select value={lineStyle} onChange={e => setLineStyle(e.target.value)} className="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
                       <option value="dashed">虛線</option>
@@ -4498,7 +4498,7 @@ const App = () => {
                          displayStyle,
                          priceTarget,
                          lineColor,
-                         lineStyle
+                         lineStyle,
                          customText,      // 👈 新增這行：儲存走圖用語
                          customTextSize   // 👈 新增這行：儲存字體大小
                        };
