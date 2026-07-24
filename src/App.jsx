@@ -2356,6 +2356,10 @@ const App = () => {
   // ✨ 新增：策略名稱與圖標的狀態
   const [strategyName, setStrategyName] = useState('');
   const [strategyMarker, setStrategyMarker] = useState('🎯');
+  const [displayStyle, setDisplayStyle] = useState('marker');
+  const [priceTarget, setPriceTarget] = useState('close');
+  const [lineColor, setLineColor] = useState('#f472b6');
+  const [lineStyle, setLineStyle] = useState('dashed');
   // ✨ 新增：管理者權限狀態 (用來隱藏產業資訊)
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('MY_STOCK_ADMIN') === 'true');
 
@@ -3511,16 +3515,29 @@ const App = () => {
 
       // ✨ 3. 現在才把包含了「所有指標」的 enrichedData 餵給策略引擎去檢查！
       let finalCustomMarks = [];
+      let finalRenderMarks = []; // ✨ 新增：專門用來存畫圖與畫線細節的陣列
       if (customStrats && Array.isArray(customStrats)) {
         customStrats.forEach(strat => {
           if (!strat.isActive) return;
-          // 注意：這裡改傳 enrichedData 而不是 data
           const results = strat.conditions.map(cond => evaluateCondition(enrichedData, i, cond));
-          if (strat.matchType === 'AND' ? results.every(r => r) : results.some(r => r)) finalCustomMarks.push(strat.marker);
+          if (strat.matchType === 'AND' ? results.every(r => r) : results.some(r => r)) {
+            finalCustomMarks.push(strat.marker); // 保留舊版供掃描雷達使用
+            
+            // ✨ 把完整的畫線與標籤設定存起來，交給圖表畫出來
+            finalRenderMarks.push({
+              marker: strat.marker,
+              displayStyle: strat.displayStyle || 'marker', // 預設是 emoji 標記
+              lineStyle: strat.lineStyle || 'dashed',
+              lineColor: strat.lineColor || '#f472b6',
+              priceTarget: strat.priceTarget || 'close',
+              priceVal: current[strat.priceTarget || 'close'] // 抓取當下的 開/高/低/收 價格
+            });
+          }
         });
       }
 
       enrichedCandle.customMarks = finalCustomMarks;
+      enrichedCandle.customRenderMarks = finalRenderMarks;
       return enrichedCandle;
     });
   };
@@ -4379,46 +4396,89 @@ const App = () => {
             
             {/* 標題與控制列 */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0 gap-3">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              
+              {/* 左側：名稱與標記 */}
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <span className="text-xl">🧪</span>
-                {/* 策略名稱輸入框 */}
                 <input 
-                  type="text" 
-                  placeholder="幫策略取個名字..." 
-                  value={strategyName} 
-                  onChange={(e) => setStrategyName(e.target.value)} 
+                  type="text" placeholder="幫策略取個名字..." 
+                  value={strategyName} onChange={(e) => setStrategyName(e.target.value)} 
                   className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-400 w-40 sm:w-48 shadow-inner placeholder-slate-600" 
                 />
-                {/* 標記圖案輸入框 (限制最多2個字，避免圖表太亂) */}
                 <input 
-                  type="text" 
-                  placeholder="標記" 
-                  value={strategyMarker} 
-                  onChange={(e) => setStrategyMarker(e.target.value)} 
+                  type="text" placeholder="標記" 
+                  value={strategyMarker} onChange={(e) => setStrategyMarker(e.target.value)} 
                   maxLength="2" 
                   className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-center text-pink-400 font-bold text-sm outline-none focus:border-pink-400 w-12 shadow-inner" 
                   title="顯示在 K 線上的圖案" 
                 />
               </div>
+
+              {/* ✨ 中間：新增的顯示方式設定區塊 */}
+              <div className="flex flex-wrap items-center gap-2 bg-slate-900/50 p-1.5 rounded border border-slate-700 w-full sm:w-auto">
+                <span className="text-slate-400 font-bold text-xs shrink-0">🎨 顯示：</span>
+                <select value={displayStyle} onChange={e => setDisplayStyle(e.target.value)} className="bg-slate-800 border border-slate-600 text-cyan-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                   <option value="marker">📍 圖示標籤</option>
+                   <option value="line">➖ 橫線延展</option>
+                   <option value="text">🏷️ 價格數字</option>
+                </select>
+                
+                {/* 如果不是選「圖示」，就秀出 價格與顏色 的選項 */}
+                {displayStyle !== 'marker' && (
+                  <>
+                    <select value={priceTarget} onChange={e => setPriceTarget(e.target.value)} className="bg-slate-800 border border-slate-600 text-amber-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                      <option value="close">收盤價</option>
+                      <option value="open">開盤價</option>
+                      <option value="high">最高價</option>
+                      <option value="low">最低價</option>
+                    </select>
+                    <select value={lineColor} onChange={e => setLineColor(e.target.value)} className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer" style={{ color: lineColor }}>
+                      <option value="#f472b6">粉紅色</option>
+                      <option value="#34d399">翠綠色</option>
+                      <option value="#60a5fa">亮藍色</option>
+                      <option value="#fbbf24">金黃色</option>
+                      <option value="#a78bfa">淡紫色</option>
+                      <option value="#f87171">鮮紅色</option>
+                    </select>
+                  </>
+                )}
+                
+                {/* 如果選「橫線延展」，就多出 實線/虛線 的選項 */}
+                {displayStyle === 'line' && (
+                  <select value={lineStyle} onChange={e => setLineStyle(e.target.value)} className="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                      <option value="dashed">虛線</option>
+                      <option value="solid">實線</option>
+                  </select>
+                )}
+              </div>
+              
+              {/* 右側：儲存按鈕 (這裡我們要把剛剛的 state 塞進 newStrategy 裡！) */}
               <div className="flex gap-2 shrink-0 self-end sm:self-auto">
-                {/* ✨ 點擊儲存時，呼叫翻譯蒟蒻，如果成功就存入系統 */}
                 <button 
                   onClick={() => {
                     if (builderFormula.length === 0) return showAlert('請先輸入公式！');
-                    const newStrategy = parseFormulaToStrategy(builderFormula, strategyName, strategyMarker);
+                    // 先翻譯出基本的策略
+                    const parsedStrategy = parseFormulaToStrategy(builderFormula, strategyName, strategyMarker);
                     
-                    if (newStrategy.error) {
-                       // 翻譯失敗，跳出警告
-                       showAlert(`公式錯誤：${newStrategy.error}`);
+                    if (parsedStrategy.error) {
+                       showAlert(`公式錯誤：${parsedStrategy.error}`);
                     } else {
-                       // 翻譯成功！存入記憶體中，並把舊的都關掉，只啟用最新寫好的這一個
+                       // ✨ 翻譯成功！把我們剛剛選的顯示設定，偷偷塞進去
+                       const newStrategy = {
+                         ...parsedStrategy,
+                         displayStyle,
+                         priceTarget,
+                         lineColor,
+                         lineStyle
+                       };
+
                        setCustomStrategies(prev => {
                           const updated = prev.map(s => ({...s, isActive: false}));
                           return [newStrategy, ...updated];
                        });
-                       setBuilderFormula([]); // 清空計算機
-                       setIsBuilderOpen(false); // 關閉視窗
-                       showAlert(`策略「${newStrategy.name}」已儲存並啟用！請在圖表上查看 🎯 標記。`);
+                       setBuilderFormula([]); 
+                       setIsBuilderOpen(false); 
+                       showAlert(`策略「${newStrategy.name}」已儲存並啟用！請在圖表上查看。`);
                     }
                   }}
                   className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1 rounded text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
@@ -6116,7 +6176,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
-          <text id="chart-title" x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.35" textAnchor="middle" pointerEvents="none">
+          <text id="chart-title" x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.85" textAnchor="middle" pointerEvents="none">
             {stockName} ({tfLabel})
           </text>
           
@@ -6334,10 +6394,40 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 <g key={`candle-${i}`}>
                   <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
                   <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
-                  {/* ✨ 補回：黑頓與自訂策略標記 */}
+                  {/* ✨ 補回：黑頓與自訂策略標記 (含升級版畫線與價格功能) */}
                   <g textAnchor="middle" fontSize="12" fontWeight="bold">
                     {toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
-                    {d.customMarks && d.customMarks.map((mark, markIdx) => <text key={markIdx} x={x} y={getY(d.high) - 10 - (toggles.showHeidun && d.signalHeidun ? 15 : 0) - (markIdx * 15)} fill="#818cf8">{mark}</text>)}
+                    
+                    {/* 讀取升級版的 customRenderMarks 來畫圖 */}
+                    {(d.customRenderMarks || (d.customMarks ? d.customMarks.map(m => ({ displayStyle: 'marker', marker: m })) : [])).map((markObj, mIdx) => {
+                      if (markObj.displayStyle === 'line') {
+                        const markY = getY(markObj.priceVal);
+                        return (
+                          <g key={`s-line-${i}-${mIdx}`}>
+                            {/* 畫一條橫線 */}
+                            <line x1={x} y1={markY} x2={width - padding} y2={markY} stroke={markObj.lineColor} strokeWidth="1.5" strokeDasharray={markObj.lineStyle === 'dashed' ? '5,5' : 'none'} opacity="0.6" />
+                            {/* 在線上寫價格 */}
+                            <text x={x} y={markY - 6} fill={markObj.lineColor} fontSize="11" fontWeight="bold" textAnchor="middle">
+                              {markObj.marker} {markObj.priceVal}
+                            </text>
+                          </g>
+                        );
+                      } else if (markObj.displayStyle === 'text') {
+                        // 純文字價格
+                        const textY = d.close >= d.open ? getY(d.high) - 15 - (mIdx * 15) : getY(d.low) + 25 + (mIdx * 15);
+                        return (
+                          <text key={`s-txt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor} fontSize="12" fontWeight="bold" textAnchor="middle">
+                            {markObj.marker} {markObj.priceVal}
+                          </text>
+                        );
+                      } else {
+                        // 傳統 Emoji 標籤 (向下相容)
+                        const textY = getY(d.high) - 10 - (toggles.showHeidun && d.signalHeidun ? 15 : 0) - (mIdx * 15);
+                        return (
+                          <text key={`s-mrk-${i}-${mIdx}`} x={x} y={textY} fill="#818cf8">{markObj.marker}</text>
+                        );
+                      }
+                    })}
                   </g>
                   {/* ✨ 補回：起漲標記 */}
                   {toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
