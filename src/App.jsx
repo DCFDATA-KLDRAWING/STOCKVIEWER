@@ -4117,7 +4117,27 @@ const App = () => {
                   <div className="flex flex-wrap gap-2 mt-1">
                     {customStrategies.map(strat => (
                       <div key={strat.id} className="flex items-center gap-1 bg-indigo-950/30 px-2 py-1 rounded border border-indigo-900/50">
-                        <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={strat.isActive} onChange={() => handleCustomToggle(strat.id)} className="w-3.5 h-3.5 text-indigo-500 rounded border-slate-600 bg-slate-900" /><span className="text-xs font-bold text-indigo-300">{strat.marker} {strat.name}</span></label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="checkbox" checked={strat.isActive} onChange={() => handleCustomToggle(strat.id)} className="w-3.5 h-3.5 text-indigo-500 rounded border-slate-600 bg-slate-900" />
+                          <span className="text-xs font-bold text-indigo-300">{strat.marker} {strat.name}</span>
+                        </label>
+                        
+                        {/* ✨ 新增：提取與編輯按鈕 */}
+                        <button 
+                          onClick={() => {
+                            setBuilderFormula(strat.rawFormula || []);
+                            setStrategyName(`${strat.name}_修改`);
+                            setStrategyMarker(strat.marker);
+                            setDisplayStyle(strat.displayStyle || 'marker');
+                            setIsBuilderOpen(true);
+                          }}
+                          className="text-indigo-400 hover:text-cyan-400 ml-2 font-bold text-[10px] transition-colors"
+                          title="載入至打造器"
+                        >
+                          ✏️
+                        </button>
+
+                        {/* 原本的刪除按鈕 */}
                         <button onClick={() => deleteCustomStrategy(strat.id)} className="text-indigo-500 hover:text-red-400 ml-1 font-bold text-[10px]">✕</button>
                       </div>
                     ))}
@@ -4575,7 +4595,8 @@ const App = () => {
                          lineStyle,
                          customText,      // 👈 新增這行：儲存走圖用語
                          customTextSize,   // 👈 新增這行：儲存字體大小
-                         textPlacement
+                         textPlacement,
+                         rawFormula: [...builderFormula] // ✨ 新增這行：把原始積木陣列備份起來！
                        };
 
                        setCustomStrategies(prev => {
@@ -4685,6 +4706,30 @@ const App = () => {
                     {/* 1. 邏輯與括號區 */}
                     <div>
                       <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">邏輯與群組</div>
+                      {/* ✨ 第三步：策略組合器 (插入現有策略) */}
+                      {customStrategies.length > 0 && (
+                        <div className="flex items-center gap-2 mb-3 bg-indigo-900/30 p-2 rounded border border-indigo-700/50">
+                          <span className="text-indigo-300 font-bold text-xs shrink-0">🧬 插入條件：</span>
+                          <select 
+                            className="bg-slate-900 border border-indigo-600 text-indigo-300 px-2 py-1.5 rounded text-xs font-bold outline-none flex-1"
+                            onChange={(e) => {
+                              if (!e.target.value) return;
+                              const targetStrat = customStrategies.find(s => s.id.toString() === e.target.value);
+                              if (targetStrat && targetStrat.rawFormula) {
+                                // 把舊公式用括號包起來，塞進現在的公式裡！
+                                setBuilderFormula(prev => [...prev, '(', ...targetStrat.rawFormula, ')']);
+                              }
+                              e.target.value = ""; // 選完歸零
+                            }}
+                          >
+                            選擇並插入已存策略 --</option>
+                            {customStrategies.map(s => (
+                              <option key={`inject-${s.id}`} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      策
                       <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                         {['而且', '或者', '(', ')', '如果', '成立取', '否則取'].map(btn => (
                           <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 rounded font-bold text-sm bg-slate-800 border-slate-700 text-pink-400 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
