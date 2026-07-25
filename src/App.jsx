@@ -2217,7 +2217,10 @@ const App = () => {
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
     showMaxVolLines: false, // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
     showZigZag: false // ✨ 新增：細折線開關
+    
   });
+  // ✨ 新增：SAR 指標的專屬參數
+  const [sarParams, setSarParams] = useState({ start: 0.02, step: 0.02, max: 0.20 });
 
   // 4. 自訂策略清單記憶
   const [customStrategies, setCustomStrategies] = useState(() => {
@@ -3275,7 +3278,7 @@ const App = () => {
     switch (condition.operator) { case '>': return leftVal > rightVal; case '<': return leftVal < rightVal; case '>=': return leftVal >= rightVal; case '<=': return leftVal <= rightVal; case '==': return leftVal === rightVal; case '!=': return leftVal !== rightVal; default: return false; }
   };
 
-  const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams, maxVolDaysParam = 90, volLineAnchorParam = 'close') => {
+  const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams, maxVolDaysParam = 90, volLineAnchorParam = 'close',sarParams = { start: 0.02, step: 0.02, max: 0.20 }) => {
     const closes = data.map(d => d.close); const volumes = data.map(d => d.volume);
     const ma1 = calculateSMA(closes, maParams.ma1.p); const ma2 = calculateSMA(closes, maParams.ma2.p); const ma3 = calculateSMA(closes, maParams.ma3.p); 
     const vma1 = calculateSMA(volumes, vmaParams.vma1.p); const vma2 = calculateSMA(volumes, vmaParams.vma2.p); const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
@@ -3331,9 +3334,59 @@ const App = () => {
     let tempHigh = null, tempHighIdx = null, tempHighLow = null;
     let tempLow = null, tempLowIdx = null, tempLowHigh = null;
     const zigzagPivots = []; 
+    
+    // ✨ SAR 初始化變數
+    let sarTrend = 1; // 1代表多頭, -1代表空頭
+    let sarEP = data[0]?.high || 0; // 極點 (Extreme Point)
+    let sarAF = sarParams?.start || 0.02; // 加速因子 (AF)
+    let currentSar = data[0]?.low || 0;
+
 
     for (let i = 0; i < data.length; i++) {
         const d = data[i];
+        // ✨ SAR 拋物線核心演算法
+        let calculatedSar = currentSar; 
+        if (i > 0) {
+            let prev = data[i - 1];
+            // 1. 根據昨天的趨勢，更新極點(EP)與加速因子(AF)
+            if (sarTrend === 1) {
+                if (prev.high > sarEP) {
+                    sarEP = prev.high;
+                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
+                }
+            } else {
+                if (prev.low < sarEP) {
+                    sarEP = prev.low;
+                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
+                }
+            }
+            // 2. 算出今天的 SAR 暫定值
+            currentSar = currentSar + sarAF * (sarEP - currentSar);
+
+            // 3. 邊界限制 (多頭 SAR 不能高於近兩日低點；空頭 SAR 不能低於近兩日高點)
+            if (sarTrend === 1) {
+                currentSar = Math.min(currentSar, prev.low, i > 1 ? data[i - 2].low : prev.low);
+            } else {
+                currentSar = Math.max(currentSar, prev.high, i > 1 ? data[i - 2].high : prev.high);
+            }
+
+            // 4. 判斷今天是否發生「反轉」
+            if (sarTrend === 1 && d.low < currentSar) {
+                sarTrend = -1; // 翻空
+                currentSar = sarEP;
+                sarEP = d.low;
+                sarAF = sarParams?.start || 0.02;
+            } else if (sarTrend === -1 && d.high > currentSar) {
+                sarTrend = 1; // 翻多
+                currentSar = sarEP;
+                sarEP = d.high;
+                sarAF = sarParams?.start || 0.02;
+            }
+            calculatedSar = currentSar;
+        }
+        // ✨ 把算好的 SAR 存進當天的 K 棒資料中
+        d.sar = calculatedSar;
+        d.sarTrend = sarTrend;
         // 從第 10 根開始算 (對應 PineScript 的 length)
         if (i > 10) { 
             if (seekingHigh) {
@@ -3989,6 +4042,19 @@ const App = () => {
 
                   {/* ✨ 新增：細折線 (ZigZag) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showZigZag} onChange={() => handleToggle('showZigZag')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">細折線</span></label>
+                  {/* ✨ 新增：SAR 指標開關與參數設定 */}
+                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
+                      <input type="checkbox" checked={toggles.showSAR} onChange={() => handleToggle('showSAR')} className="w-3.5 h-3.5 text-fuchsia-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-xs text-fuchsia-400 font-bold">SAR</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 ml-1">起始</span>
+                    <input type="number" step="0.01" value={sarParams.start} onChange={(e) => setSarParams(p => ({...p, start: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="起始值" />
+                    <span className="text-[10px] text-slate-400">累加</span>
+                    <input type="number" step="0.01" value={sarParams.step} onChange={(e) => setSarParams(p => ({...p, step: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="累加值" />
+                    <span className="text-[10px] text-slate-400">最大</span>
+                    <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
+                  </div>
                   {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
@@ -6254,6 +6320,24 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 <path d={data.map((d, i) => d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
             </g>)}
 
+            {/* ✨ 畫出主圖的 SAR 指標 (小圓點) */}
+            {toggles.showSAR && data.map((d, i) => {
+                if (d.sar === undefined || i === 0) return null; 
+                // 台股習慣：紅K為漲，所以多頭支撐點用紅色；空頭壓力點用綠色
+                const sarColor = d.sarTrend === 1 ? '#ef4444' : '#22c55e';
+                const sarY = getY(d.sar);
+                return (
+                    <circle 
+                      key={`sar-${i}`} 
+                      cx={padding + i * spacing + spacing / 2} 
+                      cy={sarY} 
+                      r="2" 
+                      fill={sarColor} 
+                      opacity="0.85" 
+                    />
+                );
+            })}
+
             {/* ✨ 新增：布林帶寬壓縮區塊標示 (連續10天，帶寬<=1.5%) */}
             {toggles.showBBandsCompress && (
               <g>
@@ -6695,6 +6779,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 if (toggles.showBBands3) {
                     tooltipLines.push({ color: '#f472b6', text: `高布林上： ${hoverD?.bbands?.up3?.toFixed(2) || '-'}` });
                     tooltipLines.push({ color: '#f472b6', text: `高布林下： ${hoverD?.bbands?.down3?.toFixed(2) || '-'}` });
+                }
+
+                // 👇 把 SAR 貼在這裡 👇
+                if (toggles.showSAR && hoverD?.sar !== undefined) {
+                    // 用 fuchsia 紫紅色來對應上面 SAR 開關的顏色
+                    tooltipLines.push({ color: '#d946ef', text: `SAR： ${hoverD?.sar?.toFixed(2) || '-'}` });
                 }
 
                 // 補回 VMA2、VMA3 均量線
