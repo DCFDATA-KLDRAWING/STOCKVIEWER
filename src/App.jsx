@@ -4722,14 +4722,13 @@ const App = () => {
                               e.target.value = ""; // 選完歸零
                             }}
                           >
-                            選擇並插入已存策略 --</option>
+                            <option value="">-- 選擇並插入已存策略 --</option>
                             {customStrategies.map(s => (
                               <option key={`inject-${s.id}`} value={s.id}>{s.name}</option>
                             ))}
                           </select>
                         </div>
                       )}
-                      策
                       <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                         {['而且', '或者', '(', ')', '如果', '成立取', '否則取'].map(btn => (
                           <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 rounded font-bold text-sm bg-slate-800 border-slate-700 text-pink-400 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
