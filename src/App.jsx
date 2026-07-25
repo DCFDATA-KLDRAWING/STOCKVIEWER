@@ -6333,7 +6333,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                       cy={sarY} 
                       r="2" 
                       fill={sarColor} 
-                      opacity="0.85" 
+                      opacity="0.4" 
                     />
                 );
             })}
