@@ -16,26 +16,7 @@ try {
 }
 
 // === 股票清單 (完整載入 1700+ 檔) ===
-const RAW_STOCK_LIST = `IX0001  加權指數(大盤)
-IX0043  櫃買指數(OTC)
-IX0017  電子類指數
-IX0024  半導體類
-IX0025  電腦及週邊
-IX0026  光電類
-IX0027  通信網路類
-IX0028  金融保險類
-IX0029  電子零組件
-IX0030  其他電子類
-IX0031  建材營造類
-IX0032  航運類
-IX0033  觀光事業類
-IX0118  富櫃200
-0050  元大台灣50
-0056  元大高股息
-00878  國泰永續高股息
-00919  群益台灣精選高息
-00929  復華台灣科技優息
-1101  台泥
+const RAW_STOCK_LIST = `1101  台泥
 1101B 台泥乙特
 1102  亞泥
 1103  嘉泥
@@ -2240,6 +2221,10 @@ const App = () => {
   });
   // ✨ 新增：SAR 指標的專屬參數
   const [sarParams, setSarParams] = useState({ start: 0.02, step: 0.02, max: 0.20 });
+  
+  // ✨ 新增：走圖專注模式
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [focusDays, setFocusDays] = useState(60); // 預設顯示近 60 天
 
   // 4. 自訂策略清單記憶
   const [customStrategies, setCustomStrategies] = useState(() => {
@@ -3921,6 +3906,25 @@ const App = () => {
       </div>
     );
   }
+  
+  // ✨ 走圖模式資料過濾器：只保留近 N 日的指標與策略圖示，讓畫面保持乾淨
+  const displayKlineData = React.useMemo(() => {
+    if (!isFocusMode || klineData.length === 0) return klineData;
+    return klineData.map((d, i) => {
+      // 在近 N 日內的資料，原封不動保留
+      if (i >= klineData.length - focusDays) return d;
+      // 過去的資料：清除指標與策略標記，只留下純 K 線
+      return {
+        ...d,
+        ma1: null, ma2: null, ma3: null, // 清除主圖均線
+        vma1: null, vma2: null, vma3: null, // 清除均量線
+        bbands: null, // 清除布林通道
+        sar: undefined, // 清除 SAR
+        customMarks: [], // 清除策略圖示
+        customRenderMarks: [] // 清除策略橫線/文字
+      };
+    });
+  }, [klineData, isFocusMode, focusDays]);
 
   return (
     <div className="min-h-screen bg-[#020617] p-2 sm:p-4 font-sans text-slate-300 pb-20 selection:bg-cyan-900/50 flex flex-col gap-3 overflow-hidden">
@@ -4075,6 +4079,16 @@ const App = () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
+                  {/* ✨ 新增：走圖專注模式 (近N日顯示) */}
+                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
+                      <input type="checkbox" checked={isFocusMode} onChange={(e) => setIsFocusMode(e.target.checked)} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-xs text-emerald-400 font-bold">走圖專注模式</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 ml-1">僅顯示近</span>
+                    <input type="number" step="1" value={focusDays} onChange={(e) => setFocusDays(Number(e.target.value))} className="w-12 bg-slate-900 border border-slate-600 rounded text-emerald-300 text-[10px] text-center outline-none focus:border-emerald-500 font-bold px-0.5 py-0.5" title="顯示天數" />
+                    <span className="text-[10px] text-slate-400">日的指標與策略</span>
+                  </div>
                   {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
@@ -4226,7 +4240,7 @@ const App = () => {
           {klineData.length > 0 ? (
             <div className="flex-1 w-full h-full relative">
               <TrendChart 
-                data={klineData} // ✨ 不再切斷，傳入全部資料，讓畫布可以無限往左滑！ 
+                data={displayKlineData} // ✨ 不再切斷，傳入全部資料，讓畫布可以無限往左滑！ 
                 timeframe={timeframe}
                 stockName={displayFullname} 
                 toggles={toggles}
