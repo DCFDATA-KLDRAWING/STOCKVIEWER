@@ -3284,7 +3284,7 @@ const App = () => {
   // ✨ 自動載入預設股票 (IX0001)，作為選股中心的墊腳石
   const autoLoadDone = useRef(false);
   useEffect(() => {
-    // 當系統準備好且有金鑰時，只自動載入一次 大盤
+    // 當系統準備好且有金鑰時，只自動載入一次大盤
     if (dbLoaded && !showKeySetup && userApiKey && !autoLoadDone.current) {
       autoLoadDone.current = true;
       fetchStockData('IX0001');
