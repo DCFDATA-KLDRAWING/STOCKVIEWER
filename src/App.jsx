@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+YzljZDBlYzYtZTMyMy00NjEzLWFiYjgtNzNkMWYxZDk1NDMzIGVjYWI5MzhlLTM3OTUtNGMzZC1hM2I4LTllZDkyNjNlZDJlZAimport React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -2186,14 +2186,36 @@ const App = () => {
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
 
+  
   // 2. 主圖均線 MA 參數記憶 (加入 show 獨立開關)
   const [maParams, setMaParams] = useState(() => {
+    // 定義 6 條線的完整預設值
+    const defaultMA = {
+      ma1: { p: 5, c: '#ef4444', w: 1.5, show: true }, 
+      ma2: { p: 10, c: '#eab308', w: 1.5, show: true }, 
+      ma3: { p: 20, c: '#22c55e', w: 1.5, show: true },
+      ma4: { p: 60, c: '#3b82f6', w: 1.5, show: false }, 
+      ma5: { p: 120, c: '#a855f7', w: 1.5, show: false }, 
+      ma6: { p: 240, c: '#f472b6', w: 1.5, show: false }  
+    };
     try {
       const saved = localStorage.getItem('MY_STOCK_MA_PARAMS');
-      return saved ? JSON.parse(saved) : { 
-        ma1: { p: 10, c: '#eab308', w: 1.5, show: true }, ma2: { p: 20, c: '#22d3ee', w: 1.5, show: true }, ma3: { p: 60, c: '#ec4899', w: 1.5, show: true } 
-      };
-    } catch (e) { return { ma1: { p: 10, c: '#eab308', w: 1.5, show: true }, ma2: { p: 20, c: '#22d3ee', w: 1.5, show: true }, ma3: { p: 60, c: '#ec4899', w: 1.5, show: true } }; }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // ✨ 強制檢查並補齊缺失的屬性 (Deep Merge)
+        return {
+          ma1: parsed.ma1 || defaultMA.ma1,
+          ma2: parsed.ma2 || defaultMA.ma2,
+          ma3: parsed.ma3 || defaultMA.ma3,
+          ma4: parsed.ma4 || defaultMA.ma4,
+          ma5: parsed.ma5 || defaultMA.ma5,
+          ma6: parsed.ma6 || defaultMA.ma6
+        };
+      }
+      return defaultMA;
+    } catch (e) { 
+      return defaultMA; 
+    }
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_MA_PARAMS', JSON.stringify(maParams)); }, [maParams]);
 
@@ -2259,7 +2281,7 @@ const App = () => {
       // 過去的資料：清除指標與策略標記，只留下純 K 線
       return {
         ...d,
-        ma1: null, ma2: null, ma3: null, // 清除主圖均線
+        ma1: null, ma2: null, ma3: null, ma4: null, ma5: null, ma6: null, // 清除主圖均線
         vma1: null, vma2: null, vma3: null, // 清除均量線
         bbands: null, // 清除布林通道
         sar: undefined, // 清除 SAR
@@ -2993,25 +3015,48 @@ const App = () => {
       const toDate = new Date(); 
       const fromDate = new Date(); 
       
-      // ✨ 判斷是否為分K，如果是分K往前抓 30 天就好 (避免資料量過大)；若是日/週/月，抓 360 天
+      // ✨ 判斷是否為分K 或 大盤指數
       const isIntra = ['5', '15', '30', '60'].includes(currentTf);
-      fromDate.setDate(toDate.getDate() - (isIntra ? 30 : 360)); 
       const targetSymbol = getRealSymbol(targetInput);
-      
-      // ✨ 動態套用 API 的 timeframe 參數
-      const apiTf = isIntra ? currentTf : 'D';
-      const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=${apiTf}&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
-      const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
-      
-      if (histRes.status === 401 || histRes.status === 403) throw new Error("⚠️ 金鑰無效或沒有權限，請點擊右上角重新設定 API 金鑰！");
-      if (!histRes.ok) throw new Error(`無法取得歷史資料 (HTTP ${histRes.status})`);
-      
-      const histData = await histRes.json();
-      let candles = histData.data.reverse().map(d => ({ 
-          // ✨ 如果是分K，顯示精準時間 (切掉毫秒與時區)；否則顯示日期
-          date: isIntra ? d.date.replace('T', ' ').substring(0, 16) : d.date, 
-          open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000) 
-      }));
+      const isIndex = targetSymbol.startsWith('IX'); // 👈 判斷是否為大盤/類股指數
+      let candles = [];
+
+      if (isIntra || isIndex) {
+          // ─── 模式 A：分K「與」大盤指數 強制使用富果 ───
+          // 分K抓30天，大盤日K抓360天 (富果極限)
+          fromDate.setDate(toDate.getDate() - (isIntra ? 30 : 360));
+          const apiTf = isIntra ? currentTf : 'D';
+          const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=${apiTf}&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
+          const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
+          if (histRes.status === 401 || histRes.status === 403) throw new Error("⚠️ 金鑰無效或沒有權限，請點擊右上角重新設定 API 金鑰！");
+          if (!histRes.ok) throw new Error(`無法取得歷史資料 (HTTP ${histRes.status})`);
+          
+          const histData = await histRes.json();
+          candles = histData.data.reverse().map(d => ({
+              date: isIntra ? d.date.replace('T', ' ').substring(0, 16) : d.date,
+              open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000)
+          }));
+      } else {
+          // ─── 模式 B：日K/週K/月K 切換成 FinMind (抓取 1200 天超長歷史！) ───
+          fromDate.setDate(toDate.getDate() - 1200); // ✨ 往前推約 3 年多
+          let priceUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${targetSymbol}&start_date=${fromDate.toISOString().split('T')[0]}`;
+          if (finmindApiKey) priceUrl += `&token=${finmindApiKey}`;
+
+          const priceRes = await fetch(priceUrl);
+          if (!priceRes.ok) throw new Error("FinMind 股價歷史資料異常");
+          const priceJson = await priceRes.json();
+
+          if (priceJson.data) {
+              candles = priceJson.data.map(d => ({
+                  date: d.date,
+                  open: d.open,
+                  high: d.max,  // ✨ 把 FinMind 的 max 對應給高點
+                  low: d.min,   // ✨ 把 FinMind 的 min 對應給低點
+                  close: d.close,
+                  volume: Math.round(d.Trading_Volume / 1000) // ✨ 轉換成張數
+              }));
+          }
+      }
 
       // ✨ 日K/週K/月K 才需要去抓當日即時報價來補最後一根，分K本身就已經很即時了
       // ✨ 根據分K或日K，分別去抓取當日的「即時K線」或「即時報價」來補齊
@@ -3328,8 +3373,9 @@ const App = () => {
 
   const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams, maxVolDaysParam = 90, volLineAnchorParam = 'close',sarParams = { start: 0.02, step: 0.02, max: 0.20 }) => {
     const closes = data.map(d => d.close); const volumes = data.map(d => d.volume);
-    const ma1 = calculateSMA(closes, maParams.ma1.p); const ma2 = calculateSMA(closes, maParams.ma2.p); const ma3 = calculateSMA(closes, maParams.ma3.p); 
-    const vma1 = calculateSMA(volumes, vmaParams.vma1.p); const vma2 = calculateSMA(volumes, vmaParams.vma2.p); const vma3 = calculateSMA(volumes, vmaParams.vma3.p); 
+    const ma1 = calculateSMA(closes, maParams?.ma1?.p || 5); const ma2 = calculateSMA(closes, maParams?.ma2?.p || 10); const ma3 = calculateSMA(closes, maParams?.ma3?.p || 20); 
+    const ma4 = calculateSMA(closes, maParams?.ma4?.p || 60); const ma5 = calculateSMA(closes, maParams?.ma5?.p || 120); const ma6 = calculateSMA(closes, maParams?.ma6?.p || 240); 
+    const vma1 = calculateSMA(volumes, vmaParams?.vma1?.p || 5); const vma2 = calculateSMA(volumes, vmaParams?.vma2?.p || 13); const vma3 = calculateSMA(volumes, vmaParams?.vma3?.p || 34); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
 
     // ✨ 新增固定的 MA 計算，專供策略的「乖離」與「動態均線區間」使用
@@ -3603,7 +3649,7 @@ const App = () => {
       
       // ✨ 1. 先把計算好所有指標的 K 棒物件建立出來
       const enrichedCandle = { 
-          ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i],bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
+          ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], ma4: ma4[i], ma5: ma5[i], ma6: ma6[i], bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           fixedMa5: fixedMa5[i], fixedMa10: fixedMa10[i], fixedMa20: fixedMa20[i], fixedMa28: fixedMa28[i], fixedMa60: fixedMa60[i], fixedMv5: fixedMv5[i],
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 }, willr,
@@ -4053,17 +4099,23 @@ const App = () => {
               <div className="flex flex-col gap-3">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1">K BARS 數量與均線 (MA / VMA)</span>
                 <div className="flex flex-col gap-2 mt-1">
-                  {[1, 2, 3].map(n => (
-                    <div key={`ma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                      <input type="checkbox" checked={maParams[`ma${n}`].show !== false} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
-                      <input type="color" value={maParams[`ma${n}`].c} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                      <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA {n}</span>
-                      <input type="number" value={maParams[`ma${n}`]?.p ?? ''} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: maParams[`ma${n}`].c}} />
-                      <select value={maParams[`ma${n}`].w} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...maParams[`ma${n}`], w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
-                        <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                      </select>
-                    </div>
-                  ))}
+                  {[1, 2, 3, 4, 5, 6].map(n => {
+                    const currentMA = maParams[`ma${n}`];
+                    // ✨ 加上防呆：如果這條線還沒準備好，就先不要畫這個格子，防止當機！
+                    if (!currentMA) return null; 
+
+                    return (
+                      <div key={`ma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
+                        <input type="checkbox" checked={currentMA.show !== false} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
+                        <input type="color" value={currentMA.c} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
+                        <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA {n}</span>
+                        <input type="number" value={currentMA.p ?? ''} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: currentMA.c}} />
+                        <select value={currentMA.w} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
+                          <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
+                        </select>
+                      </div>
+                    );
+                  })}
                 </div>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1 mt-2">均量線 (VMA)</span>
                 <div className="flex flex-col gap-2 mt-1">
@@ -6125,7 +6177,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
          {/* ✨ 新增：K棒數量縮放滑桿 */}
          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-600 shrink-0 shadow-inner mr-auto">
            <span className="text-cyan-400 text-xs font-bold whitespace-nowrap">🔎 視角</span>
-           <input type="range" min="30" max="300" step="10" value={displayCount} onChange={(e) => { setDisplayCount(Number(e.target.value)); }} className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" />
+           <input type="range" min="30" max="500" step="10" value={displayCount} onChange={(e) => { setDisplayCount(Number(e.target.value)); }} className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" />
            <span className="text-slate-300 text-xs font-bold w-6">{displayCount}</span>
          </div>
 
@@ -6407,9 +6459,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             })()}
 
             {/* 獨立開關的主圖 MA */}
-            {toggles.showMA && maParams.ma1.show !== false && <path d={getLinePath(data, 'ma1')} stroke={maParams.ma1.c} strokeWidth={maParams.ma1.w} fill="none" opacity="0.8"/>}
-            {toggles.showMA && maParams.ma2.show !== false && <path d={getLinePath(data, 'ma2')} stroke={maParams.ma2.c} strokeWidth={maParams.ma2.w} fill="none" opacity="0.8"/>}
-            {toggles.showMA && maParams.ma3.show !== false && <path d={getLinePath(data, 'ma3')} stroke={maParams.ma3.c} strokeWidth={maParams.ma3.w} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams?.ma1?.show !== false && <path d={getLinePath(data, 'ma1')} stroke={maParams?.ma1?.c || '#ef4444'} strokeWidth={maParams?.ma1?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams?.ma2?.show !== false && <path d={getLinePath(data, 'ma2')} stroke={maParams?.ma2?.c || '#eab308'} strokeWidth={maParams?.ma2?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams?.ma3?.show !== false && <path d={getLinePath(data, 'ma3')} stroke={maParams?.ma3?.c || '#22c55e'} strokeWidth={maParams?.ma3?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams?.ma4?.show !== false && <path d={getLinePath(data, 'ma4')} stroke={maParams?.ma4?.c || '#3b82f6'} strokeWidth={maParams?.ma4?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams?.ma5?.show !== false && <path d={getLinePath(data, 'ma5')} stroke={maParams?.ma5?.c || '#a855f7'} strokeWidth={maParams?.ma5?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showMA && maParams?.ma6?.show !== false && <path d={getLinePath(data, 'ma6')} stroke={maParams?.ma6?.c || '#f472b6'} strokeWidth={maParams?.ma6?.w || 1.5} fill="none" opacity="0.8"/>}
 
             {toggles.showBBands && (<g opacity="0.6">
                 <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
@@ -6690,9 +6745,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                   {/* ✨ 補回：起漲標記 */}
                   {toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
                   {/* 獨立開關的 MA 圓點 */}
-                  {toggles.showMA && maParams.ma1.show !== false && i === data.length - maParams.ma1.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma1.c} />}
-                  {toggles.showMA && maParams.ma2.show !== false && i === data.length - maParams.ma2.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma2.c} />}
-                  {toggles.showMA && maParams.ma3.show !== false && i === data.length - maParams.ma3.p - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams.ma3.c} />}
+                  {toggles.showMA && maParams?.ma1?.show !== false && i === data.length - (maParams?.ma1?.p || 5) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma1?.c || '#ef4444'} />}
+                  {toggles.showMA && maParams?.ma2?.show !== false && i === data.length - (maParams?.ma2?.p || 10) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma2?.c || '#eab308'} />}
+                  {toggles.showMA && maParams?.ma3?.show !== false && i === data.length - (maParams?.ma3?.p || 20) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma3?.c || '#22c55e'} />}
+                  {toggles.showMA && maParams?.ma4?.show !== false && i === data.length - (maParams?.ma4?.p || 60) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma4?.c || '#3b82f6'} />}
+                  {toggles.showMA && maParams?.ma5?.show !== false && i === data.length - (maParams?.ma5?.p || 120) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma5?.c || '#a855f7'} />}
+                  {toggles.showMA && maParams?.ma6?.show !== false && i === data.length - (maParams?.ma6?.p || 240) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma6?.c || '#f472b6'} />}
                 </g>
               );
             })}
@@ -6702,17 +6760,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {data.map((d, i) => <rect key={`vol-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>)}
             
             {/* 獨立開關的 VMA */}
-            {toggles.showVolume && vmaParams.vma1.show !== false && <path d={getLinePath(data, 'vma1')} stroke={vmaParams.vma1.c} strokeWidth={vmaParams.vma1.w} fill="none" opacity="0.8"/>}
-            {toggles.showVolume && vmaParams.vma2.show !== false && <path d={getLinePath(data, 'vma2')} stroke={vmaParams.vma2.c} strokeWidth={vmaParams.vma2.w} fill="none" opacity="0.8"/>}
-            {toggles.showVolume && vmaParams.vma3.show !== false && <path d={getLinePath(data, 'vma3')} stroke={vmaParams.vma3.c} strokeWidth={vmaParams.vma3.w} fill="none" opacity="0.8"/>}
+            {toggles.showVolume && vmaParams?.vma1?.show !== false && <path d={getLinePath(data, 'vma1')} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth={vmaParams?.vma1?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showVolume && vmaParams?.vma2?.show !== false && <path d={getLinePath(data, 'vma2')} stroke={vmaParams?.vma2?.c || '#8b5cf6'} strokeWidth={vmaParams?.vma2?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showVolume && vmaParams?.vma3?.show !== false && <path d={getLinePath(data, 'vma3')} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth={vmaParams?.vma3?.w || 1.5} fill="none" opacity="0.8"/>}
 
             {data.map((d, i) => {
               const x = padding + i * spacing + spacing / 2;
               return (
                 <g key={`volsignal-${i}`}>
-                  {toggles.showVolume && vmaParams.vma1.show !== false && i === data.length - vmaParams.vma1.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma1.c} strokeWidth="2" fill="none" />}
-                  {toggles.showVolume && vmaParams.vma2.show !== false && i === data.length - vmaParams.vma2.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma2.c} strokeWidth="2" fill="none" />}
-                  {toggles.showVolume && vmaParams.vma3.show !== false && i === data.length - vmaParams.vma3.p - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams.vma3.c} strokeWidth="2" fill="none" />}
+                  {toggles.showVolume && vmaParams?.vma1?.show !== false && i === data.length - (vmaParams?.vma1?.p || 5) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth="2" fill="none" />}
+                  {toggles.showVolume && vmaParams?.vma2?.show !== false && i === data.length - (vmaParams?.vma2?.p || 13) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma2?.c || '#8b5cf6'} strokeWidth="2" fill="none" />}
+                  {toggles.showVolume && vmaParams?.vma3?.show !== false && i === data.length - (vmaParams?.vma3?.p || 34) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth="2" fill="none" />}
                   {/* ✨ 補回：量能標記 */}
                   {toggles.showVolSignal && d.signalVol && <text x={x} y={getVolY(d.volume) - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill={d.signalVol === '天量' ? '#ef4444' : (d.signalVol === '巨量' ? '#f97316' : '#8b5cf6')}>{d.signalVol === '極限大量' ? '極' : d.signalVol[0]}</text>}
                 </g>
@@ -6854,16 +6912,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             tooltipLines.push({ color: '#e2e8f0', text: `收： ${hoverD?.close?.toFixed(2)}` });
             tooltipLines.push({ color: '#e2e8f0', text: `量： ${hoverD?.volume} 張` });
 
-            // 顯示 3 條主圖均線 MA
+            // 顯示 6 條主圖均線 MA
             if (toggles.showMA) {
-                if (maParams.ma1.show !== false) tooltipLines.push({ color: maParams.ma1.c, text: `MA${maParams.ma1.p}： ${hoverD?.ma1?.toFixed(2) || '-'}` });
-                if (maParams.ma2.show !== false) tooltipLines.push({ color: maParams.ma2.c, text: `MA${maParams.ma2.p}： ${hoverD?.ma2?.toFixed(2) || '-'}` });
-                if (maParams.ma3.show !== false) tooltipLines.push({ color: maParams.ma3.c, text: `MA${maParams.ma3.p}： ${hoverD?.ma3?.toFixed(2) || '-'}` });
+                if (maParams?.ma1?.show !== false) tooltipLines.push({ color: maParams?.ma1?.c || '#ef4444', text: `MA${maParams?.ma1?.p || 5}： ${hoverD?.ma1?.toFixed(2) || '-'}` });
+                if (maParams?.ma2?.show !== false) tooltipLines.push({ color: maParams?.ma2?.c || '#eab308', text: `MA${maParams?.ma2?.p || 10}： ${hoverD?.ma2?.toFixed(2) || '-'}` });
+                if (maParams?.ma3?.show !== false) tooltipLines.push({ color: maParams?.ma3?.c || '#22c55e', text: `MA${maParams?.ma3?.p || 20}： ${hoverD?.ma3?.toFixed(2) || '-'}` });
+                if (maParams?.ma4?.show !== false) tooltipLines.push({ color: maParams?.ma4?.c || '#3b82f6', text: `MA${maParams?.ma4?.p || 60}： ${hoverD?.ma4?.toFixed(2) || '-'}` });
+                if (maParams?.ma5?.show !== false) tooltipLines.push({ color: maParams?.ma5?.c || '#a855f7', text: `MA${maParams?.ma5?.p || 120}： ${hoverD?.ma5?.toFixed(2) || '-'}` });
+                if (maParams?.ma6?.show !== false) tooltipLines.push({ color: maParams?.ma6?.c || '#f472b6', text: `MA${maParams?.ma6?.p || 240}： ${hoverD?.ma6?.toFixed(2) || '-'}` });
             }
 
             // 只顯示 1 條 VMA1 (預設5日均量線)
-            if (toggles.showVolume && vmaParams.vma1.show !== false) {
-                tooltipLines.push({ color: vmaParams.vma1.c, text: `VMA${vmaParams.vma1.p}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
+            if (toggles.showVolume && vmaParams?.vma1?.show !== false) {
+                tooltipLines.push({ color: vmaParams?.vma1?.c || '#f59e0b', text: `VMA${vmaParams?.vma1?.p || 5}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
             }
 
             
@@ -6891,8 +6952,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
                 // 補回 VMA2、VMA3 均量線
                 if (toggles.showVolume) {
-                    if (vmaParams.vma2.show !== false) tooltipLines.push({ color: vmaParams.vma2.c, text: `VMA${vmaParams.vma2.p}： ${hoverD?.vma2?.toFixed(2) || '-'}` });
-                    if (vmaParams.vma3.show !== false) tooltipLines.push({ color: vmaParams.vma3.c, text: `VMA${vmaParams.vma3.p}： ${hoverD?.vma3?.toFixed(2) || '-'}` });
+                    if (vmaParams?.vma2?.show !== false) tooltipLines.push({ color: vmaParams?.vma2?.c || '#8b5cf6', text: `VMA${vmaParams?.vma2?.p || 13}： ${hoverD?.vma2?.toFixed(2) || '-'}` });
+                    if (vmaParams?.vma3?.show !== false) tooltipLines.push({ color: vmaParams?.vma3?.c || '#10b981', text: `VMA${vmaParams?.vma3?.p || 34}： ${hoverD?.vma3?.toFixed(2) || '-'}` });
                 }
 
                 // 根據當前切換的副圖指標顯示對應數值
