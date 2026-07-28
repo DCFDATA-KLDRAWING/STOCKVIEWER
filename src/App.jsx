@@ -1,4 +1,3 @@
-YzljZDBlYzYtZTMyMy00NjEzLWFiYjgtNzNkMWYxZDk1NDMzIGVjYWI5MzhlLTM3OTUtNGMzZC1hM2I4LTllZDkyNjNlZDJlZAimport React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
