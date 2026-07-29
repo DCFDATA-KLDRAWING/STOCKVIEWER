@@ -2863,6 +2863,76 @@ const App = () => {
     }
   };
 
+  // ✨ 處理一鍵從 Google Sheets (Colab) 匯入排行
+  const handleFetchCloudRanking = async () => {
+    setIsRankingOpen(true);
+    setIsLoadingRanking(true);
+    setRankingTab('ranking'); // 切換到排行榜頁籤
+
+    try {
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/1qXbIbn0wYDZlokHogl5cWUAOLtH613PJb2Akc2kT_Qk/gviz/tq?tqx=out:csv&sheet=Rank';
+      const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error('網路連線異常');
+      
+      const csvText = await response.text();
+      const newRanking = [];
+      const seen = new Set();
+      
+      // 將 CSV 逐行切開
+      const lines = csvText.split('\n');
+
+      lines.forEach(line => {
+        // 清理 Google Sheets 預設的雙引號，並把逗號轉成空格方便辨識
+        const cleanLine = line.replace(/"/g, ' ').replace(/,/g, ' ');
+        // 尋找 4 碼股號
+        const match = cleanLine.match(/([0-9]{4}[a-zA-Z]?)/);
+        
+        if (match) {
+          const symbol = match[1];
+          const stockInfo = STOCKS.find(s => s.id === symbol);
+          
+          if (stockInfo && !seen.has(symbol)) {
+            let change = '熱門';
+            let volume = '-';
+            
+            const parts = cleanLine.split(/[\s\t]+/);
+            
+            // 尋找漲跌幅與成交量
+            parts.forEach(p => {
+              if (p !== symbol && p !== stockInfo.name && p.trim() !== '') {
+                // 如果包含 % 或是 停 (漲停/跌停)
+                if (p.includes('%') || p.includes('停')) {
+                  change = p;
+                } else {
+                  // 嘗試找出成交量 (找純數字，且大於 100)
+                  const num = parseInt(p.replace(/,/g, ''), 10);
+                  if (!isNaN(num) && num > 100) {
+                    volume = p;
+                  }
+                }
+              }
+            });
+
+            newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
+            seen.add(symbol);
+          }
+        }
+      });
+
+      if (newRanking.length > 0) {
+        setRankingList(newRanking);
+        showAlert(`🎉 成功從雲端同步 ${newRanking.length} 檔股票！`);
+      } else {
+        showAlert('雲端資料解析失敗，請確認表格內是否有包含股號。');
+      }
+    } catch (error) {
+      console.error('Fetch cloud ranking error:', error);
+      showAlert('無法取得雲端排行，請確認網路連線！');
+    } finally {
+      setIsLoadingRanking(false);
+    }
+  };
+
   // ✨ 處理手動貼上文字排行 (玩股網專屬防擠壓 + 富邦黏巴達 雙引擎合體版)
   const handlePasteRanking = () => {
     if (!pasteText.trim()) return showAlert("請先貼上資料！");
@@ -4114,6 +4184,11 @@ const App = () => {
               {isLoadingRanking ? '⏳ 處理中' : '📸 上傳截圖'}
             </div>
           </div>*/}
+
+          {/* ✨ 2. 雲端同步排行按鈕 (新加入) */}
+          <button onClick={handleFetchCloudRanking} className="shrink-0 justify-center bg-purple-900/50 border border-purple-700 text-purple-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(168,85,247,0.2)] hover:bg-purple-800 whitespace-nowrap transition-all flex items-center">
+            ☁️ 雲端排行
+          </button>          
 
           {/* ✨ 2.5 手動貼上排行按鈕 */}
           <button onClick={() => setIsPasteModalOpen(true)} className="shrink-0 justify-center bg-emerald-900/40 border border-emerald-700 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center">
