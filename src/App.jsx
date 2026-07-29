@@ -2154,6 +2154,41 @@ const aggregateData = (dailyData, tf) => {
 const App = () => {
   const [appModal, setAppModal] = useState(null);
   const showAlert = (msg) => setAppModal({ type: 'alert', message: msg, onConfirm: () => setAppModal(null) });
+  // === 🚀 系統自動更新偵測機制 ===
+  useEffect(() => {
+    // 每次開啟網頁，延遲 3 秒後偷偷檢查更新 (避免拖慢首頁載入速度)
+    const timer = setTimeout(() => {
+      fetch(`/?clear_cache=${new Date().getTime()}`, { cache: 'no-store' })
+        .then(res => res.text())
+        .then(html => {
+          // 抓取 Vite 每次編譯產生在 HTML 裡的專屬指紋檔名 (例如 index-Xyz123.js)
+          const match = html.match(/\/assets\/index-[a-zA-Z0-9_-]+\.js/);
+          if (match) {
+            const latestHash = match[0];
+            const currentHash = localStorage.getItem('MY_STOCK_APP_HASH');
+            
+            if (currentHash && currentHash !== latestHash) {
+               // 發現新版本指紋！跳出更新通知
+               setAppModal({
+                  type: 'confirm',
+                  message: '🚀 系統已發布最新版本！\n為了確保功能正常，建議您立即更新。\n(您的所有畫板與個人設定皆會保留)',
+                  onConfirm: () => {
+                     localStorage.setItem('MY_STOCK_APP_HASH', latestHash);
+                     // 掛上時間戳強制重新載入，打破瀏覽器快取
+                     window.location.replace(window.location.pathname + '?v=' + new Date().getTime());
+                  },
+                  onCancel: () => setAppModal(null) // 使用者可以按取消，下次重整會再提醒
+               });
+            } else if (!currentHash) {
+               // 第一次進來，記下當前版本指紋
+               localStorage.setItem('MY_STOCK_APP_HASH', latestHash);
+            }
+          }
+        })
+        .catch(() => {}); // 若無網路就不理會
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ✨ Firebase 認證與資料庫載入狀態
   const [user, setUser] = useState(null);
@@ -4044,6 +4079,13 @@ const App = () => {
 
         {/* 🌟 可滾動的右側區域：流通張數 + 策略 + 產業工具 */}
         <div className="flex items-center gap-2.5 px-3 py-2 shrink-0 h-full">
+          {/* ✨ 移到這裡的手動刷新按鈕 */}
+          <button onClick={() => window.location.replace(window.location.pathname + '?v=' + new Date().getTime())} className="shrink-0 justify-center bg-slate-800/80 border border-slate-600 text-emerald-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
+            🔄 系統更新
+          </button>
+          
+          <div className="w-[1px] h-6 bg-slate-700 mx-1 shrink-0"></div>
+            
           <div className="relative flex items-center shrink-0">
             <input type="number" value={issuedShares} onChange={(e) => setIssuedShares(e.target.value)} className="px-3 py-1.5 border border-amber-900/50 bg-amber-950/20 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 w-28 font-mono text-left text-sm text-amber-400 placeholder-amber-700/50 pr-16 shadow-inner" placeholder="流通張數" />
             <div className="absolute right-1 flex items-center gap-1">
