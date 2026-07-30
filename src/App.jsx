@@ -5164,29 +5164,71 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     return () => observer.disconnect();
   }, [displayCount, data ? data.length : 0]);
 
-  // ✨ 標題永遠置中的追蹤雷達 (60fps光速跟隨)
+  // ✨ 新增：動態 Y 軸狀態 (紀錄畫面上可見的最大與最小值)
+  const [yAxis, setYAxis] = useState({ min: null, max: null });
+  const lastY = useRef({ min: null, max: null });
+
+  // ✨ 標題永遠置中的追蹤雷達 + 動態 Y 軸縮放引擎 (三竹級體驗)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const updateTitlePosition = () => {
+    // 當切換股票或視角時，重置極值
+    lastY.current = { min: null, max: null };
+
+    const handleScrollUpdate = () => {
+      const scrollX = container.scrollLeft;
+      const clientW = container.clientWidth;
+
+      // 1. 動態更新標題位置
       const title = document.getElementById('chart-title');
       if (title) {
-        // 動態將 X 座標設為「目前滾動距離 + 螢幕一半」，讓標題永遠黏在視角正中間！
-        title.setAttribute('x', container.scrollLeft + container.clientWidth / 2);
+        title.setAttribute('x', scrollX + clientW / 2);
+      }
+
+      // 2. 動態 Y 軸縮放 (只抓取畫面上可見的 K 棒極值)
+      if (chartWidth <= 0 || !data || data.length === 0) return;
+      
+      const totalSlots = data.length + 10; // 固定留 10 根
+      const spacing = (chartWidth - 60) / totalSlots; // 60 是 padding * 2
+      if (spacing <= 0) return;
+
+      // 算出目前可見的 K 棒範圍 (多抓前後 2 根當緩衝)
+      const startIdx = Math.max(0, Math.floor(scrollX / spacing) - 2);
+      const endIdx = Math.min(data.length - 1, Math.ceil((scrollX + clientW) / spacing) + 2);
+
+      let tempMax = -Infinity;
+      let tempMin = Infinity;
+
+      for (let i = startIdx; i <= endIdx; i++) {
+        if (!data[i]) continue;
+        if (data[i].high > tempMax) tempMax = data[i].high;
+        if (data[i].low < tempMin) tempMin = data[i].low;
+      }
+
+      // 只有當最大最小值真的改變時，才觸發畫面重新渲染 (節省效能，無縫滑動)
+      if (tempMax !== -Infinity && tempMin !== Infinity) {
+        const currentMin = lastY.current.min;
+        const currentMax = lastY.current.max;
+        if (currentMin === null || currentMax === null || Math.abs(tempMax - currentMax) > 0.05 || Math.abs(tempMin - currentMin) > 0.05) {
+          lastY.current = { min: tempMin, max: tempMax };
+          setYAxis({ min: tempMin, max: tempMax });
+        }
       }
     };
 
-    // 監聽手指滑動與拖曳
-    container.addEventListener('scroll', updateTitlePosition);
-    
-    // 剛載入、翻轉螢幕、或切換 K 棒數量時，主動對齊一次
-    updateTitlePosition();
-    // 延遲 150 毫秒再確認一次，確保自動滾動到最新日期後標題有跟上
-    setTimeout(updateTitlePosition, 150); 
+    container.addEventListener('scroll', handleScrollUpdate);
+    // 初次載入主動對齊一次
+    handleScrollUpdate();
+    // 給予緩衝時間，確保切換股票自動滾動到底部後，再次抓取正確範圍
+    const timer = setTimeout(handleScrollUpdate, 150); 
 
-    return () => container.removeEventListener('scroll', updateTitlePosition);
-  }, [displayCount, isFullscreen, data.length]);
+    return () => {
+        container.removeEventListener('scroll', handleScrollUpdate);
+        clearTimeout(timer);
+    };
+  }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length, chartWidth]);
+
 
   // ✨ 自動滾動到最右側 (完美保留 10 根 K 棒留白空間)
   useEffect(() => {
@@ -5344,12 +5386,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const extraCandles = 10;
   const totalSlots = data.length + extraCandles;
 
-  let actualMax = -Infinity; let actualMin = Infinity;
+  // ✨ 找出全局最大最小 (作為備用)
+  let globalMax = -Infinity; let globalMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  data.forEach((d) => { if (d.high > actualMax) { actualMax = d.high; } if (d.low < actualMin) { actualMin = d.low; } });
-  const minPrice = Math.min(actualMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.99; 
-  const maxPrice = actualMax * 1.01; 
+  data.forEach((d) => { if (d.high > globalMax) { globalMax = d.high; } if (d.low < globalMin) { globalMin = d.low; } });
+
+  // ✨ 終極動態 Y 軸：優先使用我們在 scroll 時抓到的「目前可見範圍」極值！
+  const activeMin = yAxis.min !== null ? yAxis.min : globalMin;
+  const activeMax = yAxis.max !== null ? yAxis.max : globalMax;
+
+  // 為了讓畫面不要太緊繃，上下多給 2% 的彈性空間 (完美還原三竹的留白感)
+  const minPrice = Math.min(activeMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.98; 
+  const maxPrice = activeMax * 1.02; 
   const maxVol = Math.max(...data.map(d => d.volume));
 
   const getY = (p) => mainHeight - padding - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - padding - chartPaddingTop);
