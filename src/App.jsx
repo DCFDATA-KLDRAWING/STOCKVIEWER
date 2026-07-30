@@ -5188,18 +5188,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     return () => container.removeEventListener('scroll', updateTitlePosition);
   }, [displayCount, isFullscreen, data.length]);
 
-  // ✨ 自動滾動到最右側 (完美保留 15 根 K 棒留白空間)
+  // ✨ 自動滾動到最右側 (完美保留 10 根 K 棒留白空間)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (container && !isFullChart && data && data.length > 0) {
-      // 給予一點點延遲，確保 SVG 畫布尺寸已經根據新的資料量重新計算完成
+      // ✨ 延遲調高至 150ms，等待手機翻轉的 CSS 動畫完全結束後再精準測量
       setTimeout(() => {
-        // 算出 SVG 畫布的總寬度
         const scrollW = container.scrollWidth;
-        // 算出螢幕(容器)的寬度
         const clientW = container.clientWidth;
         
-        // 算出「留白區塊」到底有多寬：
         // 1. 知道總共有多少個槽位 (資料長度 + 10)
         const totalSlots = data.length + 10; 
         // 2. 算出一根 K 棒佔多寬
@@ -5208,12 +5205,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         const extraWidth = 10 * singleSlotWidth;
 
         // 將滾動條拉到極限的最右邊，然後往回扣掉留白區塊的寬度！
-        // 這樣最新的一根 K 棒就會剛好貼齊螢幕右側！
         const maxScroll = scrollW - clientW; 
         container.scrollLeft = Math.max(0, maxScroll - extraWidth);
-      }, 50); 
+      }, 150); 
     }
-  }, [realSymbol, timeframe, isFullscreen, data?.length, displayCount, isFullChart]);
+  // ✨ 終極關鍵：把 chartWidth 加入依賴陣列！
+  // 這樣當手機一轉向、畫布寬度真正變化的那一瞬間，它就會自動再精準對齊一次！
+  }, [realSymbol, timeframe, isFullscreen, data?.length, displayCount, isFullChart, chartWidth]);
 
   const commitDrawings = (newDrawings) => {
     setDrawings(newDrawings);
@@ -5280,7 +5278,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
         
         // ✨ 進入橫向時，自動載入 240 根 K 線
-        setDisplayCount(120);
+        setDisplayCount(240);
 
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
@@ -5288,7 +5286,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
       if (window.screen && window.screen.orientation && window.screen.orientation.unlock) { try { window.screen.orientation.unlock(); } catch (e) {} }
       
-      // ✨ 退出橫向時，恢復你原本的 60 根
+      // ✨ 退出橫向時，恢復你原本的 120 根
       setDisplayCount(120);
     }
   };
