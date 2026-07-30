@@ -6539,8 +6539,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         {/* ✨ 動態切換 className 讓全圖模式可以完美縮進單一螢幕裡 */}
         {/* ✨ 解除畫布高度與寬度限制，完全貼合手機螢幕不留白 */}
         <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} 
+          width="100%"
+          height={totalSVGHeight}
           className={`select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} 
-          style={{ width: width, minWidth: width, height: totalSVGHeight }}
+          style={{ minWidth: '100%' }}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove} 
           onMouseUp={handlePointerUp}
@@ -6554,7 +6556,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
-          <text id="chart-title" x={width / 2} y={45} fill="#67e8f9" fontSize="22" fontWeight="bold" opacity="0.35" textAnchor="middle" pointerEvents="none">
+          <text 
+            id="chart-title" 
+            x="50%" 
+            y={totalSVGHeight / 3} 
+            fill="#334155" 
+            fontSize={isFullscreen ? "6vw" : "12vw"} 
+            fontWeight="900" 
+            opacity="0.15" 
+            textAnchor="middle" 
+            dominantBaseline="middle" 
+            pointerEvents="none" 
+            className="tracking-widest"
+          >
             {stockName} ({tfLabel})
           </text>
           
