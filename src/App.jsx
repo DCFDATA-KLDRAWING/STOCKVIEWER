@@ -6539,10 +6539,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         {/* ✨ 動態切換 className 讓全圖模式可以完美縮進單一螢幕裡 */}
         {/* ✨ 解除畫布高度與寬度限制，完全貼合手機螢幕不留白 */}
         <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} 
-          width="100%"
-          height={totalSVGHeight}
           className={`select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} 
-          style={{ minWidth: '100%' }}
+          style={{ width: `${width}px`, minWidth: `${width}px`, height: `${totalSVGHeight}px` }}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove} 
           onMouseUp={handlePointerUp}
@@ -6558,7 +6556,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
           <text 
             id="chart-title" 
-            x="50%" 
+            x={width / 2} 
             y={totalSVGHeight / 3} 
             fill="#334155" 
             fontSize={isFullscreen ? "6vw" : "12vw"} 
