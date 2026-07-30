@@ -3116,6 +3116,7 @@ const App = () => {
     if (!targetInput) return showAlert('請先輸入股號');
 
     setLoading(true); setError('');
+  
     try {
       const toDate = new Date(); 
       const fromDate = new Date(); 
@@ -3152,13 +3153,15 @@ const App = () => {
           const priceJson = await priceRes.json();
 
           if (priceJson.data) {
-              candles = priceJson.data.map(d => ({
+              const validData = priceJson.data.filter(d => d.Trading_Volume > 0);
+              
+              candles = validData.map(d => ({
                   date: d.date,
                   open: d.open,
-                  high: d.max,  // ✨ 把 FinMind 的 max 對應給高點
-                  low: d.min,   // ✨ 把 FinMind 的 min 對應給低點
+                  high: d.max,  
+                  low: d.min,   
                   close: d.close,
-                  volume: Math.round(d.Trading_Volume / 1000) // ✨ 轉換成張數
+                  volume: Math.round(d.Trading_Volume / 1000) 
               }));
           }
       }
@@ -3168,7 +3171,7 @@ const App = () => {
       if (isIntra) {
         // ✨ 分K專用：歷史API不包含當天盤中分K，必須呼叫 Intraday API 抓取並縫合
         try {
-          const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/candles/${targetSymbol}?timeframe=${apiTf}`;
+          const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/candles/${targetSymbol}?timeframe=${currentTf}`;
           const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': userApiKey } });
           if (intraRes.ok) {
             const intraJson = await intraRes.json();
@@ -5143,7 +5146,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       setChartHeight(ch); 
 
       const currentDataLen = data ? data.length : 0;
-      const currentExtra = Math.floor(currentDataLen * 0.15) || 15;
+      const currentExtra = 10;
       const totalSlots = currentDataLen + currentExtra;
       
       // 🛡️ 安全保護：自動判斷你是否有兩指縮放功能，沒有也不會當機！
@@ -5185,30 +5188,29 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     return () => container.removeEventListener('scroll', updateTitlePosition);
   }, [displayCount, isFullscreen, data.length]);
 
-  // ✨ 自動滾動到最右側，但「隱藏未來留白」(滑動才會出現)
+  // ✨ 自動滾動到最右側 (完美保留 15 根 K 棒留白空間)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (container && !isFullChart) {
+    if (container && !isFullChart && data && data.length > 0) {
+      // 給予一點點延遲，確保 SVG 畫布尺寸已經根據新的資料量重新計算完成
       setTimeout(() => {
+        // 算出 SVG 畫布的總寬度
         const scrollW = container.scrollWidth;
+        // 算出螢幕(容器)的寬度
         const clientW = container.clientWidth;
-
-        // 1. 抓出你目前的 K 棒總數與留白數量
-        const currentDataLen = data ? data.length : 0;
-        // 💡 這裡的 0.25 (25%) 或 0.15 (15%) 要跟你畫布計算寬度的留白比例一致
-        const extraSlots = Math.floor(displayCount * 0.05) || 5; 
-        const totalSlots = currentDataLen + extraSlots;
         
-        if (totalSlots === 0) return;
-        
-        // 2. 算出一根 K 棒有多寬，進而推算出「留白區塊」總共佔了幾 Pixel
+        // 算出「留白區塊」到底有多寬：
+        // 1. 知道總共有多少個槽位 (資料長度 + 10)
+        const totalSlots = data.length + 10; 
+        // 2. 算出一根 K 棒佔多寬
         const singleSlotWidth = scrollW / totalSlots;
-        const extraWidth = extraSlots * singleSlotWidth;
+        // 3. 算出 10 根留白總共的寬度
+        const extraWidth = 10 * singleSlotWidth;
 
-        // 3. 算出極限位置後，往回扣除留白寬度，讓最新 K 棒剛好貼齊右側邊緣！
+        // 將滾動條拉到極限的最右邊，然後往回扣掉留白區塊的寬度！
+        // 這樣最新的一根 K 棒就會剛好貼齊螢幕右側！
         const maxScroll = scrollW - clientW; 
         container.scrollLeft = Math.max(0, maxScroll - extraWidth);
-
       }, 50); 
     }
   }, [realSymbol, timeframe, isFullscreen, data?.length, displayCount, isFullChart]);
@@ -5341,7 +5343,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   }
 
   // ✨ 動態計算額外的空白 K 棒數 (預留 15% 空間給未來畫線用)
-  const extraCandles = Math.floor(data.length * 0.05) || 5; 
+  const extraCandles = 10;
   const totalSlots = data.length + extraCandles;
 
   let actualMax = -Infinity; let actualMin = Infinity;
@@ -6533,7 +6535,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           <div className="absolute top-2 left-1/2 -translate-x-1/2 text-cyan-300 font-bold bg-slate-800/80 backdrop-blur-sm border border-cyan-800 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.2)] text-sm pointer-events-none z-10">
             ✏️ 作圖模式：拖曳放開即畫完
           </div>
-        )}
+        )}        
+       
 
         {/* ✨ 動態切換 className 讓全圖模式可以完美縮進單一螢幕裡 */}
         {/* ✨ 解除畫布高度與寬度限制，完全貼合手機螢幕不留白 */}
