@@ -5175,7 +5175,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
     // 當切換股票或視角時，重置極值
     lastY.current = { min: null, max: null };
-    // ✨ 新增這行：強制清空舊股票的 Y 軸記憶，解決切換股票瞬間被壓縮的問題！
+    // 強制清空舊股票的 Y 軸記憶
     setYAxis({ min: null, max: null });
 
     const handleScrollUpdate = () => {
@@ -5188,16 +5188,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         title.setAttribute('x', scrollX + clientW / 2);
       }
 
-      // 2. 動態 Y 軸縮放 (只抓取畫面上可見的 K 棒極值)
+      // 2. 動態 Y 軸縮放
       if (chartWidth <= 0 || !data || data.length === 0) return;
       
       const totalSlots = data.length + 10; // 固定留 10 根
       const spacing = (chartWidth - 60) / totalSlots; // 60 是 padding * 2
       if (spacing <= 0) return;
 
-      // 算出目前可見的 K 棒範圍 (多抓前後 2 根當緩衝)
-      const startIdx = Math.max(0, Math.floor(scrollX / spacing) - 2);
-      const endIdx = Math.min(data.length - 1, Math.ceil((scrollX + clientW) / spacing) + 2);
+      // 💡 關鍵修正 2：扣除 SVG 左邊的 30px Padding 誤差，並加大安全緩衝區 (前後多抓 4 根 K 棒)
+      // 這樣不論怎麼滑，邊緣的最高/最低點絕對不會漏算！
+      const startIdx = Math.max(0, Math.floor((scrollX - 30) / spacing) - 4);
+      const endIdx = Math.min(data.length - 1, Math.ceil((scrollX + clientW - 30) / spacing) + 4);
 
       let tempMax = -Infinity;
       let tempMin = Infinity;
@@ -5208,7 +5209,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         if (data[i].low < tempMin) tempMin = data[i].low;
       }
 
-      // 只有當最大最小值真的改變時，才觸發畫面重新渲染 (節省效能，無縫滑動)
+      // 只有當最大最小值真的改變時，才觸發畫面重新渲染
       if (tempMax !== -Infinity && tempMin !== Infinity) {
         const currentMin = lastY.current.min;
         const currentMax = lastY.current.max;
@@ -5221,14 +5222,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
     container.addEventListener('scroll', handleScrollUpdate);
     
-    // ✨ 修改時機：把原本立即執行的檢查拿掉，改為等待畫面「自動滾動到最右邊」後再結算 Y 軸，徹底消除殘影！
-    const timer1 = setTimeout(handleScrollUpdate, 100); 
-    const timer2 = setTimeout(handleScrollUpdate, 300); 
+    // 剛載入時主動對齊一次
+    handleScrollUpdate();
 
     return () => {
         container.removeEventListener('scroll', handleScrollUpdate);
-        clearTimeout(timer1);
-        clearTimeout(timer2);
     };
   }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length, chartWidth]);
 
@@ -5397,8 +5395,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   let defaultMax = -Infinity; let defaultMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  // 💡 關鍵修改：只抓取最新 N 根 K 棒來當作預設天花板，不使用全部歷史，徹底解決壓縮問題！
-  const latestData = data.slice(Math.max(0, data.length - displayCount));
+  // 💡 關鍵修正 1：因為右邊留了 10 根空白，所以畫面上實際看到的 K 棒只有 (displayCount - 10) 根
+  // 我們只抓這真正看得見的部分來當預設天花板，解決一開始的高低誤差！
+  const visibleBarsCount = Math.max(1, displayCount - 10);
+  const latestData = data.slice(Math.max(0, data.length - visibleBarsCount));
+  
   latestData.forEach((d) => { 
       if (d.high > defaultMax) { defaultMax = d.high; } 
       if (d.low < defaultMin) { defaultMin = d.low; } 
