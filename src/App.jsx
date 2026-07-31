@@ -5250,8 +5250,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         const extraWidth = 10 * singleSlotWidth;
 
         // 將滾動條拉到極限的最右邊，然後往回扣掉留白區塊的寬度！
+        // ✨ 修正 1：加入 Math.ceil 抹平小數點誤差，防止白邊
         const maxScroll = scrollW - clientW; 
-        container.scrollLeft = Math.max(0, maxScroll - extraWidth);
+        container.scrollLeft = Math.max(0, Math.ceil(maxScroll - extraWidth));
+        
+        // ✨ 修正 2：強制發送滾動通知，喚醒 Y 軸引擎立刻重算高度！
+        container.dispatchEvent(new Event('scroll'));
       }, 150); 
     }
   // ✨ 終極關鍵：把 chartWidth 加入依賴陣列！
@@ -5389,15 +5393,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const extraCandles = 10;
   const totalSlots = data.length + extraCandles;
 
-  // ✨ 找出全局最大最小 (作為備用)
-  let globalMax = -Infinity; let globalMin = Infinity;
+  // ✨ 找出「預設可見範圍」的最大最小 (作為切換股票瞬間的完美備胎)
+  let defaultMax = -Infinity; let defaultMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  data.forEach((d) => { if (d.high > globalMax) { globalMax = d.high; } if (d.low < globalMin) { globalMin = d.low; } });
+  // 💡 關鍵修改：只抓取最新 N 根 K 棒來當作預設天花板，不使用全部歷史，徹底解決壓縮問題！
+  const latestData = data.slice(Math.max(0, data.length - displayCount));
+  latestData.forEach((d) => { 
+      if (d.high > defaultMax) { defaultMax = d.high; } 
+      if (d.low < defaultMin) { defaultMin = d.low; } 
+  });
 
   // ✨ 終極動態 Y 軸：優先使用我們在 scroll 時抓到的「目前可見範圍」極值！
-  const activeMin = yAxis.min !== null ? yAxis.min : globalMin;
-  const activeMax = yAxis.max !== null ? yAxis.max : globalMax;
+  // 如果追蹤引擎還沒收到通知，就用 latestData 算出來的完美預設值！
+  const activeMin = yAxis.min !== null ? yAxis.min : defaultMin;
+  const activeMax = yAxis.max !== null ? yAxis.max : defaultMax;
 
   // 為了讓畫面不要太緊繃，上下多給 2% 的彈性空間 (完美還原三竹的留白感)
   const minPrice = Math.min(activeMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.98; 
