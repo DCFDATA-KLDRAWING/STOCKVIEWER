@@ -5195,8 +5195,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       const spacing = (chartWidth - 60) / totalSlots; // 60 是 padding * 2
       if (spacing <= 0) return;
 
-      // 💡 關鍵修正 2：扣除 SVG 左邊的 30px Padding 誤差，並加大安全緩衝區 (前後多抓 4 根 K 棒)
-      // 這樣不論怎麼滑，邊緣的最高/最低點絕對不會漏算！
+      // 扣除 SVG 左邊的 30px Padding 誤差，並加大安全緩衝區
       const startIdx = Math.max(0, Math.floor((scrollX - 30) / spacing) - 4);
       const endIdx = Math.min(data.length - 1, Math.ceil((scrollX + clientW - 30) / spacing) + 4);
 
@@ -5209,7 +5208,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         if (data[i].low < tempMin) tempMin = data[i].low;
       }
 
-      // 只有當最大最小值真的改變時，才觸發畫面重新渲染
       if (tempMax !== -Infinity && tempMin !== Infinity) {
         const currentMin = lastY.current.min;
         const currentMax = lastY.current.max;
@@ -5222,8 +5220,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
     container.addEventListener('scroll', handleScrollUpdate);
     
-    // 剛載入時主動對齊一次
-    handleScrollUpdate();
+    // 💡 關鍵修正：把原本寫在這裡的 handleScrollUpdate() 拿掉了！
+    // 讓它保持空杯狀態(吃我們寫好的完美備胎)，直到下面那個自動滾動引擎把它推到最右側，才會開始算！
 
     return () => {
         container.removeEventListener('scroll', handleScrollUpdate);
@@ -5235,29 +5233,35 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (container && !isFullChart && data && data.length > 0) {
-      // ✨ 延遲調高至 150ms，等待手機翻轉的 CSS 動畫完全結束後再精準測量
-      setTimeout(() => {
+      
+      // 我們把對齊的邏輯包裝成一個絕招
+      const alignChart = () => {
         const scrollW = container.scrollWidth;
         const clientW = container.clientWidth;
         
-        // 1. 知道總共有多少個槽位 (資料長度 + 10)
         const totalSlots = data.length + 10; 
-        // 2. 算出一根 K 棒佔多寬
         const singleSlotWidth = scrollW / totalSlots;
-        // 3. 算出 10 根留白總共的寬度
         const extraWidth = 10 * singleSlotWidth;
 
-        // 將滾動條拉到極限的最右邊，然後往回扣掉留白區塊的寬度！
-        // ✨ 修正 1：加入 Math.ceil 抹平小數點誤差，防止白邊
         const maxScroll = scrollW - clientW; 
         container.scrollLeft = Math.max(0, Math.ceil(maxScroll - extraWidth));
         
-        // ✨ 修正 2：強制發送滾動通知，喚醒 Y 軸引擎立刻重算高度！
+        // 強制發送滾動通知，喚醒 Y 軸引擎立刻重算高度！
         container.dispatchEvent(new Event('scroll'));
-      }, 150); 
+      };
+
+      // 🏆 終極連環技：為了對抗手機瀏覽器排版延遲，我們在 50ms, 150ms, 300ms 各對齊一次！
+      // 確保不管手機性能如何、畫面有沒有被卡住，最後一定會對準最右側，並拿到精準的 Y 軸極值！
+      const t1 = setTimeout(alignChart, 50);
+      const t2 = setTimeout(alignChart, 150);
+      const t3 = setTimeout(alignChart, 300);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     }
-  // ✨ 終極關鍵：把 chartWidth 加入依賴陣列！
-  // 這樣當手機一轉向、畫布寬度真正變化的那一瞬間，它就會自動再精準對齊一次！
   }, [realSymbol, timeframe, isFullscreen, data?.length, displayCount, isFullChart, chartWidth]);
 
   const commitDrawings = (newDrawings) => {
