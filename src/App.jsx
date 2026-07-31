@@ -5719,7 +5719,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     }
   };
 
-  // 🍎 完美相容 Apple 與 Android 的存圖機制 (裁切可見視角版)
+  // 🍎 完美相容 Apple 與 Android 的存圖機制 (裁切可見視角+精準防誤傷版)
   const handleDownloadImage = () => {
     setCrosshair(null); setHoverPoint(null);
 
@@ -5728,36 +5728,41 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       const container = scrollContainerRef.current; 
       if (!svg || !container) return;
 
-      // 1. 取得完整寬度、螢幕可見寬度，以及目前的水平滾動位置
       const fullWidth = svg.getBoundingClientRect().width;
       const fullHeight = svg.getBoundingClientRect().height;
       const visibleWidth = container.clientWidth;
       const scrollX = container.scrollLeft;
 
-      // 2. 動態把背景的「浮水印標題」移到你目前螢幕的正中央，確保截圖有名字
-      const texts = svg.querySelectorAll('text');
+      // ✨ 2. 精準定位：只抓取帶有特定 Class 或 ID 的背景字與圖例，絕對不碰 K 棒指標！
+      const watermarks = svg.querySelectorAll('.watermark-text');
       const originalXs = [];
-      texts.forEach((t, i) => {
-         // 抓出標題元素 (通常是置中的大字) 移到當前視角中央
-         if (t.getAttribute('text-anchor') === 'middle' && !t.innerHTML.includes('MA') && !t.innerHTML.includes('VMA')) {
-             originalXs[i] = t.getAttribute('x');
-             t.setAttribute('x', scrollX + visibleWidth / 2);
-         }
+      watermarks.forEach((t, i) => {
+         originalXs[i] = t.getAttribute('x');
+         t.setAttribute('x', scrollX + visibleWidth / 2);
       });
+
+      const legendGroup = svg.querySelector('#bottom-legend-group');
+      let originalTransform = null;
+      if (legendGroup) {
+         originalTransform = legendGroup.getAttribute('transform');
+         legendGroup.setAttribute('transform', `translate(${scrollX + visibleWidth / 2}, ${mainHeight + volHeight + indicatorHeight + 60})`);
+      }
 
       const svgData = new XMLSerializer().serializeToString(svg);
       
-      // 3. 存完資料馬上把文字位置復原，避免影響你的畫面
-      texts.forEach((t, i) => {
+      // ✨ 3. 存完資料馬上復原
+      watermarks.forEach((t, i) => {
          if (originalXs[i]) t.setAttribute('x', originalXs[i]);
       });
+      if (legendGroup && originalTransform) {
+         legendGroup.setAttribute('transform', originalTransform);
+      }
 
       const canvas = document.createElement("canvas"); 
       const ctx = canvas.getContext("2d"); 
       const img = new Image();
       
-      const scale = 2; // 維持 2 倍高畫質
-      // ✨ 關鍵修正：畫布寬度只取「螢幕可見寬度」
+      const scale = 2; 
       canvas.width = visibleWidth * scale; 
       canvas.height = fullHeight * scale;
       
@@ -5765,7 +5770,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         ctx.fillStyle = "#0f172a"; 
         ctx.fillRect(0, 0, canvas.width, canvas.height); 
         
-        // ✨ 關鍵修正：把畫布往左平移 scrollX，就像拿相機平移對準你的螢幕一樣！
         ctx.translate(-scrollX * scale, 0);
         ctx.drawImage(img, 0, 0, fullWidth * scale, fullHeight * scale);
         
@@ -6644,7 +6648,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             textAnchor="middle" 
             dominantBaseline="middle" 
             pointerEvents="none" 
-            className="tracking-widest"
+            className="tracking-widest watermark-text" // 👈 加上 watermark-text
           >
             {stockName} ({tfLabel})
           </text>
