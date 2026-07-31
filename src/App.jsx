@@ -5175,6 +5175,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
     // 當切換股票或視角時，重置極值
     lastY.current = { min: null, max: null };
+    // ✨ 新增這行：強制清空舊股票的 Y 軸記憶，解決切換股票瞬間被壓縮的問題！
+    setYAxis({ min: null, max: null });
 
     const handleScrollUpdate = () => {
       const scrollX = container.scrollLeft;
@@ -5218,14 +5220,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     };
 
     container.addEventListener('scroll', handleScrollUpdate);
-    // 初次載入主動對齊一次
-    handleScrollUpdate();
-    // 給予緩衝時間，確保切換股票自動滾動到底部後，再次抓取正確範圍
-    const timer = setTimeout(handleScrollUpdate, 150); 
+    
+    // ✨ 修改時機：把原本立即執行的檢查拿掉，改為等待畫面「自動滾動到最右邊」後再結算 Y 軸，徹底消除殘影！
+    const timer1 = setTimeout(handleScrollUpdate, 100); 
+    const timer2 = setTimeout(handleScrollUpdate, 300); 
 
     return () => {
         container.removeEventListener('scroll', handleScrollUpdate);
-        clearTimeout(timer);
+        clearTimeout(timer1);
+        clearTimeout(timer2);
     };
   }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length, chartWidth]);
 
