@@ -6628,14 +6628,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
+          {/* ✨ 升級為鏤空字體：只畫邊框 (stroke)、內部透明 (fill="none")，並調高不透明度 */}
           <text 
             id="chart-title" 
             x={width / 2} 
             y={totalSVGHeight / 3} 
-            fill="#334155" 
+            fill="none" 
+            stroke="#475569" 
+            strokeWidth="2" 
             fontSize={isFullscreen ? "6vw" : "12vw"} 
             fontWeight="900" 
-            opacity="0.15" 
+            opacity="0.5" 
             textAnchor="middle" 
             dominantBaseline="middle" 
             pointerEvents="none" 
