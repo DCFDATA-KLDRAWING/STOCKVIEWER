@@ -5164,8 +5164,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     return () => observer.disconnect();
   }, [displayCount, data ? data.length : 0]);
 
-  // ✨ 新增：動態 Y 軸狀態 (紀錄畫面上可見的最大與最小值)
-  const [yAxis, setYAxis] = useState({ min: null, max: null });
+  // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
+  const [yAxis, setYAxis] = useState({ min: null, max: null, symbol: realSymbol });
   const lastY = useRef({ min: null, max: null });
 
   // ✨ 標題永遠置中的追蹤雷達 + 動態 Y 軸縮放引擎 (三竹級體驗)
@@ -5173,14 +5173,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // 當切換股票或視角時，重置極值
+    // 當切換股票或視角時，強制清空舊股票的 Y 軸記憶
     lastY.current = { min: null, max: null };
-    // 強制清空舊股票的 Y 軸記憶
-    setYAxis({ min: null, max: null });
+    setYAxis({ min: null, max: null, symbol: realSymbol });
+
+    // 🛡️ 終極防護罩：鎖定 Y 軸引擎 500 毫秒！
+    // 確保 DOM 動畫、寬度計算、自動滾動全部徹底完成後，才允許引擎重新接管，杜絕一切亂算的殘影！
+    let isEngineLocked = true;
+    const unlockTimer = setTimeout(() => {
+        isEngineLocked = false;
+    }, 500);
 
     const handleScrollUpdate = () => {
       const scrollX = container.scrollLeft;
       const clientW = container.clientWidth;
+      const scrollW = container.scrollWidth;
 
       // 1. 動態更新標題位置
       const title = document.getElementById('chart-title');
@@ -5189,10 +5196,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       }
 
       // 2. 動態 Y 軸縮放
-      if (chartWidth <= 0 || !data || data.length === 0) return;
+      // 🛑 如果還在鎖定期 (剛載入的500毫秒內)，或者沒有資料，就直接跳出，不要亂算 Y 軸！
+      // 畫面會完美套用我們上面寫好的 defaultMax 備胎！
+      if (isEngineLocked || scrollW <= 0 || !data || data.length === 0) return;
       
       const totalSlots = data.length + 10; // 固定留 10 根
-      const spacing = (chartWidth - 60) / totalSlots; // 60 是 padding * 2
+      const spacing = (scrollW - 60) / totalSlots; // 60 是 padding * 2
       if (spacing <= 0) return;
 
       // 扣除 SVG 左邊的 30px Padding 誤差，並加大安全緩衝區
@@ -5213,20 +5222,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         const currentMax = lastY.current.max;
         if (currentMin === null || currentMax === null || Math.abs(tempMax - currentMax) > 0.05 || Math.abs(tempMin - currentMin) > 0.05) {
           lastY.current = { min: tempMin, max: tempMax };
-          setYAxis({ min: tempMin, max: tempMax });
+          setYAxis({ min: tempMin, max: tempMax, symbol: realSymbol });
         }
       }
     };
 
     container.addEventListener('scroll', handleScrollUpdate);
     
-    // 💡 關鍵修正：把原本寫在這裡的 handleScrollUpdate() 拿掉了！
-    // 讓它保持空杯狀態(吃我們寫好的完美備胎)，直到下面那個自動滾動引擎把它推到最右側，才會開始算！
-
     return () => {
         container.removeEventListener('scroll', handleScrollUpdate);
+        clearTimeout(unlockTimer);
     };
-  }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length, chartWidth]);
+  }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length]);
 
 
   // ✨ 自動滾動到最右側 (完美保留 10 根 K 棒留白空間)
@@ -5399,20 +5406,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   let defaultMax = -Infinity; let defaultMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  // 💡 關鍵修正 1：因為右邊留了 10 根空白，所以畫面上實際看到的 K 棒只有 (displayCount - 10) 根
-  // 我們只抓這真正看得見的部分來當預設天花板，解決一開始的高低誤差！
-  const visibleBarsCount = Math.max(1, displayCount - 10);
-  const latestData = data.slice(Math.max(0, data.length - visibleBarsCount));
+  // 💡 終極數學修正：畫面上顯示的真實 K 棒就是 displayCount 根！(未來的 10 根空白被推到畫面右外側了)
+  // 不扣除任何數量，確保畫面上的極值被 100% 完美包覆！
+  const latestData = data.slice(Math.max(0, data.length - displayCount));
   
   latestData.forEach((d) => { 
       if (d.high > defaultMax) { defaultMax = d.high; } 
       if (d.low < defaultMin) { defaultMin = d.low; } 
   });
 
-  // ✨ 終極動態 Y 軸：優先使用我們在 scroll 時抓到的「目前可見範圍」極值！
-  // 如果追蹤引擎還沒收到通知，就用 latestData 算出來的完美預設值！
-  const activeMin = yAxis.min !== null ? yAxis.min : defaultMin;
-  const activeMax = yAxis.max !== null ? yAxis.max : defaultMax;
+  // ✨ 終極動態 Y 軸：檢查 Y 軸記憶是不是屬於目前這檔股票的？
+  // 如果是舊股票的記憶殘留，我們就「無視它」，直接使用剛算好的 default 完美備胎！
+  const isYAxisValid = yAxis.min !== null && yAxis.symbol === realSymbol;
+  const activeMin = isYAxisValid ? yAxis.min : defaultMin;
+  const activeMax = isYAxisValid ? yAxis.max : defaultMax;
 
   // 為了讓畫面不要太緊繃，上下多給 2% 的彈性空間 (完美還原三竹的留白感)
   const minPrice = Math.min(activeMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.98; 
