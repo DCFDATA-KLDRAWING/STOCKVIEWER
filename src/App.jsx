@@ -5185,6 +5185,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     }, 500);
 
     const handleScrollUpdate = () => {
+      const offsetBars = Math.max(0, displayCount - (data.length + 10));
       const scrollX = container.scrollLeft;
       const clientW = container.clientWidth;
       const scrollW = container.scrollWidth;
@@ -5200,13 +5201,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       // 畫面會完美套用我們上面寫好的 defaultMax 備胎！
       if (isEngineLocked || scrollW <= 0 || !data || data.length === 0) return;
       
-      const totalSlots = data.length + 10; // 固定留 10 根
-      const spacing = (scrollW - 60) / totalSlots; // 60 是 padding * 2
+      // ✨ 修正：與 updateSize 使用完全一致的計算邏輯
+      const totalSlots = data.length + 10;
+      const virtualTotalSlots = Math.max(totalSlots, displayCount); 
+      const spacing = (scrollW - 60) / virtualTotalSlots;
       if (spacing <= 0) return;
 
-      // 扣除 SVG 左邊的 30px Padding 誤差，並加大安全緩衝區
-      const startIdx = Math.max(0, Math.floor((scrollX - 30) / spacing) - 4);
-      const endIdx = Math.min(data.length - 1, Math.ceil((scrollX + clientW - 30) / spacing) + 4);
+      // ✨ 修正：減去偏移量，讓索引回到資料陣列的正確位置
+      const startIdx = Math.max(0, Math.floor((scrollX - 30) / spacing) - 4 - offsetBars);
+      const endIdx = Math.min(data.length - 1, Math.ceil((scrollX + clientW - 30) / spacing) + 4 - offsetBars);
 
       let tempMax = -Infinity;
       let tempMin = Infinity;
@@ -6642,13 +6645,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             fill="none" 
             stroke="#475569" 
             strokeWidth="2" 
-            fontSize={isFullscreen ? "4vw" : "8vw"} 
+            fontSize={isFullscreen ? "4vw" : "8vw"} // 👈 把這裡的數字調小
             fontWeight="900" 
             opacity="0.5" 
             textAnchor="middle" 
             dominantBaseline="middle" 
             pointerEvents="none" 
-            className="tracking-widest watermark-text" // 👈 加上 watermark-text
+            className="tracking-widest watermark-text"
           >
             {stockName} ({tfLabel})
           </text>
