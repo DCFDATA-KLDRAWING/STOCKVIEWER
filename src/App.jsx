@@ -5134,7 +5134,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器尺寸，實現完美直橫式視角與滑桿縮放 (防呆安全版)
+  // ✨ 動態監聽容器尺寸，實現完美直橫式視角與滑桿縮放 (防呆安全版 + 旋轉校正)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -5149,19 +5149,41 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       const currentExtra = 10;
       const totalSlots = currentDataLen + currentExtra;
       
-      // 🛡️ 安全保護：自動判斷你是否有兩指縮放功能，沒有也不會當機！
+      // ✨ 關鍵 1：定義虛擬總數，當資料量小於顯示視角時，強制撐起比例！
+      const virtualTotalSlots = Math.max(totalSlots, displayCount);
+      
+      // 🛡️ 安全保護：自動判斷你是否有兩指縮放功能
       const currentScale = typeof zoomScale !== 'undefined' ? zoomScale : 1;
-      const calculatedWidth = (cw / displayCount) * totalSlots * currentScale; 
+      
+      // ✨ 關鍵 2：改用 virtualTotalSlots 計算寬度，確保比例正確
+      const calculatedWidth = (cw / displayCount) * virtualTotalSlots * currentScale; 
       
       setChartWidth(Math.max(cw, calculatedWidth));
     };
 
-    const observer = new ResizeObserver(() => updateSize());
+    // 使用 requestAnimationFrame 讓縮放更滑順
+    const observer = new ResizeObserver(() => {
+      window.requestAnimationFrame(updateSize);
+    });
     observer.observe(container);
+
+    // 🛡️ 針對手機橫向翻轉的延遲，進行多段校正
+    const handleRotation = () => {
+      updateSize();
+      setTimeout(updateSize, 150);
+      setTimeout(updateSize, 500);
+    };
+    window.addEventListener('resize', handleRotation);
+    window.addEventListener('orientationchange', handleRotation);
+
     updateSize();
 
     // 🛡️ 將 zoomScale 移出依賴陣列，徹底防止黑畫面
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', handleRotation);
+      window.removeEventListener('orientationchange', handleRotation);
+    };
   }, [displayCount, data ? data.length : 0]);
 
   // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
@@ -5403,7 +5425,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
   // ✨ 動態計算額外的空白 K 棒數 (預留 15% 空間給未來畫線用)
   const extraCandles = 10;
-  const totalSlots = data.length + extraCandles;
+  const totalSlots = data.length + extraCandles;  
 
   // ✨ 找出「預設可見範圍」的最大最小 (作為切換股票瞬間的完美備胎)
   let defaultMax = -Infinity; let defaultMin = Infinity;
@@ -5432,11 +5454,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const getY = (p) => mainHeight - padding - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - padding - chartPaddingTop);
   const getVolY = (v) => volHeight - (v / maxVol) * volHeight;
   
-  // ✨ 將間距計算改為包含未來空白區的 totalSlots
-  const spacing = (width - padding * 2) / totalSlots; 
-  const candleWidth = Math.max(0.5, spacing * 0.90); // ✨ 將最小寬度改為 0.5px，讓全圖壓縮時 K 棒不會糊成一團
-  // ✨ 計算偏移量：如果實際資料少於 displayCount，算出缺少了幾根，用來把整個圖表往右推
-  const offsetBars = Math.max(0, displayCount - data.length);
+  // ✨ 將間距計算改為 virtualTotalSlots，K棒大小就不會變形了
+  const spacing = (width - padding * 2) / virtualTotalSlots; 
+  const candleWidth = Math.max(0.5, spacing * 0.90); 
+  
+  // ✨ 偏移量精準計算：補齊「視角」與「實際資料+留白」的差額
+  const offsetBars = Math.max(0, displayCount - totalSlots);
 
   const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${padding + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
 
