@@ -5432,8 +5432,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   // ✨ 將間距計算改為包含未來空白區的 totalSlots
   const spacing = (width - padding * 2) / totalSlots; 
   const candleWidth = Math.max(0.5, spacing * 0.90); // ✨ 將最小寬度改為 0.5px，讓全圖壓縮時 K 棒不會糊成一團
+  // ✨ 計算偏移量：如果實際資料少於 displayCount，算出缺少了幾根，用來把整個圖表往右推
+  const offsetBars = Math.max(0, displayCount - data.length);
 
-  const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${padding + i * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
+  const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${padding + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
 
   // === 🎯 相對座標系統 (還原不平移版) ===
   const getSnappedDataPoint = (clientX, clientY) => {
@@ -5441,7 +5443,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     const pt = svg.createSVGPoint(); pt.x = clientX; pt.y = clientY;
     const pos = pt.matrixTransform(svg.getScreenCTM().inverse());
     
-    let exactIdxFloat = (pos.x - padding - spacing/2) / spacing;
+    let exactIdxFloat = (pos.x - padding - spacing/2) / spacing - offsetBars;
     if (exactIdxFloat < 0) exactIdxFloat = 0; 
     
     // ✨ 允許游標範圍延伸至右側未來空白區
@@ -5470,7 +5472,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   };
 
   const resolvePoint = (pt) => { 
-    const x = padding + (data.length - 1 - pt.idxFromEnd) * spacing + spacing / 2; 
+    const x = padding + (data.length - 1 - pt.idxFromEnd + offsetBars) * spacing + spacing / 2; 
     return { x, y: getY(pt.price), price: pt.price }; 
   };
 
@@ -5717,58 +5719,58 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     }
   };
 
-  // 🍎 完美相容 Apple 與 Android 的存圖機制 (所見即所得、絕對不跳出全螢幕版)
+  // 🍎 完美相容 Apple 與 Android 的存圖機制 (裁切可見視角版)
   const handleDownloadImage = () => {
     setCrosshair(null); setHoverPoint(null);
-
-    // ✨ 拔除 window.confirm，直接預設儲存「目前螢幕看見的範圍」，保護全螢幕不中斷！
-    const onlyVisible = true; 
 
     setTimeout(() => {
       const svg = document.getElementById('trend-chart-svg'); 
       const container = scrollContainerRef.current; 
       if (!svg || !container) return;
 
+      // 1. 取得完整寬度、螢幕可見寬度，以及目前的水平滾動位置
       const fullWidth = svg.getBoundingClientRect().width;
       const fullHeight = svg.getBoundingClientRect().height;
       const visibleWidth = container.clientWidth;
       const scrollX = container.scrollLeft;
 
-      // ✨ 動態把標題移到「目前可見範圍」的正中央，確保存圖一定有股號
-      const titleText = svg.querySelector('#chart-title');
-      if (titleText) {
-          titleText.setAttribute('x', scrollX + visibleWidth / 2);
-      }
+      // 2. 動態把背景的「浮水印標題」移到你目前螢幕的正中央，確保截圖有名字
+      const texts = svg.querySelectorAll('text');
+      const originalXs = [];
+      texts.forEach((t, i) => {
+         // 抓出標題元素 (通常是置中的大字) 移到當前視角中央
+         if (t.getAttribute('text-anchor') === 'middle' && !t.innerHTML.includes('MA') && !t.innerHTML.includes('VMA')) {
+             originalXs[i] = t.getAttribute('x');
+             t.setAttribute('x', scrollX + visibleWidth / 2);
+         }
+      });
 
       const svgData = new XMLSerializer().serializeToString(svg);
       
-      // ✨ 存完圖馬上把標題恢復原位
-      if (titleText) {
-          titleText.setAttribute('x', fullWidth / 2);
-      }
+      // 3. 存完資料馬上把文字位置復原，避免影響你的畫面
+      texts.forEach((t, i) => {
+         if (originalXs[i]) t.setAttribute('x', originalXs[i]);
+      });
 
       const canvas = document.createElement("canvas"); 
       const ctx = canvas.getContext("2d"); 
       const img = new Image();
       
-      // ✨ 目標寬度就是你當下螢幕的寬度
-      const targetWidth = visibleWidth;
       const scale = 2; // 維持 2 倍高畫質
-
-      canvas.width = targetWidth * scale; 
+      // ✨ 關鍵修正：畫布寬度只取「螢幕可見寬度」
+      canvas.width = visibleWidth * scale; 
       canvas.height = fullHeight * scale;
       
       img.onload = () => {
         ctx.fillStyle = "#0f172a"; 
         ctx.fillRect(0, 0, canvas.width, canvas.height); 
         
-        // ✨ 把畫布往左平移，精準切下你目前螢幕停留的畫面
+        // ✨ 關鍵修正：把畫布往左平移 scrollX，就像拿相機平移對準你的螢幕一樣！
         ctx.translate(-scrollX * scale, 0);
         ctx.drawImage(img, 0, 0, fullWidth * scale, fullHeight * scale);
         
-        // 👇 雙平台下載邏輯完全保留 👇
         const isAppleDevice = /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) || /Macintosh/i.test(navigator.userAgent);
-        const fileName = `${stockName}_策略圖_目前視角_${new Date().toISOString().split('T')[0]}.png`;
+        const fileName = `${stockName}_策略圖_${new Date().toISOString().split('T')[0]}.png`;
         
         if (isAppleDevice) {
            canvas.toBlob((blob) => {
@@ -6693,7 +6695,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 return (
                     <circle 
                       key={`sar-${i}`} 
-                      cx={padding + i * spacing + spacing / 2} 
+                      cx={padding + (i + offsetBars) * spacing + spacing / 2} 
                       cy={sarY} 
                       r="2" 
                       fill={sarColor} 
@@ -6876,7 +6878,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
             {/* 標準 K 線 (拔除了與寶塔線衝突的邏輯) */}
             {data.map((d, i) => {
-              const x = padding + i * spacing + spacing / 2;
+              const x = padding + (i + offsetBars) * spacing + spacing / 2;
               const color = d.close >= d.open ? '#ef4444' : '#22c55e';
               return (
                 <g key={`candle-${i}`}>
@@ -6964,7 +6966,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           </g>
 
           <g transform={`translate(0, ${mainHeight})`} clipPath="url(#chartClip)">
-            {data.map((d, i) => <rect key={`vol-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>)}
+            {data.map((d, i) => <rect key={`vol-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>)}
             
             {/* 獨立開關的 VMA */}
             {toggles.showVolume && vmaParams?.vma1?.show !== false && <path d={getLinePath(data, 'vma1')} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth={vmaParams?.vma1?.w || 1.5} fill="none" opacity="0.8"/>}
@@ -6972,7 +6974,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {toggles.showVolume && vmaParams?.vma3?.show !== false && <path d={getLinePath(data, 'vma3')} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth={vmaParams?.vma3?.w || 1.5} fill="none" opacity="0.8"/>}
 
             {data.map((d, i) => {
-              const x = padding + i * spacing + spacing / 2;
+              const x = padding + (i + offsetBars) * spacing + spacing / 2;
               return (
                 <g key={`volsignal-${i}`}>
                   {toggles.showVolume && vmaParams?.vma1?.show !== false && i === data.length - (vmaParams?.vma1?.p || 5) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth="2" fill="none" />}
@@ -7005,7 +7007,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 let maxT = -Infinity, minT = Infinity; data.forEach(d => { if (d.tower.top > maxT) maxT = d.tower.top; if (d.tower.bottom < minT) minT = d.tower.bottom; });
                 const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - indPadding*2) - indPadding;
                 return (<g>
-                    {data.map((d, i) => <rect key={`tw-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
+                    {data.map((d, i) => <rect key={`tw-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
                     <text x={padding} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
                 </g>);
             })()}
@@ -7039,7 +7041,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
                             const y = getInstY(val);
                             const color = val >= 0 ? '#ef4444' : '#22c55e'; // 紅買綠賣
-                            return <rect key={`inst-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
+                            return <rect key={`inst-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
                         })}
                         <text x={padding} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
                             {indicatorType === '外資' ? '外資買賣超(張)' : indicatorType === '投信' ? '投信買賣超(張)' : indicatorType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
@@ -7061,7 +7063,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     {/* 用柱狀圖畫融資 */}
                     {data.map((d, i) => {
                         const y = getMarginY(d.marginDiff); const zeroY = getMarginY(0);
-                        return <rect key={`margin-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.marginDiff >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
+                        return <rect key={`margin-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.marginDiff >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
                     })}
                     {/* 用線條畫融券 */}
                     <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMarginY(d.shortDiff)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
@@ -7075,7 +7077,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; const getMyY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
                     return (<g>
                             <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
-                            {data.map((d, i) => { const y = getMyY(d.macd.osc); const zeroY = getMyY(0); return <rect key={`osc-${i}`} x={padding + i * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; })}
+                            {data.map((d, i) => { const y = getMyY(d.macd.osc); const zeroY = getMyY(0); return <rect key={`osc-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; })}
                             <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMyY(d.macd.dif)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                             <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMyY(d.macd.macd)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                         </g>);
