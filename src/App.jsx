@@ -6382,13 +6382,22 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const displayIdx = crosshair && crosshair.idx >= 0 && crosshair.idx < data.length ? crosshair.idx : data.length - 1;
   const currentHoverData = data[displayIdx];
 
+  // ✨ 智慧判斷：如果高度 > 寬度（代表是直立的手機），才需要啟動假旋轉
+  const isPortrait = windowDim.h > windowDim.w;
+
   return (
     // ✨ 加入 group 讓滑鼠移進圖表時箭頭才會亮起
-    // ✨ 修改這裡：把原本的 w-[100vh] 拔掉，加上 style 動態綁定 windowDim 的精準像素
+    // ✨ 智慧版外層容器：電腦版原生放大、手機版精準像素旋轉
     <div 
       ref={chartContainerRef} 
-      className={isFullscreen ? "fixed top-0 left-0 origin-top-left z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}
-      style={isFullscreen ? {
+      className={
+        isFullscreen 
+          ? (isPortrait 
+              ? "fixed top-0 left-0 origin-top-left z-[10000] bg-[#020617] flex flex-col group" 
+              : "fixed inset-0 z-[10000] bg-[#020617] flex flex-col group w-full h-full") 
+          : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"
+      }
+      style={isFullscreen && isPortrait ? {
           width: `${windowDim.h}px`,
           height: `${windowDim.w}px`,
           transform: `translateX(${windowDim.w}px) rotate(90deg)`
