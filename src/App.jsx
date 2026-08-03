@@ -3073,7 +3073,7 @@ const App = () => {
         const numA = parseInt(valA.toString().replace(/,/g, '')) || 0;
         const numB = parseInt(valB.toString().replace(/,/g, '')) || 0;
         return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-      
+      }
       
       // 處理文字排序 (股號/股名)
       if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
