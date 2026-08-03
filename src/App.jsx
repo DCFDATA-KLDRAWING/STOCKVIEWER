@@ -7281,5 +7281,4 @@ const generateMockData = () => {
     return { date: d.toISOString().split('T')[0], open, high, low, close, volume: Math.floor(Math.random() * 5000) + 1000 };
   });
 };
-
 export default App;
