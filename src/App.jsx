@@ -6340,7 +6340,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
         </g>
       );
     }
-    return null；
+    return null;
   };
 
   // ✨ 固定暗黑科技主題
