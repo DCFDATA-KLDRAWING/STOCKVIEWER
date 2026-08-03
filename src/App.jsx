@@ -5075,22 +5075,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
 
-  // ✨ 1. 新增：追蹤螢幕真實像素，精準計算假全螢幕的長寬比例
-  const [windowDim, setWindowDim] = useState({ 
-      w: typeof window !== 'undefined' ? window.innerWidth : 1200, 
-      h: typeof window !== 'undefined' ? window.innerHeight : 800 
-  });
-
-  useEffect(() => {
-    const handleResize = () => setWindowDim({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, []);
-
   // ✨ 新增：圖表動態寬度狀態與全圖判定
   const [chartWidth, setChartWidth] = useState(1200);
   const [chartHeight, setChartHeight] = useState(600);
@@ -6382,27 +6366,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const displayIdx = crosshair && crosshair.idx >= 0 && crosshair.idx < data.length ? crosshair.idx : data.length - 1;
   const currentHoverData = data[displayIdx];
 
-  // ✨ 智慧判斷：如果高度 > 寬度（代表是直立的手機），才需要啟動假旋轉
-  const isPortrait = windowDim.h > windowDim.w;
-
   return (
     // ✨ 加入 group 讓滑鼠移進圖表時箭頭才會亮起
-    // ✨ 智慧版外層容器：電腦版原生放大、手機版精準像素旋轉
-    <div 
-      ref={chartContainerRef} 
-      className={
-        isFullscreen 
-          ? (isPortrait 
-              ? "fixed top-0 left-0 origin-top-left z-[10000] bg-[#020617] flex flex-col group" 
-              : "fixed inset-0 z-[10000] bg-[#020617] flex flex-col group w-full h-full") 
-          : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"
-      }
-      style={isFullscreen && isPortrait ? {
-          width: `${windowDim.h}px`,
-          height: `${windowDim.w}px`,
-          transform: `translateX(${windowDim.w}px) rotate(90deg)`
-      } : {}}
-    >
+    <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}>
       <CustomModal modal={chartModal}/>
       
       {/* ✨ 排行榜視窗被安置在全螢幕容器內部，保證絕不會被遮擋 */}
