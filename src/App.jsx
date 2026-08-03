@@ -5425,7 +5425,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
   // ✨ 動態計算額外的空白 K 棒數 (預留 15% 空間給未來畫線用)
   const extraCandles = 10;
-  const totalSlots = data.length + extraCandles;  
+  const totalSlots = data.length + extraCandles;
+  
 
   // ✨ 找出「預設可見範圍」的最大最小 (作為切換股票瞬間的完美備胎)
   let defaultMax = -Infinity; let defaultMin = Infinity;
