@@ -7280,6 +7280,6 @@ const generateMockData = () => {
     const high = Math.max(open, close) + Math.random()*5, low = Math.min(open, close) - Math.random()*5; price = close;
     return { date: d.toISOString().split('T')[0], open, high, low, close, volume: Math.floor(Math.random() * 5000) + 1000 };
   });
-};
+}1
 
 export default App;
