@@ -5075,11 +5075,26 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
   
-  // ✨ 新增：缺口線狀態管理 (貼在這裡!)
-  const [gapLevels, setGapLevels] = useState({
-    line1: { active: false, date: null, priceType: 'close', val: null },
-    line2: { active: false, date: null, priceType: 'close', val: null }
+  // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
+  const [gapLevels, setGapLevels] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_GLOBAL_GAP_LEVELS');
+      return saved ? JSON.parse(saved) : {
+        line1: { active: false, date: null, priceType: 'close', val: null },
+        line2: { active: false, date: null, priceType: 'close', val: null }
+      };
+    } catch (e) {
+      return {
+        line1: { active: false, date: null, priceType: 'close', val: null },
+        line2: { active: false, date: null, priceType: 'close', val: null }
+      };
+    }
   });
+
+  // 只要缺口設定有變動，就自動同步存入 localStorage
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_GLOBAL_GAP_LEVELS', JSON.stringify(gapLevels));
+  }, [gapLevels]);
 
   // ✨ 新增：圖表動態寬度狀態與全圖判定
   const [chartWidth, setChartWidth] = useState(1200);
