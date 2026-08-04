@@ -5074,6 +5074,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
+  
+  // ✨ 新增：缺口線狀態管理 (貼在這裡!)
+  const [gapLevels, setGapLevels] = useState({
+    line1: { active: false, date: null, priceType: 'close', val: null },
+    line2: { active: false, date: null, priceType: 'close', val: null }
+  });
 
   // ✨ 新增：圖表動態寬度狀態與全圖判定
   const [chartWidth, setChartWidth] = useState(1200);
@@ -6385,10 +6391,35 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
            <button onClick={toggleFullscreen} className="justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
              {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
            </button>
-           {/* 👇 貼在這裡：專屬的查價線獨立開關 👇 */}
+           {/* 查價線按鈕 */}
            <button onClick={onToggleCrosshair} className={`justify-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center border ${toggles.showCrosshair !== false ? 'bg-pink-900/80 border-pink-500 text-pink-200 shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'bg-slate-800/80 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-pink-300'}`}>
              {toggles.showCrosshair !== false ? '🎯 關查價' : '🎯 開查價'}
            </button>
+
+           {/* ✨ 直接把缺口線設定器塞在這裡！ */}
+           <div className="flex items-center gap-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 shrink-0">
+             <span className="text-[10px] font-bold text-slate-400">缺口：</span>
+             {['line1', 'line2'].map(key => (
+               <div key={key} className="flex items-center gap-1">
+                 <input type="checkbox" checked={gapLevels[key].active} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} className="accent-pink-500 cursor-pointer w-3 h-3" />
+                 <span className="text-[10px] text-pink-300 font-bold">{key === 'line1' ? 'L1' : 'L2'}</span>
+                 <select value={gapLevels[key].priceType} onChange={e => {
+                   const type = e.target.value;
+                   const val = gapLevels[key].date ? data.find(d => d.date === gapLevels[key].date)?.[type] : null;
+                   setGapLevels({...gapLevels, [key]: {...gapLevels[key], priceType: type, val}});
+                 }} className="bg-slate-900 text-[10px] text-white p-0.5 rounded cursor-pointer border border-slate-700">
+                   <option value="open">開</option><option value="high">高</option><option value="low">低</option><option value="close">收</option>
+                 </select>
+                 <input type="date" onChange={e => {
+                    const date = e.target.value;
+                    const val = data.find(d => d.date === date)?.[gapLevels[key].priceType];
+                    setGapLevels({...gapLevels, [key]: {...gapLevels[key], date, val}});
+                 }} className="bg-slate-900 text-[10px] text-white p-0.5 rounded w-24 cursor-pointer border border-slate-700" />
+               </div>
+             ))}
+           </div>
+
+           {/* 畫板按鈕 */}
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">
              📁 畫板
            </button>
@@ -7240,6 +7271,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {toggles.showHeidun && <text x="80"><tspan fill="#f8fafc" fontWeight="bold">黑頓</tspan></text>}
             {customStrategies.filter(s => s.isActive).map((strat, idx) => <text key={strat.id} x={180 + (idx * 100)}><tspan fill="#4f46e5" fontWeight="bold">{strat.marker}</tspan> {strat.name}</text>)}
           </g>
+          {/* ✨ 新增：雙缺口線渲染 */}
+          {Object.values(gapLevels).map((l, i) => {
+            if (!l.active || l.val === null) return null;
+            return (
+              <g key={`gap-${i}`}>
+                <line x1={0} y1={getY(l.val)} x2={width} y2={getY(l.val)} stroke={i === 0 ? "#f472b6" : "#fbbf24"} strokeWidth="2" strokeDasharray="6,4" opacity="0.7" pointerEvents="none" />
+                <text x={padding + 5} y={getY(l.val) - 5} fill={i === 0 ? "#f472b6" : "#fbbf24"} fontSize="11" fontWeight="bold" pointerEvents="none">
+                   缺口線 {i+1}: {l.val.toFixed(2)}
+                </text>
+              </g>
+            );
+          })}
           
         </svg>
       </div>
