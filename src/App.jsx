@@ -6398,7 +6398,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
            {/* ✨ 直接把缺口線設定器塞在這裡！ */}
            <div className="flex items-center gap-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 shrink-0">
-             <span className="text-[10px] font-bold text-slate-400">缺口：</span>
+             <span className="text-[10px] font-bold text-slate-400">切口線：</span>
              {['line1', 'line2'].map(key => (
                <div key={key} className="flex items-center gap-1">
                  <input type="checkbox" checked={gapLevels[key].active} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} className="accent-pink-500 cursor-pointer w-3 h-3" />
