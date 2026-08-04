@@ -6413,25 +6413,29 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
            {/* ✨ 直接把缺口線設定器塞在這裡！ */}
            <div className="flex items-center gap-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 shrink-0">
-             <span className="text-[10px] font-bold text-slate-400">切口線：</span>
-             {['line1', 'line2'].map(key => (
-               <div key={key} className="flex items-center gap-1">
-                 <input type="checkbox" checked={gapLevels[key].active} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} className="accent-pink-500 cursor-pointer w-3 h-3" />
-                 <span className="text-[10px] text-pink-300 font-bold">{key === 'line1' ? 'L1' : 'L2'}</span>
-                 <select value={gapLevels[key].priceType} onChange={e => {
-                   const type = e.target.value;
-                   const val = gapLevels[key].date ? data.find(d => d.date === gapLevels[key].date)?.[type] : null;
-                   setGapLevels({...gapLevels, [key]: {...gapLevels[key], priceType: type, val}});
-                 }} className="bg-slate-900 text-[10px] text-white p-0.5 rounded cursor-pointer border border-slate-700">
-                   <option value="open">開</option><option value="high">高</option><option value="low">低</option><option value="close">收</option>
-                 </select>
-                 <input type="date" onChange={e => {
-                    const date = e.target.value;
-                    const val = data.find(d => d.date === date)?.[gapLevels[key].priceType];
-                    setGapLevels({...gapLevels, [key]: {...gapLevels[key], date, val}});
-                 }} className="bg-slate-900 text-[10px] text-white p-0.5 rounded w-24 cursor-pointer border border-slate-700" />
-               </div>
-             ))}
+             <span className="text-[10px] font-bold text-slate-400">切口：</span>
+             {['line1', 'line2'].map(key => {
+               // ✨ 智慧動態計算：不管切到哪一檔股票，只要有存日期，就自動去當前資料中找出該日期的價位！
+               const currentItem = gapLevels[key].date && data ? data.find(d => d.date === gapLevels[key].date) : null;
+               const activeVal = currentItem ? currentItem[gapLevels[key].priceType] : null;
+
+               return (
+                 <div key={key} className="flex items-center gap-1">
+                   <input type="checkbox" checked={gapLevels[key].active} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} className="accent-pink-500 cursor-pointer w-3 h-3" />
+                   <span className="text-[10px] text-pink-300 font-bold">{key === 'line1' ? 'L1' : 'L2'}</span>
+                   <select value={gapLevels[key].priceType} onChange={e => {
+                     const type = e.target.value;
+                     setGapLevels({...gapLevels, [key]: {...gapLevels[key], priceType: type}});
+                   }} className="bg-slate-900 text-[10px] text-white p-0.5 rounded cursor-pointer border border-slate-700">
+                     <option value="open">開</option><option value="high">高</option><option value="low">低</option><option value="close">收</option>
+                   </select>
+                   <input type="date" value={gapLevels[key].date || ''} onChange={e => {
+                      const date = e.target.value;
+                      setGapLevels({...gapLevels, [key]: {...gapLevels[key], date}});
+                   }} className="bg-slate-900 text-[10px] text-white p-0.5 rounded w-24 cursor-pointer border border-slate-700" />
+                 </div>
+               );
+             })}
            </div>
 
            {/* 畫板按鈕 */}
@@ -7286,14 +7290,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {toggles.showHeidun && <text x="80"><tspan fill="#f8fafc" fontWeight="bold">黑頓</tspan></text>}
             {customStrategies.filter(s => s.isActive).map((strat, idx) => <text key={strat.id} x={180 + (idx * 100)}><tspan fill="#4f46e5" fontWeight="bold">{strat.marker}</tspan> {strat.name}</text>)}
           </g>
-          {/* ✨ 新增：雙缺口線渲染 */}
+          {/* ✨ 修正：使用動態對應當前股票的價位渲染 */}
           {Object.values(gapLevels).map((l, i) => {
-            if (!l.active || l.val === null) return null;
+            const key = i === 0 ? 'line1' : 'line2';
+            const currentItem = l.date && data ? data.find(d => d.date === l.date) : null;
+            const targetVal = currentItem ? currentItem[l.priceType] : null;
+
+            if (!l.active || targetVal === null) return null;
             return (
               <g key={`gap-${i}`}>
-                <line x1={0} y1={getY(l.val)} x2={width} y2={getY(l.val)} stroke={i === 0 ? "#f472b6" : "#fbbf24"} strokeWidth="2" strokeDasharray="6,4" opacity="0.7" pointerEvents="none" />
-                <text x={padding + 5} y={getY(l.val) - 5} fill={i === 0 ? "#f472b6" : "#fbbf24"} fontSize="11" fontWeight="bold" pointerEvents="none">
-                   缺口線 {i+1}: {l.val.toFixed(2)}
+                <line x1={0} y1={getY(targetVal)} x2={width} y2={getY(targetVal)} stroke={i === 0 ? "#f472b6" : "#fbbf24"} strokeWidth="2" strokeDasharray="6,4" opacity="0.7" pointerEvents="none" />
+                <text x={padding + 5} y={getY(targetVal) - 5} fill={i === 0 ? "#f472b6" : "#fbbf24"} fontSize="11" fontWeight="bold" pointerEvents="none">
+                   缺口線 {i+1}: {targetVal.toFixed(2)}
                 </text>
               </g>
             );
