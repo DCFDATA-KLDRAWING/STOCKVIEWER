@@ -5090,6 +5090,89 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
       };
     }
   });
+  // ✨ 新增：計算特定日期的 P 值與 Q 值函數
+  const calculatePQ = (targetDate) => {
+    if (!targetDate || !data) return { p: 0, q: 0 };
+    const idx = data.findIndex(d => d.date === targetDate);
+    if (idx <= 0) return { p: 0, q: 0 };
+
+    const current = data[idx];
+    const prev = data[idx - 1];
+
+    const p = prev.close > 0 ? ((current.close - prev.close) / prev.close) * 100 : 0;
+    let q = 0;
+    if (prev.volume > 0) {
+      q = ((current.volume / prev.volume) - 1) * 10;
+    }
+    return { p, q };
+  };
+
+  // 供需圖彈窗開關狀態
+  const [pqModalOpen, setPqModalOpen] = useState(false);
+  const [activePqTarget, setActivePqTarget] = useState('line1'); // 'line1' 或 'line2'
+  const pqChartRef = useRef(null);
+
+  // 當開啟供需圖時，利用 ECharts 繪製 8 象限交點圖
+  useEffect(() => {
+    if (!pqModalOpen || !window.echarts) return;
+    const l = gapLevels[activePqTarget];
+    if (!l.date) return;
+
+    const { p, q } = calculatePQ(l.date);
+    const chartDom = pqChartRef.current;
+    if (!chartDom) return;
+
+    const myChart = window.echarts.init(chartDom, 'dark');
+    
+    let cleanQ = q; if (cleanQ > 10) cleanQ = 10; if (cleanQ < -10) cleanQ = -10;
+    let cleanP = p; if (cleanP > 10) cleanP = 10; if (cleanP < -10) cleanP = -10;
+
+    const option = {
+      backgroundColor: 'transparent',
+      grid: { left: '10%', right: '12%', top: '15%', bottom: '15%', containLabel: true },
+      xAxis: {
+        type: 'value', min: -10, max: 10,
+        axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
+        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+        axisLabel: { color: '#d1d5db', formatter: '{value}' },
+        name: 'Q (量)', nameTextStyle: { color: '#d1d5db' }
+      },
+      yAxis: {
+        type: 'value', min: -10, max: 10,
+        axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
+        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+        axisLabel: { color: '#d1d5db', formatter: '{value}%' },
+        name: 'P (價)', nameTextStyle: { color: '#d1d5db' }
+      },
+      series: [
+        { name: '供給線', type: 'line', data: [[-10, 10], [10, -10]], lineStyle: { color: '#ef4444', width: 3 }, symbol: 'none' },
+        { name: '需求線', type: 'line', data: [[-10, -10], [10, 10]], lineStyle: { color: '#22c55e', width: 3 }, symbol: 'none' },
+        { name: '平移供給', type: 'line', data: [[-10 + cleanQ, 10 + cleanP], [10 + cleanQ, -10 + cleanP]], lineStyle: { color: '#f472b6', type: 'dashed', width: 2 }, symbol: 'none' },
+        { name: '平移需求', type: 'line', data: [[-10 + cleanQ, -10 + cleanP], [10 + cleanQ, 10 + cleanP]], lineStyle: { color: '#86efac', type: 'dashed', width: 2 }, symbol: 'none' },
+        {
+          name: '交點', type: 'scatter', data: [[cleanQ, cleanP]], symbolSize: 15,
+          itemStyle: { color: '#fbbf24', shadowBlur: 10, shadowColor: 'rgba(251, 191, 36, 0.5)' },
+          label: {
+            show: true, formatter: () => `P:${p.toFixed(1)}%\nQ:${q.toFixed(1)}`,
+            position: 'top', color: '#fff', fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.6)', padding: [4, 6], borderRadius: 4
+          }
+        },
+        {
+          type: 'scatter', symbolSize: 0, silent: true,
+          label: { show: true, color: '#9ca3af', fontSize: 20, fontWeight: 'bold', opacity: 0.2 },
+          data: [
+            { value: [-5, 7.5], label: { formatter: '2' } }, { value: [5, 7.5], label: { formatter: '3' } },
+            { value: [5, 2.5], label: { formatter: '4' } }, { value: [-5, 2.5], label: { formatter: '1' } },
+            { value: [-5, -2.5], label: { formatter: '8' } }, { value: [5, -2.5], label: { formatter: '5' } },
+            { value: [5, -7.5], label: { formatter: '6' } }, { value: [-5, -7.5], label: { formatter: '7' } }
+          ]
+        }
+      ]
+    };
+    myChart.setOption(option);
+
+    return () => { myChart.dispose(); };
+  }, [pqModalOpen, activePqTarget, data]);
 
   // 只要缺口設定有變動，就自動同步存入 localStorage
   useEffect(() => {
@@ -6368,6 +6451,39 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     // ✨ 加入 group 讓滑鼠移進圖表時箭頭才會亮起
     <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}>
       <CustomModal modal={chartModal}/>
+      {/* ✨ 8象限買賣供需圖彈跳視窗 (放置在最外層容器內，確保層級最高且絕不被遮擋) */}
+      {pqModalOpen && (
+        <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto" onClick={() => setPqModalOpen(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-4 w-full max-w-md flex flex-col gap-3 relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setPqModalOpen(false)} className="absolute top-2 right-3 text-xl text-slate-400 hover:text-white font-bold">&times;</button>
+            
+            <h3 className="text-lg font-bold flex items-center gap-2 text-slate-100">
+              <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-sm shadow-sm">{stockName}</span>
+              <span>買賣供需圖 ({activePqTarget === 'line1' ? 'L1 缺口日' : 'L2 缺口日'})</span>
+            </h3>
+
+            {(() => {
+              const { p, q } = calculatePQ(gapLevels[activePqTarget].date);
+              return (
+                <div className="flex justify-around text-sm font-mono bg-slate-800 p-2 rounded-lg border border-slate-700">
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">P值 (漲幅)</div>
+                    <div className={`text-lg font-bold font-mono ${p > 0 ? 'text-red-400' : 'text-green-400'}`}>{p.toFixed(2)}%</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">Q值 (量增)</div>
+                    <div className={`text-lg font-bold font-mono ${q > 0 ? 'text-red-400' : 'text-green-400'}`}>{q.toFixed(2)}</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div ref={pqChartRef} className="h-64 w-full bg-slate-950/40 rounded border border-slate-800"></div>
+            
+            <p className="text-[10px] text-center text-slate-500">日期: {gapLevels[activePqTarget].date || '尚未選擇日期'}</p>
+          </div>
+        </div>
+      )}
       
       {/* ✨ 排行榜視窗被安置在全螢幕容器內部，保證絕不會被遮擋 */}
       {rankingModalContent}
@@ -6420,15 +6536,25 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                const activeVal = currentItem ? currentItem[gapLevels[key].priceType] : null;
 
                return (
-                 <div key={key} className="flex items-center gap-1">
+                 <div key={key} className="flex items-center gap-1 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/60">
                    <input type="checkbox" checked={gapLevels[key].active} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} className="accent-pink-500 cursor-pointer w-3 h-3" />
-                   <span className="text-[10px] text-pink-300 font-bold">{key === 'line1' ? 'L1' : 'L2'}</span>
+        
+                   {/* ✨ 點擊 L1 或 L2 的標籤，或旁邊的小按鈕即可直接開啟供需圖！ */}
+                   <span 
+                     onClick={() => { setActivePqTarget(key); setPqModalOpen(true); }}
+                     className="text-[10px] text-pink-300 font-bold cursor-pointer hover:text-purple-400 hover:underline"
+                     title="點擊查看此日期的 8 象限買賣供需圖"
+                   >
+                     {key === 'line1' ? 'L1📊' : 'L2📊'}
+                   </span>
+
                    <select value={gapLevels[key].priceType} onChange={e => {
                      const type = e.target.value;
                      setGapLevels({...gapLevels, [key]: {...gapLevels[key], priceType: type}});
                    }} className="bg-slate-900 text-[10px] text-white p-0.5 rounded cursor-pointer border border-slate-700">
                      <option value="open">開</option><option value="high">高</option><option value="low">低</option><option value="close">收</option>
                    </select>
+        
                    <input type="date" value={gapLevels[key].date || ''} onChange={e => {
                       const date = e.target.value;
                       setGapLevels({...gapLevels, [key]: {...gapLevels[key], date}});
@@ -7290,9 +7416,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {toggles.showHeidun && <text x="80"><tspan fill="#f8fafc" fontWeight="bold">黑頓</tspan></text>}
             {customStrategies.filter(s => s.isActive).map((strat, idx) => <text key={strat.id} x={180 + (idx * 100)}><tspan fill="#4f46e5" fontWeight="bold">{strat.marker}</tspan> {strat.name}</text>)}
           </g>
-          {/* ✨ 修正：使用動態對應當前股票的價位渲染 */}
+          {/* ✨ 雙缺口線動態渲染 */}
           {Object.values(gapLevels).map((l, i) => {
-            const key = i === 0 ? 'line1' : 'line2';
             const currentItem = l.date && data ? data.find(d => d.date === l.date) : null;
             const targetVal = currentItem ? currentItem[l.priceType] : null;
 
