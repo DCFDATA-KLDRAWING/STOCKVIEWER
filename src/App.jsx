@@ -5122,57 +5122,72 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     const chartDom = pqChartRef.current;
     if (!chartDom) return;
 
-    const myChart = window.echarts.init(chartDom, 'dark');
-    
-    let cleanQ = q; if (cleanQ > 10) cleanQ = 10; if (cleanQ < -10) cleanQ = -10;
-    let cleanP = p; if (cleanP > 10) cleanP = 10; if (cleanP < -10) cleanP = -10;
+    // ✨ 蘋果救星：加入 50 毫秒的延遲，確保 iOS/Safari 的 DOM 寬高已經渲染完成才畫圖
+    const renderTimer = setTimeout(() => {
+      // 避免重複初始化
+      let myChart = window.echarts.getInstanceByDom(chartDom);
+      if (!myChart) {
+        myChart = window.echarts.init(chartDom, 'dark');
+      }
+      
+      let cleanQ = q; if (cleanQ > 10) cleanQ = 10; if (cleanQ < -10) cleanQ = -10;
+      let cleanP = p; if (cleanP > 10) cleanP = 10; if (cleanP < -10) cleanP = -10;
 
-    const option = {
-      backgroundColor: 'transparent',
-      grid: { left: '10%', right: '12%', top: '15%', bottom: '15%', containLabel: true },
-      xAxis: {
-        type: 'value', min: -10, max: 10,
-        axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
-        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
-        axisLabel: { color: '#d1d5db', formatter: '{value}' },
-        name: 'Q (量)', nameTextStyle: { color: '#d1d5db' }
-      },
-      yAxis: {
-        type: 'value', min: -10, max: 10,
-        axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
-        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
-        axisLabel: { color: '#d1d5db', formatter: '{value}%' },
-        name: 'P (價)', nameTextStyle: { color: '#d1d5db' }
-      },
-      series: [
-        { name: '供給線', type: 'line', data: [[-10, 10], [10, -10]], lineStyle: { color: '#ef4444', width: 3 }, symbol: 'none' },
-        { name: '需求線', type: 'line', data: [[-10, -10], [10, 10]], lineStyle: { color: '#22c55e', width: 3 }, symbol: 'none' },
-        { name: '平移供給', type: 'line', data: [[-10 + cleanQ, 10 + cleanP], [10 + cleanQ, -10 + cleanP]], lineStyle: { color: '#f472b6', type: 'dashed', width: 2 }, symbol: 'none' },
-        { name: '平移需求', type: 'line', data: [[-10 + cleanQ, -10 + cleanP], [10 + cleanQ, 10 + cleanP]], lineStyle: { color: '#86efac', type: 'dashed', width: 2 }, symbol: 'none' },
-        {
-          name: '交點', type: 'scatter', data: [[cleanQ, cleanP]], symbolSize: 15,
-          itemStyle: { color: '#fbbf24', shadowBlur: 10, shadowColor: 'rgba(251, 191, 36, 0.5)' },
-          label: {
-            show: true, formatter: () => `P:${p.toFixed(1)}%\nQ:${q.toFixed(1)}`,
-            position: 'top', color: '#fff', fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.6)', padding: [4, 6], borderRadius: 4
-          }
+      const option = {
+        backgroundColor: 'transparent',
+        grid: { left: '10%', right: '12%', top: '15%', bottom: '15%', containLabel: true },
+        xAxis: {
+          type: 'value', min: -10, max: 10,
+          axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
+          splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+          axisLabel: { color: '#d1d5db', formatter: '{value}' },
+          name: 'Q (量)', nameTextStyle: { color: '#d1d5db' }
         },
-        {
-          type: 'scatter', symbolSize: 0, silent: true,
-          label: { show: true, color: '#9ca3af', fontSize: 20, fontWeight: 'bold', opacity: 0.2 },
-          data: [
-            { value: [-5, 7.5], label: { formatter: '2' } }, { value: [5, 7.5], label: { formatter: '3' } },
-            { value: [5, 2.5], label: { formatter: '4' } }, { value: [-5, 2.5], label: { formatter: '1' } },
-            { value: [-5, -2.5], label: { formatter: '8' } }, { value: [5, -2.5], label: { formatter: '5' } },
-            { value: [5, -7.5], label: { formatter: '6' } }, { value: [-5, -7.5], label: { formatter: '7' } }
-          ]
-        }
-      ]
-    };
-    myChart.setOption(option);
+        yAxis: {
+          type: 'value', min: -10, max: 10,
+          axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
+          splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+          axisLabel: { color: '#d1d5db', formatter: '{value}%' },
+          name: 'P (價)', nameTextStyle: { color: '#d1d5db' }
+        },
+        series: [
+          { name: '供給線', type: 'line', data: [[-10, 10], [10, -10]], lineStyle: { color: '#ef4444', width: 3 }, symbol: 'none' },
+          { name: '需求線', type: 'line', data: [[-10, -10], [10, 10]], lineStyle: { color: '#22c55e', width: 3 }, symbol: 'none' },
+          { name: '平移供給', type: 'line', data: [[-10 + cleanQ, 10 + cleanP], [10 + cleanQ, -10 + cleanP]], lineStyle: { color: '#f472b6', type: 'dashed', width: 2 }, symbol: 'none' },
+          { name: '平移需求', type: 'line', data: [[-10 + cleanQ, -10 + cleanP], [10 + cleanQ, 10 + cleanP]], lineStyle: { color: '#86efac', type: 'dashed', width: 2 }, symbol: 'none' },
+          {
+            name: '交點', type: 'scatter', data: [[cleanQ, cleanP]], symbolSize: 15,
+            itemStyle: { color: '#fbbf24', shadowBlur: 10, shadowColor: 'rgba(251, 191, 36, 0.5)' },
+            label: {
+              show: true, formatter: () => `P:${p.toFixed(1)}%\nQ:${q.toFixed(1)}`,
+              position: 'top', color: '#fff', fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.6)', padding: [4, 6], borderRadius: 4
+            }
+          },
+          {
+            type: 'scatter', symbolSize: 0, silent: true,
+            label: { show: true, color: '#9ca3af', fontSize: 20, fontWeight: 'bold', opacity: 0.2 },
+            data: [
+              { value: [-5, 7.5], label: { formatter: '2' } }, { value: [5, 7.5], label: { formatter: '3' } },
+              { value: [5, 2.5], label: { formatter: '4' } }, { value: [-5, 2.5], label: { formatter: '1' } },
+              { value: [-5, -2.5], label: { formatter: '8' } }, { value: [5, -2.5], label: { formatter: '5' } },
+              { value: [5, -7.5], label: { formatter: '6' } }, { value: [-5, -7.5], label: { formatter: '7' } }
+            ]
+          }
+        ]
+      };
+      myChart.setOption(option);
+      // 強制重繪確保 Apple 設備吃得到尺寸
+      myChart.resize();
+    }, 50);
 
-    return () => { myChart.dispose(); };
-  }, [pqModalOpen, activePqTarget, data]);
+    return () => { 
+      clearTimeout(renderTimer);
+      const chartInstance = window.echarts.getInstanceByDom(chartDom);
+      if (chartInstance) {
+        chartInstance.dispose(); 
+      }
+    };
+  }, [pqModalOpen, activePqTarget, data, gapLevels]);
 
   // 只要缺口設定有變動，就自動同步存入 localStorage
   useEffect(() => {
@@ -6459,7 +6474,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             
             <h3 className="text-lg font-bold flex items-center gap-2 text-slate-100">
               <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-sm shadow-sm">{stockName}</span>
-              <span>買賣供需圖 ({activePqTarget === 'line1' ? 'L1 ' : 'L2 '})</span>
+              <span>買賣供需圖 ({activePqTarget === 'line1' ? 'L1' : 'L2'})</span>
             </h3>
 
             {(() => {
@@ -6478,7 +6493,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
               );
             })()}
 
-            <div ref={pqChartRef} className="h-64 w-full bg-slate-950/40 rounded border border-slate-800"></div>
+            {/* ✨ 蘋果救星：強制設定 minHeight 與 shrink-0 避免 Safari 壓縮 Canvas */}
+            <div ref={pqChartRef} className="h-64 min-h-[256px] shrink-0 w-full bg-slate-950/40 rounded border border-slate-800 relative"></div>
             
             <p className="text-[10px] text-center text-slate-500">日期: {gapLevels[activePqTarget].date || '尚未選擇日期'}</p>
           </div>
