@@ -6459,7 +6459,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             
             <h3 className="text-lg font-bold flex items-center gap-2 text-slate-100">
               <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-sm shadow-sm">{stockName}</span>
-              <span>買賣供需圖 ({activePqTarget === 'line1' ? 'L1 缺口日' : 'L2 缺口日'})</span>
+              <span>買賣供需圖 ({activePqTarget === 'line1' ? 'L1 ' : 'L2 '})</span>
             </h3>
 
             {(() => {
