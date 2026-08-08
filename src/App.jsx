@@ -4450,8 +4450,9 @@ const App = () => {
                 timeframe={timeframe}
                 stockName={displayFullname} 
                 toggles={toggles}
+                isFocusMode={isFocusMode}
                 focusModeDate={focusModeDate}
-                                   setFocusModeDate={setFocusModeDate}
+                setFocusModeDate={setFocusModeDate}
                 onToggleCrosshair={() => handleToggle('showCrosshair')} 
                 customStrategies={customStrategies} 
                 maParams={maParams}
@@ -5078,8 +5079,9 @@ const MetricSelector = ({ value, onChange }) => (
     </div>
   </div>
 );
+
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
