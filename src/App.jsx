@@ -2304,15 +2304,19 @@ const App = () => {
   const [sarParams, setSarParams] = useState({ start: 0.02, step: 0.02, max: 0.20 });
   
   // ✨ 新增：走圖專注模式
-  const [isFocusMode, setIsFocusMode] = useState(false);
-  const [focusDays, setFocusDays] = useState(60); // 預設顯示近 60 天
+  const [isFocusMode, setIsFocusMode] = useState(false);  
+  const [focusModeDate, setFocusModeDate] = useState('');// ✨ 新增：走圖專注模式的目標日期
   
-  // ✨ 走圖模式資料過濾器：只保留近 N 日的指標與策略圖示，讓畫面保持乾淨
+  
+  // ✨ 走圖模式資料過濾器：只保留「指定日期之後」的指標與策略圖示，讓畫面保持乾淨
   const displayKlineData = React.useMemo(() => {
-    if (!isFocusMode || klineData.length === 0) return klineData;
-    return klineData.map((d, i) => {
-      // 在近 N 日內的資料，原封不動保留
-      if (i >= klineData.length - focusDays) return d;
+    // 如果沒開專注模式，或者還沒選日期，就顯示全部
+    if (!isFocusMode || !focusModeDate || klineData.length === 0) return klineData;
+    
+    return klineData.map((d) => {
+      // 在設定日期「之後 (含當天)」的資料，原封不動保留
+      if (d.date >= focusModeDate) return d;
+      
       // 過去的資料：清除指標與策略標記，只留下純 K 線
       return {
         ...d,
@@ -2324,7 +2328,7 @@ const App = () => {
         customRenderMarks: [] // 清除策略橫線/文字
       };
     });
-  }, [klineData, isFocusMode, focusDays]);
+  }, [klineData, isFocusMode, focusModeDate]); // 這裡依賴項改成 focusModeDate
 
   // 4. 自訂策略清單記憶
   const [customStrategies, setCustomStrategies] = useState(() => {
@@ -4275,15 +4279,21 @@ const App = () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
-                  {/* ✨ 新增：走圖專注模式 (近N日顯示) */}
+                  {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
                       <input type="checkbox" checked={isFocusMode} onChange={(e) => setIsFocusMode(e.target.checked)} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" />
                       <span className="text-xs text-emerald-400 font-bold">走圖專注模式</span>
                     </label>
-                    <span className="text-[10px] text-slate-400 ml-1">僅顯示近</span>
-                    <input type="number" step="1" value={focusDays} onChange={(e) => setFocusDays(Number(e.target.value))} className="w-12 bg-slate-900 border border-slate-600 rounded text-emerald-300 text-[10px] text-center outline-none focus:border-emerald-500 font-bold px-0.5 py-0.5" title="顯示天數" />
-                    <span className="text-[10px] text-slate-400">日的指標與策略</span>
+                    <span className="text-[10px] text-slate-400 ml-1">僅顯示</span>
+                    <input 
+                      type="date" 
+                      value={focusModeDate || ''} 
+                      onChange={(e) => setFocusModeDate(e.target.value)} 
+                      className="bg-slate-900 border border-slate-600 rounded text-emerald-300 text-[10px] text-center outline-none focus:border-emerald-500 font-bold px-1 py-0.5 cursor-pointer" 
+                      title="選擇起始日期" 
+                    />
+                    <span className="text-[10px] text-slate-400">之後的指標與策略</span>
                   </div>
                   {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
@@ -4440,6 +4450,8 @@ const App = () => {
                 timeframe={timeframe}
                 stockName={displayFullname} 
                 toggles={toggles}
+                focusModeDate={focusModeDate}
+                                   setFocusModeDate={setFocusModeDate}
                 onToggleCrosshair={() => handleToggle('showCrosshair')} 
                 customStrategies={customStrategies} 
                 maParams={maParams}
@@ -5067,7 +5079,7 @@ const MetricSelector = ({ value, onChange }) => (
   </div>
 );
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -7079,16 +7091,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {data.map((d, i) => {
               const x = padding + (i + offsetBars) * spacing + spacing / 2;
               const color = d.close >= d.open ? '#ef4444' : '#22c55e';
+              // ✨ 核心邏輯：判斷是否需要隱藏此根 K 棒的訊號
+                               // 如果開啟專注模式，且有設定日期，且這根 K 棒的日期「小於」設定日，就隱藏
+                               const hideSignals = isFocusMode && focusModeDate && d.date < focusModeDate;
               return (
                 <g key={`candle-${i}`}>
                   <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
                   <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
                   {/* ✨ 補回：黑頓與自訂策略標記 (含升級版畫線與價格功能) */}
                   <g textAnchor="middle" fontSize="12" fontWeight="bold">
-                    {toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
+                    {!hideSignals && toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
                     
                     {/* 讀取升級版的 customRenderMarks 來畫圖 */}
-                    {(d.customRenderMarks || (d.customMarks ? d.customMarks.map(m => ({ displayStyle: 'marker', marker: m })) : [])).map((markObj, mIdx) => {
+                    {!hideSignals && (d.customRenderMarks || (d.customMarks ? d.customMarks.map(m => ({ displayStyle: 'marker', marker: m })) : [])).map((markObj, mIdx) => {
                       if (markObj.displayStyle === 'line') {
                         const markY = getY(markObj.priceVal);
                         return (
@@ -7151,7 +7166,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     })}
                   </g>
                   {/* ✨ 補回：起漲標記 */}
-                  {toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
+                  {!hideSignals && toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
                   {/* 獨立開關的 MA 圓點 */}
                   {toggles.showMA && maParams?.ma1?.show !== false && i === data.length - (maParams?.ma1?.p || 5) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma1?.c || '#ef4444'} />}
                   {toggles.showMA && maParams?.ma2?.show !== false && i === data.length - (maParams?.ma2?.p || 10) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma2?.c || '#eab308'} />}
