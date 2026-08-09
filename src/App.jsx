@@ -6573,7 +6573,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
            {/* ✨ 直接把缺口線設定器塞在這裡！ */}
            <div className="flex items-center gap-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 shrink-0">
-             <span className="text-[10px] font-bold text-slate-400">切口：</span>
+             <span className="text-[10px] font-bold text-slate-400">切口/供需圖：</span>
              {['line1', 'line2'].map(key => {
                // ✨ 智慧動態計算：不管切到哪一檔股票，只要有存日期，就自動去當前資料中找出該日期的價位！
                const currentItem = gapLevels[key].date && data ? data.find(d => d.date === gapLevels[key].date) : null;
