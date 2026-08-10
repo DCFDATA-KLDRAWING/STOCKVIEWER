@@ -2204,7 +2204,7 @@ const App = () => {
   const [symbolInput, setSymbolInput] = useState(''); 
   const [currentViewedSymbol, setCurrentViewedSymbol] = useState(''); // ✨ 新增：用來記錄目前「成功載入並顯示在圖表上」的股號
   const [issuedShares, setIssuedShares] = useState(''); 
-  const [displayCount, setDisplayCount] = useState(120);
+  const [displayCount, setDisplayCount] = useState(60);
   const [timeframe, setTimeframe] = useState('D');
   
   // ✨ 新增副圖指標狀態 (預設關閉 None)
@@ -5475,8 +5475,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         else if (chartContainerRef.current.webkitRequestFullscreen) await chartContainerRef.current.webkitRequestFullscreen();
         if (window.screen && window.screen.orientation && window.screen.orientation.lock) { try { await window.screen.orientation.lock('landscape'); } catch (e) {} }
         
-        // ✨ 進入橫向時，自動載入 240 根 K 線
-        setDisplayCount(240);
+        // ✨ 進入橫向時，自動載入 120 根 K 線
+        setDisplayCount(120);
 
       } catch (err) { setIsFullscreen(!isFullscreen); }
     } else {
@@ -5484,8 +5484,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
       if (window.screen && window.screen.orientation && window.screen.orientation.unlock) { try { window.screen.orientation.unlock(); } catch (e) {} }
       
-      // ✨ 退出橫向時，恢復你原本的 120 根
-      setDisplayCount(120);
+      // ✨ 退出橫向時，恢復你原本的 60 根
+      setDisplayCount(60);
     }
   };
 
