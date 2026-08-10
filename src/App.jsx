@@ -5089,7 +5089,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
   
-  const extraCandles = 50;
+  const extraCandles = 15;
   // ✨ 關鍵修正：總格數取「資料長度」與「檢視視角 (displayCount)」的最大值，確保放大視角時畫布絕對不會崩塌
   const totalSlots = data.length + extraCandles;
 
