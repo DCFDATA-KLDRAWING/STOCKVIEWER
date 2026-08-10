@@ -3409,7 +3409,27 @@ const App = () => {
         throw new Error(`⚠️ 找不到 ${targetSymbol} 的歷史股價資料，可能是此股在資料庫中無紀錄或暫無交易資料。`);
       }
 
-      setRawDailyData(mergedCandles);
+      // 🛡️ Android 專用防護罩：強力淨化資料，將所有可能造成手機 SVG 崩潰的 NaN 轉為 0
+      const sanitizedCandles = mergedCandles.map(c => ({
+        ...c,
+        open: Number(c.open) || 0,
+        high: Number(c.high) || 0,
+        low: Number(c.low) || 0,
+        close: Number(c.close) || 0,
+        volume: Number(c.volume) || 0,
+        foreign: Number(c.foreign) || 0,
+        trust: Number(c.trust) || 0,
+        dealer: Number(c.dealer) || 0,
+        marginDiff: Number(c.marginDiff) || 0,
+        shortDiff: Number(c.shortDiff) || 0,
+        revYoY: Number(c.revYoY) || 0,
+        revMoM: Number(c.revMoM) || 0,
+        eps: Number(c.eps) || 0,
+        eps4q: Number(c.eps4q) || 0,
+        grossMargin: Number(c.grossMargin) || 0
+      })).filter(c => c.close > 0);
+
+      setRawDailyData(sanitizedCandles); // 👈 這裡改放淨化後的 sanitizedCandles！
       setCurrentViewedSymbol(targetInput);
       setSymbolInput(''); 
 
