@@ -5093,8 +5093,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   // ✨ 關鍵修正：總格數取「資料長度」與「檢視視角 (displayCount)」的最大值，確保放大視角時畫布絕對不會崩塌
   const totalSlots = Math.max(data.length, displayCount) + extraCandles;
 
-  // ✨ 智慧對齊：當檢視視角大於資料長度時，自動向右靠齊最新 K 棒，不留空白
-  const offsetBars = 0;
+  // ✨ 完美對齊機制：當檢視視角大於資料長度時，自動將畫面推向右側最新 K 棒，絕不留白
+  const offsetBars = Math.max(0, displayCount - data.length);
   
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
   const [gapLevels, setGapLevels] = useState(() => {
@@ -5275,6 +5275,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   }, [data.length, timeframe]);
 
   // ✨ 動態調整畫布寬度與視角縮放，確保 30 根到 500 根的 K 棒間距永遠清晰舒適、絕不擠壓
+  // ✨ 完美等比例縮放與自動撐滿寬度引擎
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -5285,12 +5286,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       
       setChartHeight(ch); 
 
-      // 💡 關鍵：畫布寬度必須根據您當前選擇的顯示根數 (displayCount) 來動態放大
-      // 這樣當您調到 330 根或 500 根時，畫布會自動變寬，K 棒之間才會有足夠的像素展開！
-      const minBarSpacing = 8; // 每根 K 棒保證至少有 8 像素的舒服間距
-      const dynamicWidth = Math.max(cw, totalSlots * minBarSpacing, (cw / displayCount) * totalSlots);
+      const currentDataLen = data ? data.length : 0;
+      const currentSlots = Math.max(currentDataLen, displayCount) + 10;
       
-      setChartWidth(dynamicWidth);
+      // ✨ 關鍵：直接用視角比例計算寬度，讓 K 棒自動撐滿橫式螢幕，絕不留白
+      const calculatedWidth = (cw / displayCount) * currentSlots; 
+      
+      setChartWidth(Math.max(cw, calculatedWidth));
     };
 
     const observer = new ResizeObserver(() => updateSize());
@@ -5298,7 +5300,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     updateSize();
 
     return () => observer.disconnect();
-  }, [displayCount, totalSlots]);
+  }, [displayCount, data?.length]);
 
   // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
   const [yAxis, setYAxis] = useState({ min: null, max: null, symbol: realSymbol });
@@ -5321,7 +5323,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     }, 500);
 
     const handleScrollUpdate = () => {
-      const offsetBars = 0;
+      const offsetBars = Math.max(0, displayCount - data.length); // 👈 改為動態對齊
       const scrollX = container.scrollLeft;
       const clientW = container.clientWidth;
       const scrollW = container.scrollWidth;
@@ -5574,10 +5576,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const getY = (p) => mainHeight - 20 - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - 20 - chartPaddingTop);
   const getVolY = (v) => volHeight - (v / maxVol) * volHeight;
   
-  // ✨ 改用左右獨立的 paddingLeft 與 paddingRight
   const spacing = (width - paddingLeft - paddingRight) / totalSlots; 
-  const candleWidth = Math.max(2, spacing * 0.85); // 確保 K 棒寬度至少 2 像素 
-  
+  const candleWidth = Math.max(0.5, spacing * 0.85);
 
   // ✨ 更新畫線工具的輔助函數 (把 padding 改成 paddingLeft)
   const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
