@@ -5385,13 +5385,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         const scrollW = container.scrollWidth;
         const clientW = container.clientWidth;
         
-        const extraCandles = 2; // 👈 配合我們剛剛改好的 2 根空白
-        const totalSlots = data.length + extraCandles;
-        const singleSlotWidth = scrollW / totalSlots;
-        const extraWidth = extraCandles * singleSlotWidth;
-
-        const maxScroll = scrollW - clientW; 
-        container.scrollLeft = Math.max(0, Math.ceil(maxScroll - extraWidth));
+        // ✨ 因為總格數已經把 2 根空白計算在內，直接滾動到最右側底部即可完美對齊！
+        container.scrollLeft = scrollW - clientW;
         
         container.dispatchEvent(new Event('scroll'));
       };
