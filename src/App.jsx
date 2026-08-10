@@ -5380,7 +5380,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         const scrollW = container.scrollWidth;
         const clientW = container.clientWidth;
         
-        const totalSlots = data.length + 10; 
+        // ✨ 關鍵同步：總格數必須與畫布總寬度計算完全一致！
+        const totalSlots = Math.max(data.length, displayCount) + 10; 
         const singleSlotWidth = scrollW / totalSlots;
         const extraWidth = 10 * singleSlotWidth;
 
@@ -5391,8 +5392,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         container.dispatchEvent(new Event('scroll'));
       };
 
-      // 🏆 終極連環技：為了對抗手機瀏覽器排版延遲，我們在 50ms, 150ms, 300ms 各對齊一次！
-      // 確保不管手機性能如何、畫面有沒有被卡住，最後一定會對準最右側，並拿到精準的 Y 軸極值！
       const t1 = setTimeout(alignChart, 50);
       const t2 = setTimeout(alignChart, 150);
       const t3 = setTimeout(alignChart, 300);
@@ -5536,16 +5535,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     mainHeight = totalSVGHeight - volHeight - indicatorHeight - bottomLegendHeight;
   }
 
-  // ✨ 動態計算額外的空白 K 棒數 (預留 15% 空間給未來畫線用)
   const extraCandles = 10;
-  const totalSlots = data.length + extraCandles;
+  // ✨ 關鍵修正：總格數取「資料長度」與「檢視視角 (displayCount)」的最大值，確保放大視角時畫布絕對不會崩塌
+  const totalSlots = Math.max(data.length, displayCount) + extraCandles;
 
-  // ✨ 找出「預設可見範圍」的最大最小 (作為切換股票瞬間的完美備胎)
+  // ✨ 智慧對齊：當檢視視角大於資料長度時，自動向右靠齊最新 K 棒，不留空白
+  const offsetBars = Math.max(0, displayCount - data.length);
+
   let defaultMax = -Infinity; let defaultMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  // 💡 終極數學修正：畫面上顯示的真實 K 棒就是 displayCount 根！(未來的 10 根空白被推到畫面右外側了)
-  // 不扣除任何數量，確保畫面上的極值被 100% 完美包覆！
   const latestData = data.slice(Math.max(0, data.length - displayCount));
   
   latestData.forEach((d) => { 
@@ -5580,8 +5579,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   // ✨ 改用左右獨立的 paddingLeft 與 paddingRight
   const spacing = (width - paddingLeft - paddingRight) / totalSlots; 
   const candleWidth = Math.max(0.5, spacing * 0.90); 
-  // 🛡️ 智慧對齊防呆：當歷史資料大於顯示根數時，自動向右靠齊最新 K 棒；若資料不夠多則貼左，絕不留大片空白
-  const offsetBars = Math.max(0, displayCount - data.length);
+  
 
   // ✨ 更新畫線工具的輔助函數 (把 padding 改成 paddingLeft)
   const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
