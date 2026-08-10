@@ -5376,14 +5376,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length]);
 
 
-  // ✨ 升級版自動滾動：精準鎖定最新 K 棒，右側完美保留 2 根空白空間
+  // ✨ 精準對齊最新 K 棒：計算最新一根 K 棒的座標，讓右側完美剛好留 2 根空白
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (container && !isFullChart && data && data.length > 0) {
       
       const alignChart = () => {
-        // 💡 終極安全對齊：直接給予一個超越極限的捲動值，瀏覽器會自動幫你卡在最右側底端，絕對不會失敗！
-        container.scrollLeft = 999999;
+        const clientW = container.clientWidth;
+        const totalSlots = data.length + 2; // 資料長度 + 2 根空白
+        const scrollW = (container.scrollWidth || (totalSlots * ((container.clientWidth || 1200) / displayCount)));
+        
+        // 算出每根 K 棒的寬度，並讓最新一根 K 棒剛好停在畫面右側 (扣掉 2 根空白的距離)
+        const singleSlotWidth = scrollW / totalSlots;
+        const targetScrollLeft = scrollW - clientW - (singleSlotWidth * 2);
+        
+        container.scrollLeft = Math.max(0, targetScrollLeft);
         
         container.dispatchEvent(new Event('scroll'));
       };
