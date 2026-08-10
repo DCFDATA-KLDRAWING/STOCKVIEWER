@@ -5580,8 +5580,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   // ✨ 改用左右獨立的 paddingLeft 與 paddingRight
   const spacing = (width - paddingLeft - paddingRight) / totalSlots; 
   const candleWidth = Math.max(0.5, spacing * 0.90); 
-  // 🛡️ 防呆修正：當顯示根數大於資料總長度時，不進行強制位移，確保 K 棒永遠乖乖留在畫布左側起點
-  const offsetBars = 0;
+  // 🛡️ 智慧對齊防呆：當歷史資料大於顯示根數時，自動向右靠齊最新 K 棒；若資料不夠多則貼左，絕不留大片空白
+  const offsetBars = Math.max(0, displayCount - data.length);
 
   // ✨ 更新畫線工具的輔助函數 (把 padding 改成 paddingLeft)
   const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
