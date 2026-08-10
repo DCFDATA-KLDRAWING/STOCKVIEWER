@@ -7623,8 +7623,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             </g>
           )}
         </svg>
-      </div>     
-    </div> 
+      </div>
+    </div>     
+  </div> 
   );
 };
 
