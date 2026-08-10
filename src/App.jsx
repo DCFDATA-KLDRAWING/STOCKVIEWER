@@ -5282,10 +5282,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       const currentExtra = 10;
       const totalSlots = currentDataLen + currentExtra;
       
-      // 🛡️ 安全保護：自動判斷你是否有兩指縮放功能，沒有也不會當機！
-      const currentScale = typeof zoomScale !== 'undefined' ? zoomScale : 1;
-      const calculatedWidth = (cw / displayCount) * totalSlots * currentScale; 
+      // ✨ 關鍵修復：每一根 K 棒的固定基本寬度 (例如 12px)，確保總寬度隨著歷史資料長度 (1200天) 完整展開！
+      const baseBarWidth = 12; 
+      const calculatedWidth = totalSlots * baseBarWidth; 
       
+      // 確保畫布寬度至少要填滿螢幕容器 (cw)，如果資料很多則依總 K 棒長度向右延伸
       setChartWidth(Math.max(cw, calculatedWidth));
     };
 
@@ -5293,9 +5294,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     observer.observe(container);
     updateSize();
 
-    // 🛡️ 將 zoomScale 移出依賴陣列，徹底防止黑畫面
     return () => observer.disconnect();
-  }, [displayCount, data ? data.length : 0]);
+  }, [data?.length]); // 依賴資料長度即可
 
   // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
   const [yAxis, setYAxis] = useState({ min: null, max: null, symbol: realSymbol });
