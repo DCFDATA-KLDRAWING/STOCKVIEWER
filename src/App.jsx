@@ -5382,11 +5382,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     if (container && !isFullChart && data && data.length > 0) {
       
       const alignChart = () => {
-        const scrollW = container.scrollWidth;
-        const clientW = container.clientWidth;
-        
-        // ✨ 因為總格數已經把 2 根空白計算在內，直接滾動到最右側底部即可完美對齊！
-        container.scrollLeft = scrollW - clientW;
+        // 💡 終極安全對齊：直接給予一個超越極限的捲動值，瀏覽器會自動幫你卡在最右側底端，絕對不會失敗！
+        container.scrollLeft = 999999;
         
         container.dispatchEvent(new Event('scroll'));
       };
