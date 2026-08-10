@@ -5591,17 +5591,27 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const totalSlots = data.length + extraCandles;
 
   // ✨ 找出「預設可見範圍」的最大最小 (作為切換股票瞬間的完美備胎)
-  let defaultMax = -Infinity; let defaultMin = Infinity;
+  // 🛡️ 絕對安全防護：預設安全的初始值，徹底防止 -Infinity / Infinity / NaN 導致 Android 手機黑屏
+  let defaultMax = 100; 
+  let defaultMin = 0;
+  
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  // 💡 終極數學修正：畫面上顯示的真實 K 棒就是 displayCount 根！(未來的 10 根空白被推到畫面右外側了)
-  // 不扣除任何數量，確保畫面上的極值被 100% 完美包覆！
-  const latestData = data.slice(Math.max(0, data.length - displayCount));
-  
-  latestData.forEach((d) => { 
-      if (d.high > defaultMax) { defaultMax = d.high; } 
-      if (d.low < defaultMin) { defaultMin = d.low; } 
-  });
+  const latestData = data ? data.slice(Math.max(0, data.length - displayCount)) : [];
+
+  if (latestData.length > 0) {
+      const validHighs = latestData.map(d => Number(d.high)).filter(v => !isNaN(v) && isFinite(v));
+      const validLows = latestData.map(d => Number(d.low)).filter(v => !isNaN(v) && isFinite(v));
+      
+      if (validHighs.length > 0) defaultMax = Math.max(...validHighs);
+      if (validLows.length > 0) defaultMin = Math.min(...validLows);
+  }
+
+  // 避免最高最低價完全相同導致除以零錯誤
+  if (defaultMax === defaultMin) {
+      defaultMax += 1;
+      defaultMin -= 1;
+  }
 
   // ✨ 終極動態 Y 軸：檢查 Y 軸記憶是不是屬於目前這檔股票的？
   // 如果是舊股票的記憶殘留，我們就「無視它」，直接使用剛算好的 default 完美備胎！
