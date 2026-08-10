@@ -3133,6 +3133,7 @@ const App = () => {
 
       if (isIntra || isIndex) {
           // ─── 模式 A：分K「與」大盤指數 強制使用富果 ───
+          // 分K抓30天，大盤日K抓360天 (富果極限)
           fromDate.setDate(toDate.getDate() - (isIntra ? 30 : 360));
           const apiTf = isIntra ? currentTf : 'D';
           const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=${apiTf}&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
@@ -3146,55 +3147,27 @@ const App = () => {
               open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000)
           }));
       } else {
-          // ─── 模式 B：日K優先嘗試使用 FinMind 抓取 1200 天超長歷史 ───
-          try {
-              fromDate.setDate(toDate.getDate() - 1200); 
-              let priceUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${targetSymbol}&start_date=${fromDate.toISOString().split('T')[0]}`;
-              if (finmindApiKey) priceUrl += `&token=${finmindApiKey}`;
+          // ─── 模式 B：日K/週K/月K 切換成 FinMind (抓取 1200 天超長歷史！) ───
+          fromDate.setDate(toDate.getDate() - 1200); // ✨ 往前推約 3 年多
+          let priceUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${targetSymbol}&start_date=${fromDate.toISOString().split('T')[0]}`;
+          if (finmindApiKey) priceUrl += `&token=${finmindApiKey}`;
 
-              const priceRes = await fetch(priceUrl);
-              if (priceRes.ok) {
-                  const priceJson = await priceRes.json();
-                  if (priceJson.data && priceJson.data.length > 0) {
-                      const validData = priceJson.data.filter(d => d.Trading_Volume > 0);
-                      candles = validData.map(d => ({
-                          date: d.date,
-                          open: d.open,
-                          high: d.max,  
-                          low: d.min,   
-                          close: d.close,
-                          volume: Math.round(d.Trading_Volume / 1000) 
-                      }));
-                  }
-              }
-          } catch (fmErr) {
-              console.warn("FinMind 抓取失敗，準備啟動富果備援...", fmErr);
-          }
+          const priceRes = await fetch(priceUrl);
+          if (!priceRes.ok) throw new Error("FinMind 股價歷史資料異常");
+          const priceJson = await priceRes.json();
 
-          // ─── 模式 C (備援防護罩)：如果 FinMind 抓不到（例如南亞科），自動改用富果日K補抓！ ───
-          if (!candles || candles.length === 0) {
-              console.log(`🔄 啟動富果備援機制：正在為您抓取 ${targetSymbol} 的歷史資料...`);
+          if (priceJson.data) {
+              const validData = priceJson.data.filter(d => d.Trading_Volume > 0);
               
-              fromDate.setDate(toDate.getDate() - 360); // 富果日K抓取 360 天
-              const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=D&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
-              
-              const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
-              if (histRes.ok) {
-                  const histData = await histRes.json();
-                  if (histData && histData.data) {
-                      candles = histData.data.reverse().map(d => ({
-                          date: d.date,
-                          open: d.open, high: d.high, low: d.low, close: d.close, 
-                          volume: Math.round(d.volume / 1000)
-                      }));
-                  }
-              }
+              candles = validData.map(d => ({
+                  date: d.date,
+                  open: d.open,
+                  high: d.max,  
+                  low: d.min,   
+                  close: d.close,
+                  volume: Math.round(d.Trading_Volume / 1000) 
+              }));
           }
-      }
-
-      // 🛡️ 最終安全防呆：如果兩邊都完全沒資料，安全阻擋並跳出提示，絕對不讓畫面黑屏當掉
-      if (!candles || candles.length === 0) {
-          throw new Error(`⚠️ 找不到代號 (${targetSymbol}) 的歷史股價資料，可能是此股在資料庫中無紀錄。`);
       }
 
       // ✨ 日K/週K/月K 才需要去抓當日即時報價來補最後一根，分K本身就已經很即時了
@@ -3404,32 +3377,11 @@ const App = () => {
           };
       });
 
-      // 🛡️ 致命防呆：檢查撈出來的 K 棒資料是不是空的！
-      if (!mergedCandles || mergedCandles.length === 0) {
-        throw new Error(`⚠️ 找不到 ${targetSymbol} 的歷史股價資料，可能是此股在資料庫中無紀錄或暫無交易資料。`);
-      }
+      setRawDailyData(mergedCandles);
+      // ==========================================
+      // ✨ [FinMind 融合區塊] 結束
+      // ==========================================
 
-      // 🛡️ Android 專用防護罩：強力淨化資料，將所有可能造成手機 SVG 崩潰的 NaN 轉為 0
-      const sanitizedCandles = mergedCandles.map(c => ({
-        ...c,
-        open: Number(c.open) || 0,
-        high: Number(c.high) || 0,
-        low: Number(c.low) || 0,
-        close: Number(c.close) || 0,
-        volume: Number(c.volume) || 0,
-        foreign: Number(c.foreign) || 0,
-        trust: Number(c.trust) || 0,
-        dealer: Number(c.dealer) || 0,
-        marginDiff: Number(c.marginDiff) || 0,
-        shortDiff: Number(c.shortDiff) || 0,
-        revYoY: Number(c.revYoY) || 0,
-        revMoM: Number(c.revMoM) || 0,
-        eps: Number(c.eps) || 0,
-        eps4q: Number(c.eps4q) || 0,
-        grossMargin: Number(c.grossMargin) || 0
-      })).filter(c => c.close > 0);
-
-      setRawDailyData(sanitizedCandles); // 👈 這裡改放淨化後的 sanitizedCandles！
       setCurrentViewedSymbol(targetInput);
       setSymbolInput(''); 
 
@@ -5591,27 +5543,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const totalSlots = data.length + extraCandles;
 
   // ✨ 找出「預設可見範圍」的最大最小 (作為切換股票瞬間的完美備胎)
-  // 🛡️ 絕對安全防護：預設安全的初始值，徹底防止 -Infinity / Infinity / NaN 導致 Android 手機黑屏
-  let defaultMax = 100; 
-  let defaultMin = 0;
-  
+  let defaultMax = -Infinity; let defaultMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  const latestData = data ? data.slice(Math.max(0, data.length - displayCount)) : [];
-
-  if (latestData.length > 0) {
-      const validHighs = latestData.map(d => Number(d.high)).filter(v => !isNaN(v) && isFinite(v));
-      const validLows = latestData.map(d => Number(d.low)).filter(v => !isNaN(v) && isFinite(v));
-      
-      if (validHighs.length > 0) defaultMax = Math.max(...validHighs);
-      if (validLows.length > 0) defaultMin = Math.min(...validLows);
-  }
-
-  // 避免最高最低價完全相同導致除以零錯誤
-  if (defaultMax === defaultMin) {
-      defaultMax += 1;
-      defaultMin -= 1;
-  }
+  // 💡 終極數學修正：畫面上顯示的真實 K 棒就是 displayCount 根！(未來的 10 根空白被推到畫面右外側了)
+  // 不扣除任何數量，確保畫面上的極值被 100% 完美包覆！
+  const latestData = data.slice(Math.max(0, data.length - displayCount));
+  
+  latestData.forEach((d) => { 
+      if (d.high > defaultMax) { defaultMax = d.high; } 
+      if (d.low < defaultMin) { defaultMin = d.low; } 
+  });
 
   // ✨ 終極動態 Y 軸：檢查 Y 軸記憶是不是屬於目前這檔股票的？
   // 如果是舊股票的記憶殘留，我們就「無視它」，直接使用剛算好的 default 完美備胎！
@@ -7623,9 +7565,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             </g>
           )}
         </svg>
-      </div>
-    </div>     
-  </div> 
+      </div>  
+     </div>
+    </div> 
   );
 };
 
