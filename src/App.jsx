@@ -5376,25 +5376,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length]);
 
 
-  // ✨ 自動滾動到最右側 (完美保留 10 根 K 棒留白空間)
+  // ✨ 升級版自動滾動：精準鎖定最新 K 棒，右側完美保留 2 根空白空間
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (container && !isFullChart && data && data.length > 0) {
       
-      // 我們把對齊的邏輯包裝成一個絕招
       const alignChart = () => {
         const scrollW = container.scrollWidth;
         const clientW = container.clientWidth;
         
-        // ✨ 關鍵同步：總格數必須與畫布總寬度計算完全一致！
-        const totalSlots = Math.max(data.length, displayCount) + 10; 
+        const extraCandles = 2; // 👈 配合我們剛剛改好的 2 根空白
+        const totalSlots = data.length + extraCandles;
         const singleSlotWidth = scrollW / totalSlots;
-        const extraWidth = 10 * singleSlotWidth;
+        const extraWidth = extraCandles * singleSlotWidth;
 
         const maxScroll = scrollW - clientW; 
         container.scrollLeft = Math.max(0, Math.ceil(maxScroll - extraWidth));
         
-        // 強制發送滾動通知，喚醒 Y 軸引擎立刻重算高度！
         container.dispatchEvent(new Event('scroll'));
       };
 
