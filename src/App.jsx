@@ -2304,15 +2304,19 @@ const App = () => {
   const [sarParams, setSarParams] = useState({ start: 0.02, step: 0.02, max: 0.20 });
   
   // ✨ 新增：走圖專注模式
-  const [isFocusMode, setIsFocusMode] = useState(false);
-  const [focusDays, setFocusDays] = useState(60); // 預設顯示近 60 天
+  const [isFocusMode, setIsFocusMode] = useState(false);  
+  const [focusModeDate, setFocusModeDate] = useState('');// ✨ 新增：走圖專注模式的目標日期
   
-  // ✨ 走圖模式資料過濾器：只保留近 N 日的指標與策略圖示，讓畫面保持乾淨
+  
+  // ✨ 走圖模式資料過濾器：只保留「指定日期之後」的指標與策略圖示，讓畫面保持乾淨
   const displayKlineData = React.useMemo(() => {
-    if (!isFocusMode || klineData.length === 0) return klineData;
-    return klineData.map((d, i) => {
-      // 在近 N 日內的資料，原封不動保留
-      if (i >= klineData.length - focusDays) return d;
+    // 如果沒開專注模式，或者還沒選日期，就顯示全部
+    if (!isFocusMode || !focusModeDate || klineData.length === 0) return klineData;
+    
+    return klineData.map((d) => {
+      // 在設定日期「之後 (含當天)」的資料，原封不動保留
+      if (d.date >= focusModeDate) return d;
+      
       // 過去的資料：清除指標與策略標記，只留下純 K 線
       return {
         ...d,
@@ -2324,7 +2328,7 @@ const App = () => {
         customRenderMarks: [] // 清除策略橫線/文字
       };
     });
-  }, [klineData, isFocusMode, focusDays]);
+  }, [klineData, isFocusMode, focusModeDate]); // 這裡依賴項改成 focusModeDate
 
   // 4. 自訂策略清單記憶
   const [customStrategies, setCustomStrategies] = useState(() => {
@@ -3129,7 +3133,6 @@ const App = () => {
 
       if (isIntra || isIndex) {
           // ─── 模式 A：分K「與」大盤指數 強制使用富果 ───
-          // 分K抓30天，大盤日K抓360天 (富果極限)
           fromDate.setDate(toDate.getDate() - (isIntra ? 30 : 360));
           const apiTf = isIntra ? currentTf : 'D';
           const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=${apiTf}&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
@@ -3143,27 +3146,55 @@ const App = () => {
               open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000)
           }));
       } else {
-          // ─── 模式 B：日K/週K/月K 切換成 FinMind (抓取 1200 天超長歷史！) ───
-          fromDate.setDate(toDate.getDate() - 1200); // ✨ 往前推約 3 年多
-          let priceUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${targetSymbol}&start_date=${fromDate.toISOString().split('T')[0]}`;
-          if (finmindApiKey) priceUrl += `&token=${finmindApiKey}`;
+          // ─── 模式 B：日K優先嘗試使用 FinMind 抓取 1200 天超長歷史 ───
+          try {
+              fromDate.setDate(toDate.getDate() - 1200); 
+              let priceUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${targetSymbol}&start_date=${fromDate.toISOString().split('T')[0]}`;
+              if (finmindApiKey) priceUrl += `&token=${finmindApiKey}`;
 
-          const priceRes = await fetch(priceUrl);
-          if (!priceRes.ok) throw new Error("FinMind 股價歷史資料異常");
-          const priceJson = await priceRes.json();
-
-          if (priceJson.data) {
-              const validData = priceJson.data.filter(d => d.Trading_Volume > 0);
-              
-              candles = validData.map(d => ({
-                  date: d.date,
-                  open: d.open,
-                  high: d.max,  
-                  low: d.min,   
-                  close: d.close,
-                  volume: Math.round(d.Trading_Volume / 1000) 
-              }));
+              const priceRes = await fetch(priceUrl);
+              if (priceRes.ok) {
+                  const priceJson = await priceRes.json();
+                  if (priceJson.data && priceJson.data.length > 0) {
+                      const validData = priceJson.data.filter(d => d.Trading_Volume > 0);
+                      candles = validData.map(d => ({
+                          date: d.date,
+                          open: d.open,
+                          high: d.max,  
+                          low: d.min,   
+                          close: d.close,
+                          volume: Math.round(d.Trading_Volume / 1000) 
+                      }));
+                  }
+              }
+          } catch (fmErr) {
+              console.warn("FinMind 抓取失敗，準備啟動富果備援...", fmErr);
           }
+
+          // ─── 模式 C (備援防護罩)：如果 FinMind 抓不到（例如南亞科），自動改用富果日K補抓！ ───
+          if (!candles || candles.length === 0) {
+              console.log(`🔄 啟動富果備援機制：正在為您抓取 ${targetSymbol} 的歷史資料...`);
+              
+              fromDate.setDate(toDate.getDate() - 360); // 富果日K抓取 360 天
+              const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=D&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
+              
+              const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
+              if (histRes.ok) {
+                  const histData = await histRes.json();
+                  if (histData && histData.data) {
+                      candles = histData.data.reverse().map(d => ({
+                          date: d.date,
+                          open: d.open, high: d.high, low: d.low, close: d.close, 
+                          volume: Math.round(d.volume / 1000)
+                      }));
+                  }
+              }
+          }
+      }
+
+      // 🛡️ 最終安全防呆：如果兩邊都完全沒資料，安全阻擋並跳出提示，絕對不讓畫面黑屏當掉
+      if (!candles || candles.length === 0) {
+          throw new Error(`⚠️ 找不到代號 (${targetSymbol}) 的歷史股價資料，可能是此股在資料庫中無紀錄。`);
       }
 
       // ✨ 日K/週K/月K 才需要去抓當日即時報價來補最後一根，分K本身就已經很即時了
@@ -3373,11 +3404,32 @@ const App = () => {
           };
       });
 
-      setRawDailyData(mergedCandles);
-      // ==========================================
-      // ✨ [FinMind 融合區塊] 結束
-      // ==========================================
+      // 🛡️ 致命防呆：檢查撈出來的 K 棒資料是不是空的！
+      if (!mergedCandles || mergedCandles.length === 0) {
+        throw new Error(`⚠️ 找不到 ${targetSymbol} 的歷史股價資料，可能是此股在資料庫中無紀錄或暫無交易資料。`);
+      }
 
+      // 🛡️ Android 專用防護罩：強力淨化資料，將所有可能造成手機 SVG 崩潰的 NaN 轉為 0
+      const sanitizedCandles = mergedCandles.map(c => ({
+        ...c,
+        open: Number(c.open) || 0,
+        high: Number(c.high) || 0,
+        low: Number(c.low) || 0,
+        close: Number(c.close) || 0,
+        volume: Number(c.volume) || 0,
+        foreign: Number(c.foreign) || 0,
+        trust: Number(c.trust) || 0,
+        dealer: Number(c.dealer) || 0,
+        marginDiff: Number(c.marginDiff) || 0,
+        shortDiff: Number(c.shortDiff) || 0,
+        revYoY: Number(c.revYoY) || 0,
+        revMoM: Number(c.revMoM) || 0,
+        eps: Number(c.eps) || 0,
+        eps4q: Number(c.eps4q) || 0,
+        grossMargin: Number(c.grossMargin) || 0
+      })).filter(c => c.close > 0);
+
+      setRawDailyData(sanitizedCandles); // 👈 這裡改放淨化後的 sanitizedCandles！
       setCurrentViewedSymbol(targetInput);
       setSymbolInput(''); 
 
@@ -4275,15 +4327,21 @@ const App = () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
-                  {/* ✨ 新增：走圖專注模式 (近N日顯示) */}
+                  {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
                       <input type="checkbox" checked={isFocusMode} onChange={(e) => setIsFocusMode(e.target.checked)} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" />
                       <span className="text-xs text-emerald-400 font-bold">走圖專注模式</span>
                     </label>
-                    <span className="text-[10px] text-slate-400 ml-1">僅顯示近</span>
-                    <input type="number" step="1" value={focusDays} onChange={(e) => setFocusDays(Number(e.target.value))} className="w-12 bg-slate-900 border border-slate-600 rounded text-emerald-300 text-[10px] text-center outline-none focus:border-emerald-500 font-bold px-0.5 py-0.5" title="顯示天數" />
-                    <span className="text-[10px] text-slate-400">日的指標與策略</span>
+                    <span className="text-[10px] text-slate-400 ml-1">僅顯示</span>
+                    <input 
+                      type="date" 
+                      value={focusModeDate || ''} 
+                      onChange={(e) => setFocusModeDate(e.target.value)} 
+                      className="bg-slate-900 border border-slate-600 rounded text-emerald-300 text-[10px] text-center outline-none focus:border-emerald-500 font-bold px-1 py-0.5 cursor-pointer" 
+                      title="選擇起始日期" 
+                    />
+                    <span className="text-[10px] text-slate-400">之後的指標與策略</span>
                   </div>
                   {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
@@ -4440,6 +4498,9 @@ const App = () => {
                 timeframe={timeframe}
                 stockName={displayFullname} 
                 toggles={toggles}
+                isFocusMode={isFocusMode}
+                focusModeDate={focusModeDate}
+                setFocusModeDate={setFocusModeDate}
                 onToggleCrosshair={() => handleToggle('showCrosshair')} 
                 customStrategies={customStrategies} 
                 maParams={maParams}
@@ -5066,8 +5127,9 @@ const MetricSelector = ({ value, onChange }) => (
     </div>
   </div>
 );
+
 // === 📈 K線圖與終極畫線工具 (已移除平移) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -5122,57 +5184,72 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     const chartDom = pqChartRef.current;
     if (!chartDom) return;
 
-    const myChart = window.echarts.init(chartDom, 'dark');
-    
-    let cleanQ = q; if (cleanQ > 10) cleanQ = 10; if (cleanQ < -10) cleanQ = -10;
-    let cleanP = p; if (cleanP > 10) cleanP = 10; if (cleanP < -10) cleanP = -10;
+    // ✨ 蘋果救星：加入 50 毫秒的延遲，確保 iOS/Safari 的 DOM 寬高已經渲染完成才畫圖
+    const renderTimer = setTimeout(() => {
+      // 避免重複初始化
+      let myChart = window.echarts.getInstanceByDom(chartDom);
+      if (!myChart) {
+        myChart = window.echarts.init(chartDom, 'dark');
+      }
+      
+      let cleanQ = q; if (cleanQ > 10) cleanQ = 10; if (cleanQ < -10) cleanQ = -10;
+      let cleanP = p; if (cleanP > 10) cleanP = 10; if (cleanP < -10) cleanP = -10;
 
-    const option = {
-      backgroundColor: 'transparent',
-      grid: { left: '10%', right: '12%', top: '15%', bottom: '15%', containLabel: true },
-      xAxis: {
-        type: 'value', min: -10, max: 10,
-        axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
-        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
-        axisLabel: { color: '#d1d5db', formatter: '{value}' },
-        name: 'Q (量)', nameTextStyle: { color: '#d1d5db' }
-      },
-      yAxis: {
-        type: 'value', min: -10, max: 10,
-        axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
-        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
-        axisLabel: { color: '#d1d5db', formatter: '{value}%' },
-        name: 'P (價)', nameTextStyle: { color: '#d1d5db' }
-      },
-      series: [
-        { name: '供給線', type: 'line', data: [[-10, 10], [10, -10]], lineStyle: { color: '#ef4444', width: 3 }, symbol: 'none' },
-        { name: '需求線', type: 'line', data: [[-10, -10], [10, 10]], lineStyle: { color: '#22c55e', width: 3 }, symbol: 'none' },
-        { name: '平移供給', type: 'line', data: [[-10 + cleanQ, 10 + cleanP], [10 + cleanQ, -10 + cleanP]], lineStyle: { color: '#f472b6', type: 'dashed', width: 2 }, symbol: 'none' },
-        { name: '平移需求', type: 'line', data: [[-10 + cleanQ, -10 + cleanP], [10 + cleanQ, 10 + cleanP]], lineStyle: { color: '#86efac', type: 'dashed', width: 2 }, symbol: 'none' },
-        {
-          name: '交點', type: 'scatter', data: [[cleanQ, cleanP]], symbolSize: 15,
-          itemStyle: { color: '#fbbf24', shadowBlur: 10, shadowColor: 'rgba(251, 191, 36, 0.5)' },
-          label: {
-            show: true, formatter: () => `P:${p.toFixed(1)}%\nQ:${q.toFixed(1)}`,
-            position: 'top', color: '#fff', fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.6)', padding: [4, 6], borderRadius: 4
-          }
+      const option = {
+        backgroundColor: 'transparent',
+        grid: { left: '10%', right: '12%', top: '15%', bottom: '15%', containLabel: true },
+        xAxis: {
+          type: 'value', min: -10, max: 10,
+          axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
+          splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+          axisLabel: { color: '#d1d5db', formatter: '{value}' },
+          name: 'Q (量)', nameTextStyle: { color: '#d1d5db' }
         },
-        {
-          type: 'scatter', symbolSize: 0, silent: true,
-          label: { show: true, color: '#9ca3af', fontSize: 20, fontWeight: 'bold', opacity: 0.2 },
-          data: [
-            { value: [-5, 7.5], label: { formatter: '2' } }, { value: [5, 7.5], label: { formatter: '3' } },
-            { value: [5, 2.5], label: { formatter: '4' } }, { value: [-5, 2.5], label: { formatter: '1' } },
-            { value: [-5, -2.5], label: { formatter: '8' } }, { value: [5, -2.5], label: { formatter: '5' } },
-            { value: [5, -7.5], label: { formatter: '6' } }, { value: [-5, -7.5], label: { formatter: '7' } }
-          ]
-        }
-      ]
-    };
-    myChart.setOption(option);
+        yAxis: {
+          type: 'value', min: -10, max: 10,
+          axisLine: { onZero: true, lineStyle: { color: '#9ca3af', width: 2 } },
+          splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+          axisLabel: { color: '#d1d5db', formatter: '{value}%' },
+          name: 'P (價)', nameTextStyle: { color: '#d1d5db' }
+        },
+        series: [
+          { name: '供給線', type: 'line', data: [[-10, 10], [10, -10]], lineStyle: { color: '#ef4444', width: 3 }, symbol: 'none' },
+          { name: '需求線', type: 'line', data: [[-10, -10], [10, 10]], lineStyle: { color: '#22c55e', width: 3 }, symbol: 'none' },
+          { name: '平移供給', type: 'line', data: [[-10 + cleanQ, 10 + cleanP], [10 + cleanQ, -10 + cleanP]], lineStyle: { color: '#f472b6', type: 'dashed', width: 2 }, symbol: 'none' },
+          { name: '平移需求', type: 'line', data: [[-10 + cleanQ, -10 + cleanP], [10 + cleanQ, 10 + cleanP]], lineStyle: { color: '#86efac', type: 'dashed', width: 2 }, symbol: 'none' },
+          {
+            name: '交點', type: 'scatter', data: [[cleanQ, cleanP]], symbolSize: 15,
+            itemStyle: { color: '#fbbf24', shadowBlur: 10, shadowColor: 'rgba(251, 191, 36, 0.5)' },
+            label: {
+              show: true, formatter: () => `P:${p.toFixed(1)}%\nQ:${q.toFixed(1)}`,
+              position: 'top', color: '#fff', fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.6)', paddingLeft: [4, 6], borderRadius: 4
+            }
+          },
+          {
+            type: 'scatter', symbolSize: 0, silent: true,
+            label: { show: true, color: '#9ca3af', fontSize: 20, fontWeight: 'bold', opacity: 0.2 },
+            data: [
+              { value: [-5, 7.5], label: { formatter: '2' } }, { value: [5, 7.5], label: { formatter: '3' } },
+              { value: [5, 2.5], label: { formatter: '4' } }, { value: [-5, 2.5], label: { formatter: '1' } },
+              { value: [-5, -2.5], label: { formatter: '8' } }, { value: [5, -2.5], label: { formatter: '5' } },
+              { value: [5, -7.5], label: { formatter: '6' } }, { value: [-5, -7.5], label: { formatter: '7' } }
+            ]
+          }
+        ]
+      };
+      myChart.setOption(option);
+      // 強制重繪確保 Apple 設備吃得到尺寸
+      myChart.resize();
+    }, 50);
 
-    return () => { myChart.dispose(); };
-  }, [pqModalOpen, activePqTarget, data]);
+    return () => { 
+      clearTimeout(renderTimer);
+      const chartInstance = window.echarts.getInstanceByDom(chartDom);
+      if (chartInstance) {
+        chartInstance.dispose(); 
+      }
+    };
+  }, [pqModalOpen, activePqTarget, data, gapLevels]);
 
   // 只要缺口設定有變動，就自動同步存入 localStorage
   useEffect(() => {
@@ -5487,12 +5564,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   if (!data || data.length === 0) return null;
 
   const width = chartWidth; // ✨ 使用動態寬度取代原本寫死的 1200
-  const padding = 30;
-  const indPadding = 15;
+  // ✨ 修改：將右側空間獨立出來給 Y 軸刻度使用
+  const paddingLeft = 10;   // 左邊留一點點空隙就好
+  const yAxisWidth = 50;    // 右側預留 50px 給價格刻度
+  const paddingRight = yAxisWidth + 10; 
+  
+  const indPaddingLeft = 15;
   
   // ✨ 動態分配高度 (完美分流版)：只有橫向放大時才撐滿螢幕，直式恢復原本的舒服高度！
   const volHeight = isFullscreen ? 50 : 80;
-  const indicatorHeight = indicatorType !== 'None' ? (isFullscreen ? 55 : 100) : 0;
+  const indicatorHeight = indicatorType !== 'None' ? (isFullscreen ? 70 : 140) : 0;
   const chartPaddingTop = isFullscreen ? 25 : 80;
   const bottomLegendHeight = 40; 
   
@@ -5510,17 +5591,27 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const totalSlots = data.length + extraCandles;
 
   // ✨ 找出「預設可見範圍」的最大最小 (作為切換股票瞬間的完美備胎)
-  let defaultMax = -Infinity; let defaultMin = Infinity;
+  // 🛡️ 絕對安全防護：預設安全的初始值，徹底防止 -Infinity / Infinity / NaN 導致 Android 手機黑屏
+  let defaultMax = 100; 
+  let defaultMin = 0;
+  
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
 
-  // 💡 終極數學修正：畫面上顯示的真實 K 棒就是 displayCount 根！(未來的 10 根空白被推到畫面右外側了)
-  // 不扣除任何數量，確保畫面上的極值被 100% 完美包覆！
-  const latestData = data.slice(Math.max(0, data.length - displayCount));
-  
-  latestData.forEach((d) => { 
-      if (d.high > defaultMax) { defaultMax = d.high; } 
-      if (d.low < defaultMin) { defaultMin = d.low; } 
-  });
+  const latestData = data ? data.slice(Math.max(0, data.length - displayCount)) : [];
+
+  if (latestData.length > 0) {
+      const validHighs = latestData.map(d => Number(d.high)).filter(v => !isNaN(v) && isFinite(v));
+      const validLows = latestData.map(d => Number(d.low)).filter(v => !isNaN(v) && isFinite(v));
+      
+      if (validHighs.length > 0) defaultMax = Math.max(...validHighs);
+      if (validLows.length > 0) defaultMin = Math.min(...validLows);
+  }
+
+  // 避免最高最低價完全相同導致除以零錯誤
+  if (defaultMax === defaultMin) {
+      defaultMax += 1;
+      defaultMin -= 1;
+  }
 
   // ✨ 終極動態 Y 軸：檢查 Y 軸記憶是不是屬於目前這檔股票的？
   // 如果是舊股票的記憶殘留，我們就「無視它」，直接使用剛算好的 default 完美備胎！
@@ -5528,29 +5619,39 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   const activeMin = isYAxisValid ? yAxis.min : defaultMin;
   const activeMax = isYAxisValid ? yAxis.max : defaultMax;
 
-  // 為了讓畫面不要太緊繃，上下多給 2% 的彈性空間 (完美還原三竹的留白感)
-  const minPrice = Math.min(activeMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity) * 0.98; 
-  const maxPrice = activeMax * 1.02; 
-  const maxVol = Math.max(...data.map(d => d.volume));
+  // 1. 實際用來畫圖的座標範圍（保留上下 2% 空間，讓 K 棒不會貼邊）
+  const minPrice = Math.min(activeMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity); 
+  const maxPrice = activeMax; 
 
-  const getY = (p) => mainHeight - padding - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - padding - chartPaddingTop);
+  const drawMinPrice = minPrice * 0.98;
+  const drawMaxPrice = maxPrice * 1.02;
+  // ✨ 修正：成交量最大值改抓「當下畫面可見範圍」的最大量，才能動態縮放
+  const visibleData = data.slice(Math.max(0, data.length - displayCount));
+  // 真實畫面中的最大成交量（用來在右側刻度顯示真實數字）
+  const realMaxVol = Math.max(...visibleData.map(d => d.volume)) || 100;
+  
+  // 實際上用來畫成交量柱狀圖高度的放大系數（保留上方 10% 留白空間）
+  const maxVol = realMaxVol * 1.1;
+  // ✨ 修改：Y軸轉換公式的上下留白統一改為 20
+  // ✨ 把底部留白固定為 20
+  const getY = (p) => mainHeight - 20 - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - 20 - chartPaddingTop);
   const getVolY = (v) => volHeight - (v / maxVol) * volHeight;
   
-  // ✨ 將間距計算改為包含未來空白區的 totalSlots
-  const spacing = (width - padding * 2) / totalSlots; 
-  const candleWidth = Math.max(0.5, spacing * 0.90); // ✨ 將最小寬度改為 0.5px，讓全圖壓縮時 K 棒不會糊成一團
-  // ✨ 計算偏移量：如果實際資料少於 displayCount，算出缺少了幾根，用來把整個圖表往右推
+  // ✨ 改用左右獨立的 paddingLeft 與 paddingRight
+  const spacing = (width - paddingLeft - paddingRight) / totalSlots; 
+  const candleWidth = Math.max(0.5, spacing * 0.90); 
   const offsetBars = Math.max(0, displayCount - data.length);
 
-  const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${padding + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
-
-  // === 🎯 相對座標系統 (還原不平移版) ===
+  // ✨ 更新畫線工具的輔助函數 (把 padding 改成 paddingLeft)
+  const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
   const getSnappedDataPoint = (clientX, clientY) => {
     const svg = svgRef.current; if (!svg) return null;
     const pt = svg.createSVGPoint(); pt.x = clientX; pt.y = clientY;
     const pos = pt.matrixTransform(svg.getScreenCTM().inverse());
     
-    let exactIdxFloat = (pos.x - padding - spacing/2) / spacing - offsetBars;
+// ✨ 修改：使用 paddingLeft
+    let exactIdxFloat = (pos.x - paddingLeft - spacing/2) / spacing - offsetBars;
+    
     if (exactIdxFloat < 0) exactIdxFloat = 0; 
     
     // ✨ 允許游標範圍延伸至右側未來空白區
@@ -5559,7 +5660,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
     const snappedIdx = Math.round(exactIdxFloat);
     const d = data[snappedIdx]; // 注意：在未來空白區時 d 會是 undefined
     
-    const rawPrice = minPrice + (maxPrice - minPrice) * ((mainHeight - padding - pos.y) / (mainHeight - padding - chartPaddingTop));
+    const rawPrice = minPrice + (maxPrice - minPrice) * ((mainHeight - 20 - pos.y) / (mainHeight - 20 - chartPaddingTop));
     let finalPrice = rawPrice;
     
     let finalIdxFromEnd = data.length - 1 - exactIdxFloat; 
@@ -5579,7 +5680,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
   };
 
   const resolvePoint = (pt) => { 
-    const x = padding + (data.length - 1 - pt.idxFromEnd + offsetBars) * spacing + spacing / 2; 
+    const x = paddingleft + (data.length - 1 - pt.idxFromEnd + offsetBars) * spacing + spacing / 2; 
     return { x, y: getY(pt.price), price: pt.price }; 
   };
 
@@ -5728,7 +5829,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
     if (activeTool === 'cursor') {
       let priceHover = null;
-      if (snap.rawY >= 0 && snap.rawY <= mainHeight) priceHover = minPrice + (maxPrice - minPrice) * ((mainHeight - padding - snap.rawY) / (mainHeight - padding - chartPaddingTop));
+      if (snap.rawY >= 0 && snap.rawY <= mainHeight) priceHover = minPrice + (maxPrice - minPrice) * ((mainHeight - paddingLeft - snap.rawY) / (mainHeight - paddingLeft - chartPaddingTop));
       setCrosshair({ x: snap.rawX, y: snap.rawY, idx: snap.exactIdx, priceHover });
     } else if (activeTool === 'edit' && editingPoint) {
       const newDrawings = drawings.map(d => {
@@ -6039,7 +6140,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             return (
               <g>
                 <line x1={0} y1={p.y} x2={width} y2={p.y} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
-                <line x1={p.x} y1={padding} x2={p.x} y2={mainHeight + volHeight + indicatorHeight} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
+                <line x1={p.x} y1={paddingLeft} x2={p.x} y2={mainHeight + volHeight + indicatorHeight} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
               </g>
             )
           })()}
@@ -6068,8 +6169,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                   return (
                     <g key={lvl}>
                       <line x1={0} y1={currY} x2={width} y2={currY} stroke={drawObj.color} strokeWidth={drawObj.width} opacity={isDraft ? baseOpacity * 0.4 : baseOpacity * 0.6} pointerEvents="none" />
-                      {/* ✨ 2. 字體套用 fillOpacity 半透明效果，並將 x 座標退到 padding 內避免被裁切 */}
-                      <text x={width - padding - 5} y={currY - 5} fill="#e2e8f0" fillOpacity={isDraft ? baseOpacity * 0.4 : baseOpacity * 0.6} fontSize="12" fontWeight="bold" textAnchor="end" pointerEvents="none">
+                      {/* ✨ 2. 字體套用 fillOpacity 明效果，並將 x 座標退到 padding 內避免被裁切 */}
+                      <text x={width - paddingRight - 5} y={currY - 5} fill="#e2e8f0" fillOpacity={isDraft ? baseOpacity * 0.4 : baseOpacity * 0.6} fontSize="12" fontWeight="bold" textAnchor="end" pointerEvents="none">
                         {lvl} ({currPrice.toFixed(2)})
                       </text>
                     </g>
@@ -6099,10 +6200,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
              
              // ✨ 3. 加入防碰撞邊界邏輯，確保資訊框不被裁切
              let boxX = rx + rw / 2;
-             if (boxX - 85 < padding) boxX = padding + 85;
-             if (boxX + 85 > width - padding) boxX = width - padding - 85;
+             if (boxX - 85 < paddingLeft) boxX = paddingLeft + 85;
+             if (boxX + 85 > width - paddingRight) boxX = width - paddingRight - 85;
              let boxY = ry - 12;
-             if (boxY < padding + 12) boxY = padding + 12;
+             if (boxY < paddingLeft + 12) boxY = paddingLeft + 12;
              
              return (
                <g>
@@ -6282,8 +6383,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
              const maxTarget = rawPts[2].price + diff * 2; 
              let maxY = getY(maxTarget);
              
-             if(maxY < padding) maxY = padding; 
-             if(maxY > mainHeight - padding) maxY = mainHeight - padding;
+             if(maxY < padding) maxY = paddingLeft; 
+             if(maxY > mainHeight - paddingLeft) maxY = mainHeight - paddingLeft;
              
              return (
                <g>
@@ -6294,8 +6395,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     let ty = getY(tPrice); 
                     let isClamped = false;
                     
-                    if (ty < padding + 15) { ty = padding + 15; isClamped = true; }
-                    if (ty > mainHeight - padding) { ty = mainHeight - padding - 5; isClamped = true; }
+                    if (ty < paddingLeft + 15) { ty = paddingLeft + 15; isClamped = true; }
+                    if (ty > mainHeight - paddingLeft) { ty = mainHeight - paddingLeft - 5; isClamped = true; }
                     
                     return (
                       <g key={k}>
@@ -6478,7 +6579,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
               );
             })()}
 
-            <div ref={pqChartRef} className="h-64 w-full bg-slate-950/40 rounded border border-slate-800"></div>
+            {/* ✨ 蘋果救星：強制設定 minHeight 與 shrink-0 避免 Safari 壓縮 Canvas */}
+            <div ref={pqChartRef} className="h-64 min-h-[256px] shrink-0 w-full bg-slate-950/40 rounded border border-slate-800 relative"></div>
             
             <p className="text-[10px] text-center text-slate-500">日期: {gapLevels[activePqTarget].date || '尚未選擇日期'}</p>
           </div>
@@ -6529,7 +6631,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
            {/* ✨ 直接把缺口線設定器塞在這裡！ */}
            <div className="flex items-center gap-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 shrink-0">
-             <span className="text-[10px] font-bold text-slate-400">切口：</span>
+             <span className="text-[10px] font-bold text-slate-400">切口/供需圖：</span>
              {['line1', 'line2'].map(key => {
                // ✨ 智慧動態計算：不管切到哪一檔股票，只要有存日期，就自動去當前資料中找出該日期的價位！
                const currentItem = gapLevels[key].date && data ? data.find(d => d.date === gapLevels[key].date) : null;
@@ -6781,19 +6883,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           🖱️ 結束畫線 (返回游標)
         </button>
       )}
-
-      {/* ✨ 移除 touch-none，讓游標模式可以原生水平滑動 */}
-      <div 
-        ref={scrollContainerRef}
-        className={`${isFullscreen ? "flex-1" : ""} overflow-x-auto p-2 pt-1 relative ${(activeTool !== 'cursor' || toggles.showCrosshair) ? 'touch-none' : ''} h-full flex flex-col`}
-      >
+      {/* 🏆 關鍵：左右並排總成容器 (flex-row) */}
+      <div className="flex-1 flex flex-row relative overflow-hidden w-full h-full min-h-0">
         
-        {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 text-cyan-300 font-bold bg-slate-800/80 backdrop-blur-sm border border-cyan-800 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.2)] text-sm pointer-events-none z-10">
-            ✏️ 作圖模式：拖曳放開即畫完
-          </div>
-        )}        
-       
+        {/* 左側：可水平滑動的 K 線圖表區 */}
+        <div 
+          ref={scrollContainerRef}
+          className={`${isFullscreen ? "flex-1" : ""} flex-1 min-w-0 overflow-x-auto p-2 pt-1 relative ${(activeTool !== 'cursor' || toggles.showCrosshair) ? 'touch-none' : ''} h-full flex flex-col`}
+        >  
+          {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 text-cyan-300 font-bold bg-slate-800/80 backdrop-blur-sm border border-cyan-800 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.2)] text-sm pointer-events-none z-10">
+              ✏️ 作圖模式：拖曳放開即畫完
+            </div>
+          )}      
 
         {/* ✨ 動態切換 className 讓全圖模式可以完美縮進單一螢幕裡 */}
         {/* ✨ 解除畫布高度與寬度限制，完全貼合手機螢幕不留白 */}
@@ -6809,7 +6911,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           onTouchEnd={handlePointerUp}
           onTouchCancel={handlePointerUp}
         >
-          <defs><clipPath id="chartClip"><rect x={padding} y={0} width={width - padding * 2} height={totalSVGHeight} /></clipPath></defs>
+          <defs><clipPath id="chartClip"><rect x={paddingLeft} y={0} width={width - paddingRight * 2} height={totalSVGHeight} /></clipPath></defs>
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           {/* 將股名與週期寫入 SVG 畫布，確保存圖時會一併匯出 */}
@@ -6839,7 +6941,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             <line x1={0} y1={getY(maxPrice)} x2={width} y2={getY(maxPrice)} stroke="#1e293b" strokeDasharray="4,4" />
             
             {toggles.showVolSignal && defensivePrice && (() => {
-              const latestX = padding + (data.length - 1) * spacing + spacing / 2;
+              const latestX = paddingLeft + (data.length - 1) * spacing + spacing / 2;
               return (
                 <g>
                   <line x1={0} y1={getY(defensivePrice)} x2={width} y2={getY(defensivePrice)} stroke="#ef4444" strokeDasharray="6,4" strokeWidth="1.5" opacity="0.8" />
@@ -6859,15 +6961,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {toggles.showMA && maParams?.ma6?.show !== false && <path d={getLinePath(data, 'ma6')} stroke={maParams?.ma6?.c || '#f472b6'} strokeWidth={maParams?.ma6?.w || 1.5} fill="none" opacity="0.8"/>}
 
             {toggles.showBBands && (<g opacity="0.6">
-                <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1]?.bbands?.mid == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1]?.bbands?.down == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1]?.bbands?.mid == null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1]?.bbands?.down == null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
             </g>)}
-            {/* ✨ 新增：繪製 高布林(3.0) 的上軌與下軌 (使用不同的粉紅色與虛線樣式區分) */}
-            {toggles.showBBands3 && (<g opacity="0.5">
-                <path d={data.map((d, i) => d.bbands?.up3 != null ? `${i===0 || data[i-1]?.bbands?.up3 == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.up3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${padding + i*spacing + spacing/2} ${getY(d.bbands.down3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
-            </g>)}
+{/* ✨ 新增：繪製 高布林(3.0) 的上軌與下軌 (使用不同的粉紅色與虛線樣式區分) */}
+{toggles.showBBands3 && (<g opacity="0.5">
+    <path d={data.map((d, i) => d.bbands?.up3 != null ? `${i===0 || data[i-1]?.bbands?.up3 == null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getY(d.bbands.up3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
+    <path d={data.map((d, i) => d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getY(d.bbands.down3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
+</g>)}
 
             {/* ✨ 畫出主圖的 SAR 指標 (小圓點) */}
             {toggles.showSAR && data.map((d, i) => {
@@ -6878,7 +6980,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                 return (
                     <circle 
                       key={`sar-${i}`} 
-                      cx={padding + (i + offsetBars) * spacing + spacing / 2} 
+                      cx={paddingLeft + (i + offsetBars) * spacing + spacing / 2} 
                       cy={sarY} 
                       r="2" 
                       fill={sarColor} 
@@ -6930,7 +7032,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                   // 2. 把符合條件的區塊，畫成半透明的黃色大方塊
                   return zones.map((z, idx) => {
                     // X 座標：區塊第一根 K 棒的位置
-                    const rectX = padding + z.start * spacing;
+                    const rectX = paddingLeft + z.start * spacing;
                     // 寬度：涵蓋的 K 棒數量 * 間距
                     const rectWidth = (z.end - z.start + 1) * spacing;
                     
@@ -6963,7 +7065,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     {pivots.length >= 2 && (
                         <path 
                           d={pivots.map((p, i) => {
-                              const px = padding + p.idx * spacing + spacing / 2;
+                              const px = paddingLeft + p.idx * spacing + spacing / 2;
                               const py = getY(p.price);
                               return `${i === 0 ? 'M' : 'L'} ${px} ${py}`;
                           }).join(' ')} 
@@ -6977,9 +7079,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     {/* 畫未確認的浮動尾段 (虛線) */}
                     {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (
                         <line
-                          x1={padding + pivots[pivots.length - 1].idx * spacing + spacing / 2}
+                          x1={paddingLeft + pivots[pivots.length - 1].idx * spacing + spacing / 2}
                           y1={getY(pivots[pivots.length - 1].price)}
-                          x2={padding + floatPoint.idx * spacing + spacing / 2}
+                          x2={paddingLeft + floatPoint.idx * spacing + spacing / 2}
                           y2={getY(floatPoint.price)}
                           stroke="#facc15"
                           strokeWidth="1.5"
@@ -6990,7 +7092,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     
                     {/* 畫轉折點標記圓點 */}
                     {pivots.map((p, i) => {
-                        const px = padding + p.idx * spacing + spacing / 2;
+                        const px = paddingLeft + p.idx * spacing + spacing / 2;
                         const py = getY(p.price);
                         const isUp = p.type === 'High';
                         const color = isUp ? '#facc15' : '#facc15'; // 高點綠色, 低點紅色
@@ -7000,7 +7102,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     {/* 畫浮動點標記圓點 */}
                     {floatPoint && floatPoint.idx !== null && (
                         <circle 
-                          cx={padding + floatPoint.idx * spacing + spacing / 2} 
+                          cx={paddingLeft + floatPoint.idx * spacing + spacing / 2} 
                           cy={getY(floatPoint.price)} 
                           r={3} 
                           fill={floatPoint.type === 'High' ? '#facc15' : '#facc15'} 
@@ -7020,8 +7122,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
                const maxP = lastDay.maxVolPrice;
                const secP = lastDay.secondVolPrice;
-               const maxStartX = padding + (lastDay.topVolIdx || 0) * spacing + spacing / 2;
-               const secStartX = padding + (lastDay.secondVolIdx || 0) * spacing + spacing / 2;
+               const maxStartX = paddingLeft + (lastDay.topVolIdx || 0) * spacing + spacing / 2;
+               const secStartX = paddingLeft + (lastDay.secondVolIdx || 0) * spacing + spacing / 2;
                const lineStyle = toggles.maxVolLineStyle || { width: 1.5, type: 'solid' };
 
                return (
@@ -7061,24 +7163,27 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
             {/* 標準 K 線 (拔除了與寶塔線衝突的邏輯) */}
             {data.map((d, i) => {
-              const x = padding + (i + offsetBars) * spacing + spacing / 2;
+              const x = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
               const color = d.close >= d.open ? '#ef4444' : '#22c55e';
+              // ✨ 核心邏輯：判斷是否需要隱藏此根 K 棒的訊號
+                               // 如果開啟專注模式，且有設定日期，且這根 K 棒的日期「小於」設定日，就隱藏
+                               const hideSignals = isFocusMode && focusModeDate && d.date < focusModeDate;
               return (
                 <g key={`candle-${i}`}>
                   <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
                   <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
                   {/* ✨ 補回：黑頓與自訂策略標記 (含升級版畫線與價格功能) */}
                   <g textAnchor="middle" fontSize="12" fontWeight="bold">
-                    {toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
+                    {!hideSignals && toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
                     
                     {/* 讀取升級版的 customRenderMarks 來畫圖 */}
-                    {(d.customRenderMarks || (d.customMarks ? d.customMarks.map(m => ({ displayStyle: 'marker', marker: m })) : [])).map((markObj, mIdx) => {
+                    {!hideSignals && (d.customRenderMarks || (d.customMarks ? d.customMarks.map(m => ({ displayStyle: 'marker', marker: m })) : [])).map((markObj, mIdx) => {
                       if (markObj.displayStyle === 'line') {
                         const markY = getY(markObj.priceVal);
                         return (
                           <g key={`s-line-${i}-${mIdx}`}>
                             {/* 畫一條橫線 */}
-                            <line x1={x} y1={markY} x2={width - padding} y2={markY} stroke={markObj.lineColor} strokeWidth="1.5" strokeDasharray={markObj.lineStyle === 'dashed' ? '5,5' : 'none'} opacity="0.6" />
+                            <line x1={x} y1={markY} x2={width - paddingRight} y2={markY} stroke={markObj.lineColor} strokeWidth="1.5" strokeDasharray={markObj.lineStyle === 'dashed' ? '5,5' : 'none'} opacity="0.6" />
                             {/* 在線上寫價格 */}
                             <text x={x} y={markY - 6} fill={markObj.lineColor} fontSize="11" fontWeight="bold" textAnchor="middle">
                               {markObj.marker} {markObj.priceVal}
@@ -7135,7 +7240,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     })}
                   </g>
                   {/* ✨ 補回：起漲標記 */}
-                  {toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
+                  {!hideSignals && toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
                   {/* 獨立開關的 MA 圓點 */}
                   {toggles.showMA && maParams?.ma1?.show !== false && i === data.length - (maParams?.ma1?.p || 5) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma1?.c || '#ef4444'} />}
                   {toggles.showMA && maParams?.ma2?.show !== false && i === data.length - (maParams?.ma2?.p || 10) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma2?.c || '#eab308'} />}
@@ -7149,7 +7254,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
           </g>
 
           <g transform={`translate(0, ${mainHeight})`} clipPath="url(#chartClip)">
-            {data.map((d, i) => <rect key={`vol-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>)}
+            {data.map((d, i) => <rect key={`vol-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>)}
             
             {/* 獨立開關的 VMA */}
             {toggles.showVolume && vmaParams?.vma1?.show !== false && <path d={getLinePath(data, 'vma1')} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth={vmaParams?.vma1?.w || 1.5} fill="none" opacity="0.8"/>}
@@ -7157,7 +7262,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             {toggles.showVolume && vmaParams?.vma3?.show !== false && <path d={getLinePath(data, 'vma3')} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth={vmaParams?.vma3?.w || 1.5} fill="none" opacity="0.8"/>}
 
             {data.map((d, i) => {
-              const x = padding + (i + offsetBars) * spacing + spacing / 2;
+              const x = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
               return (
                 <g key={`volsignal-${i}`}>
                   {toggles.showVolume && vmaParams?.vma1?.show !== false && i === data.length - (vmaParams?.vma1?.p || 5) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth="2" fill="none" />}
@@ -7176,22 +7281,22 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             
             {indicatorType === 'OBV' && (() => {
                 let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
-                const range = (maxO - minO) || 1; const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - indPadding*2) - indPadding;
+                const range = (maxO - minO) || 1; const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - 20) - 10;
                 return (<g>
-                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
-                    <path d={data.map((d, i) => d.obvMa !== null ? `${i===0||data[i-1].obvMa===null?'M':'L'} ${padding + i*spacing + spacing/2} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-                    <text x={padding} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
-                    <text x={padding + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                    <path d={data.map((d, i) => d.obvMa !== null ? `${i===0||data[i-1].obvMa===null?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                    <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
+                    <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
                 </g>);
             })()}
 
             {/* ✨ 寶塔線副圖 */}
             {indicatorType === 'TOWER' && (() => {
                 let maxT = -Infinity, minT = Infinity; data.forEach(d => { if (d.tower.top > maxT) maxT = d.tower.top; if (d.tower.bottom < minT) minT = d.tower.bottom; });
-                const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - indPadding*2) - indPadding;
+                const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - 20) - 10;
                 return (<g>
-                    {data.map((d, i) => <rect key={`tw-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
-                    <text x={padding} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
+                    {data.map((d, i) => <rect key={`tw-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
+                    <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
                 </g>);
             })()}
 
@@ -7209,7 +7314,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     if (val < minV) minV = val;
                 });
                 const absMax = Math.max(Math.abs(maxV), Math.abs(minV)) || 1;
-                const getInstY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
+                const getInstY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft);
                 const zeroY = getInstY(0);
 
                 return (
@@ -7224,9 +7329,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
                             const y = getInstY(val);
                             const color = val >= 0 ? '#ef4444' : '#22c55e'; // 紅買綠賣
-                            return <rect key={`inst-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
+                            return <rect key={`inst-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
                         })}
-                        <text x={padding} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
+                        <text x={paddingLeft} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
                             {indicatorType === '外資' ? '外資買賣超(張)' : indicatorType === '投信' ? '投信買賣超(張)' : indicatorType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
                         </text>
                     </g>
@@ -7240,45 +7345,45 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
                     if (d.shortDiff > maxM) maxM = d.shortDiff; if (d.shortDiff < minM) minM = d.shortDiff; 
                 });
                 const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
-                const getMarginY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
+                const getMarginY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft);
                 return (<g>
                     <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
                     {/* 用柱狀圖畫融資 */}
                     {data.map((d, i) => {
                         const y = getMarginY(d.marginDiff); const zeroY = getMarginY(0);
-                        return <rect key={`margin-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.marginDiff >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
+                        return <rect key={`margin-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.marginDiff >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
                     })}
                     {/* 用線條畫融券 */}
-                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMarginY(d.shortDiff)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
-                    <text x={padding} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
-                    <text x={padding + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getMarginY(d.shortDiff)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
+                    <text x={paddingLeft} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
+                    <text x={paddingLeft + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
                 </g>);
             })()}
             
             {indicatorType === 'MACD' && (() => {
                     let maxM = -Infinity, minM = Infinity; data.forEach(d => { if (d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif < minM) minM = d.macd.dif; if (d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd < minM) minM = d.macd.macd; if (d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc < minM) minM = d.macd.osc; });
-                    const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; const getMyY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPadding);
+                    const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; const getMyY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - 10);
                     return (<g>
                             <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
-                            {data.map((d, i) => { const y = getMyY(d.macd.osc); const zeroY = getMyY(0); return <rect key={`osc-${i}`} x={padding + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; })}
-                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMyY(d.macd.dif)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getMyY(d.macd.macd)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                            {data.map((d, i) => { const y = getMyY(d.macd.osc); const zeroY = getMyY(0); return <rect key={`osc-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; })}
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getMyY(d.macd.dif)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getMyY(d.macd.macd)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
             {indicatorType === 'KD' && (() => {
-                    const getKdY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - indPadding*2) - indPadding;
+                    const getKdY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
                     return (<g>
                             <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getKdY(d.kd.k)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${padding + i*spacing + spacing/2} ${getKdY(d.kd.d)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getKdY(d.kd.k)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getKdY(d.kd.d)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
             {indicatorType === 'RSI' && (() => {
-                    const getRsiY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - indPadding*2) - indPadding;
+                    const getRsiY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
                     return (<g>
                             <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => d.rsi.rsi1 !== null ? `${i===0||data[i-1].rsi.rsi1===null?'M':'L'} ${padding + i*spacing + spacing/2} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => d.rsi.rsi2 !== null ? `${i===0||data[i-1].rsi.rsi2===null?'M':'L'} ${padding + i*spacing + spacing/2} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => d.rsi.rsi1 !== null ? `${i===0||data[i-1].rsi.rsi1===null?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => d.rsi.rsi2 !== null ? `${i===0||data[i-1].rsi.rsi2===null?'M':'L'} ${paddingLeft + i*spacing + spacing/2} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
           </g>
@@ -7390,7 +7495,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
 
             return (
               <g className="pointer-events-none">
-                <line x1={crosshair.x} y1={padding} x2={crosshair.x} y2={mainHeight + volHeight + indicatorHeight} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" />
+                <line x1={crosshair.x} y1={paddingLeft} x2={crosshair.x} y2={mainHeight + volHeight + indicatorHeight} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" />
                 {crosshair.priceHover !== null && (
                   <g>
                     <line x1={0} y1={crosshair.y} x2={width} y2={crosshair.y} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" />
@@ -7425,16 +7530,101 @@ const TrendChart = ({ data, timeframe, stockName, toggles, onToggleCrosshair, cu
             return (
               <g key={`gap-${i}`}>
                 <line x1={0} y1={getY(targetVal)} x2={width} y2={getY(targetVal)} stroke={i === 0 ? "#f472b6" : "#fbbf24"} strokeWidth="2" strokeDasharray="6,4" opacity="0.7" pointerEvents="none" />
-                <text x={padding + 5} y={getY(targetVal) - 5} fill={i === 0 ? "#f472b6" : "#fbbf24"} fontSize="11" fontWeight="bold" pointerEvents="none">
+                <text x={paddingLeft + 5} y={getY(targetVal) - 5} fill={i === 0 ? "#f472b6" : "#fbbf24"} fontSize="11" fontWeight="bold" pointerEvents="none">
                    缺口線 {i+1}: {targetVal.toFixed(2)}
                 </text>
               </g>
             );
           })}
+          {/* ========================================== */}
+          {/* ✨ 全圖水平網格線 (貫穿主圖，數字改用右側浮動層) */}
+          {/* ========================================== */}
           
+          {/* 價格網格 */}
+          <g>
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const priceLabel = drawMinPrice + (drawMaxPrice - drawMinPrice) * ratio;
+              return <line key={`grid-p-${ratio}`} x1={0} y1={getY(priceLabel)} x2={width} y2={getY(priceLabel)} stroke="#1e293b" strokeDasharray="2,6" opacity="0.5" />;
+            })}
+          </g>
+
+          {/* 成交量網格 */}
+          <g>
+            {[0.33, 0.66, 1].map((ratio) => {
+              const volLabel = maxVol * ratio;
+              return <line key={`grid-v-${ratio}`} x1={0} y1={mainHeight + getVolY(volLabel)} x2={width} y2={mainHeight + getVolY(volLabel)} stroke="#1e293b" strokeDasharray="2,6" opacity="0.5" />;
+            })}
+          </g>
+
+          {/* 十字查價線 (橫跨全圖的藍色虛線) */}
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
+            <line x1={0} y1={crosshair.y} x2={width} y2={crosshair.y} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" pointerEvents="none" />
+          )}          
         </svg>
-      </div>
-    </div>
+      </div>  
+
+        {/* ========================================== */}
+        {/* ✨ 右側獨立固定 Y 軸刻度區 (絕對不會跟著橫向滑動！) */}
+        {/* ========================================== */}
+        <div 
+          className="pointer-events-none z-50 bg-[#020617]/95 border-l border-slate-800 shadow-2xl shrink-0"
+          style={{ width: `${yAxisWidth}px`, height: '100%' }}
+        >
+          <svg width={yAxisWidth} height={totalSVGHeight}>
+          {/* 1. 價格刻度數字 (顯示真實極值 activeMin / activeMax) */}
+          <g transform="translate(5, 0)">
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              // 💡 顯示的數字：使用真實的 activeMin / activeMax 來均分 5 等分
+              const priceLabel = activeMin + (activeMax - activeMin) * ratio; 
+              
+              // 💡 畫布上的座標 Y：繼續使用帶有 2% 留白的 drawMinPrice / drawMaxPrice 來定位，才不會貼邊
+              let textY = getY(drawMinPrice + (drawMaxPrice - drawMinPrice) * ratio); 
+              
+              if (ratio === 1) textY += 10;
+              if (ratio === 0) textY -= 5;
+              return (
+                <g key={`sticky-y-price-${ratio}`}>
+                  <line x1="-5" y1={textY} x2="0" y2={textY} stroke="#475569" strokeWidth="1" />
+                  <text x="2" y={textY} fill="#cbd5e1" fontSize="11" fontWeight="bold" dominantBaseline="middle">
+                    {priceLabel > 1000 ? Math.round(priceLabel) : priceLabel.toFixed(1)}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+
+          {/* 2. 成交量刻度數字 (顯示真實最大量 realMaxVol) */}
+          <g transform={`translate(5, ${mainHeight})`}>
+            {[0.33, 0.66, 1].map((ratio) => {
+              // 💡 顯示的數字：使用真實的 realMaxVol 均分
+              const volLabel = realMaxVol * ratio; 
+              
+              // 💡 畫布上的座標 Y：繼續使用帶有 10% 留白的 maxVol 來定位
+              let textY = getVolY(maxVol * ratio); 
+              
+              return (
+                <g key={`sticky-y-vol-${ratio}`}>
+                  <line x1="-5" y1={textY} x2="0" y2={textY} stroke="#475569" strokeWidth="1" />
+                  <text x="2" y={textY} fill="#94a3b8" fontSize="10" dominantBaseline="middle">
+                    {Math.round(volLabel)}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+
+          {/* 查價線紅底白字 (釘在右側獨立浮動層上) */}
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
+            <g>
+              <rect x={0} y={crosshair.y - 12} width={yAxisWidth} height={24} fill="#ef4444" rx="2" />
+              <text x={yAxisWidth / 2} y={crosshair.y + 4} fill="#ffffff" fontSize="12" fontWeight="bold" textAnchor="middle">
+                {crosshair.priceHover > 1000 ? Math.round(crosshair.priceHover) : crosshair.priceHover.toFixed(2)}
+              </text>
+            </g>
+          )}
+        </svg>
+      </div>     
+    </div> 
   );
 };
 
