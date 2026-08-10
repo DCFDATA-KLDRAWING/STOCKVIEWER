@@ -5680,7 +5680,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   };
 
   const resolvePoint = (pt) => { 
-    const x = paddingleft + (data.length - 1 - pt.idxFromEnd + offsetBars) * spacing + spacing / 2; 
+    const x = paddingLeft + (data.length - 1 - pt.idxFromEnd + offsetBars) * spacing + spacing / 2; 
     return { x, y: getY(pt.price), price: pt.price }; 
   };
 
