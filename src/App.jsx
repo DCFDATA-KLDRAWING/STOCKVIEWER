@@ -5091,11 +5091,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   
   const extraCandles = 2;
   // ✨ 關鍵修正：總格數取「資料長度」與「檢視視角 (displayCount)」的最大值，確保放大視角時畫布絕對不會崩塌
-  const totalSlots = displayCount + extraCandles;
+  const totalSlots = data.length + extraCandles;
 
-  // ✨ 完美對齊機制：當檢視視角大於資料長度時，自動將畫面推向右側最新 K 棒，絕不留白
-  const offsetBars = 0;
-  
+  // ✨ 智慧對齊：確保大視角時自動向右靠齊最新 K 棒
+  const offsetBars = Math.max(0, displayCount - data.length);  
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
   const [gapLevels, setGapLevels] = useState(() => {
     try {
@@ -5287,12 +5286,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       setChartHeight(ch); 
 
       const currentDataLen = data ? data.length : 0;
-      const currentSlots = displayCount + 2;
+      const currentSlots = currentDataLen + extraCandles;
       
-      // ✨ 關鍵：直接用視角比例計算寬度，讓 K 棒自動撐滿橫式螢幕，絕不留白
+      // ✨ 恢復正常的等比例縮放公式，確保視角放大縮小時 K 棒大小與位置完全精準
       const calculatedWidth = (cw / displayCount) * currentSlots; 
       
-      setChartWidth(calculatedWidth);
+      setChartWidth(Math.max(cw, calculatedWidth));
     };
 
     const observer = new ResizeObserver(() => updateSize());
@@ -5300,7 +5299,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     updateSize();
 
     return () => observer.disconnect();
-  }, [displayCount]);
+  }, [displayCount, data?.length]);
 
   // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
   const [yAxis, setYAxis] = useState({ min: null, max: null, symbol: realSymbol });
