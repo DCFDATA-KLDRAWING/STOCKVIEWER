@@ -5267,7 +5267,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器尺寸，實現完美直橫式視角與滑桿縮放 (防呆安全版)
+  // ✨ 動態監聽容器尺寸，確保縮放滑桿 (displayCount) 與寬度計算 100% 同步
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -5282,9 +5282,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       const currentExtra = 10;
       const totalSlots = currentDataLen + currentExtra;
       
-      // 🛡️ 安全保護：自動判斷你是否有兩指縮放功能，沒有也不會當機！
-      const currentScale = typeof zoomScale !== 'undefined' ? zoomScale : 1;
-      const calculatedWidth = (cw / displayCount) * totalSlots * currentScale; 
+      // 💡 恢復原有的比例縮放公式：確保 cw / displayCount 的縮放連動完全正常，Y軸才不會亂飛！
+      const calculatedWidth = (cw / displayCount) * totalSlots; 
       
       setChartWidth(Math.max(cw, calculatedWidth));
     };
@@ -5293,9 +5292,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     observer.observe(container);
     updateSize();
 
-    // 🛡️ 將 zoomScale 移出依賴陣列，徹底防止黑畫面
     return () => observer.disconnect();
-  }, [displayCount, data ? data.length : 0]);
+  }, [displayCount, data?.length]);
 
   // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
   const [yAxis, setYAxis] = useState({ min: null, max: null, symbol: realSymbol });
