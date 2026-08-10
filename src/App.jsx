@@ -5267,7 +5267,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態監聽容器尺寸，確保縮放滑桿 (displayCount) 與寬度計算 100% 同步
+  // ✨ 動態調整畫布寬度與視角縮放，確保 30 根到 500 根的 K 棒間距永遠清晰舒適、絕不擠壓
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -5278,14 +5278,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       
       setChartHeight(ch); 
 
-      const currentDataLen = data ? data.length : 0;
-      const currentExtra = 10;
-      const totalSlots = currentDataLen + currentExtra;
+      // 💡 關鍵：畫布寬度必須根據您當前選擇的顯示根數 (displayCount) 來動態放大
+      // 這樣當您調到 330 根或 500 根時，畫布會自動變寬，K 棒之間才會有足夠的像素展開！
+      const minBarSpacing = 8; // 每根 K 棒保證至少有 8 像素的舒服間距
+      const dynamicWidth = Math.max(cw, totalSlots * minBarSpacing, (cw / displayCount) * totalSlots);
       
-      // 💡 恢復原有的比例縮放公式：確保 cw / displayCount 的縮放連動完全正常，Y軸才不會亂飛！
-      const calculatedWidth = (cw / displayCount) * totalSlots; 
-      
-      setChartWidth(Math.max(cw, calculatedWidth));
+      setChartWidth(dynamicWidth);
     };
 
     const observer = new ResizeObserver(() => updateSize());
@@ -5293,7 +5291,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     updateSize();
 
     return () => observer.disconnect();
-  }, [displayCount, data?.length]);
+  }, [displayCount, totalSlots]);
 
   // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
   const [yAxis, setYAxis] = useState({ min: null, max: null, symbol: realSymbol });
@@ -5316,7 +5314,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     }, 500);
 
     const handleScrollUpdate = () => {
-      const offsetBars = Math.max(0, displayCount - (data.length + 10));
+      const offsetBars = 0;
       const scrollX = container.scrollLeft;
       const clientW = container.clientWidth;
       const scrollW = container.scrollWidth;
@@ -5540,7 +5538,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const totalSlots = Math.max(data.length, displayCount) + extraCandles;
 
   // ✨ 智慧對齊：當檢視視角大於資料長度時，自動向右靠齊最新 K 棒，不留空白
-  const offsetBars = Math.max(0, displayCount - data.length);
+  const offsetBars = 0;
 
   let defaultMax = -Infinity; let defaultMin = Infinity;
   const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
@@ -5578,7 +5576,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   
   // ✨ 改用左右獨立的 paddingLeft 與 paddingRight
   const spacing = (width - paddingLeft - paddingRight) / totalSlots; 
-  const candleWidth = Math.max(0.5, spacing * 0.90); 
+  const candleWidth = Math.max(2, spacing * 0.85); // 確保 K 棒寬度至少 2 像素 
   
 
   // ✨ 更新畫線工具的輔助函數 (把 padding 改成 paddingLeft)
