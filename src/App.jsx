@@ -5089,6 +5089,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
   
+  const extraCandles = 10;
+  // ✨ 關鍵修正：總格數取「資料長度」與「檢視視角 (displayCount)」的最大值，確保放大視角時畫布絕對不會崩塌
+  const totalSlots = Math.max(data.length, displayCount) + extraCandles;
+
+  // ✨ 智慧對齊：當檢視視角大於資料長度時，自動向右靠齊最新 K 棒，不留空白
+  const offsetBars = 0;
+  
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
   const [gapLevels, setGapLevels] = useState(() => {
     try {
