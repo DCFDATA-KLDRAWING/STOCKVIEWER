@@ -7349,6 +7349,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             tooltipLines.push({ color: '#e2e8f0', text: `高： ${hoverD?.high?.toFixed(2)}` });
             tooltipLines.push({ color: '#e2e8f0', text: `低： ${hoverD?.low?.toFixed(2)}` });
             tooltipLines.push({ color: '#e2e8f0', text: `收： ${hoverD?.close?.toFixed(2)}` });
+            // ✨ 新增：計算當日漲跌幅 % (需對比前一根收盤價)
+            const prevD = crosshair.idx > 0 ? data[crosshair.idx - 1] : null;
+            const changeRatio = (prevD && prevD.close > 0) ? ((hoverD.close - prevD.close) / prevD.close) * 100 : 0;
+            const changeColor = changeRatio > 0 ? '#ef4444' : (changeRatio < 0 ? '#22c55e' : '#e2e8f0');
+            const changeSign = changeRatio > 0 ? '+' : '';
+            
+            tooltipLines.push({ color: changeColor, text: `漲跌： ${changeSign}${changeRatio.toFixed(2)}%` });
             tooltipLines.push({ color: '#e2e8f0', text: `量： ${hoverD?.volume} 張` });
 
             // 顯示 6 條主圖均線 MA
