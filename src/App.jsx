@@ -5089,11 +5089,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
   
-  const extraCandles = 15;
-  // ✨ 關鍵修正：總格數取「資料長度」與「檢視視角 (displayCount)」的最大值，確保放大視角時畫布絕對不會崩塌
+  const extraCandles = 2; // 永遠只保留 2 根空白
   const totalSlots = data.length + extraCandles;
-
-  // ✨ 智慧對齊：確保大視角時自動向右靠齊最新 K 棒
   const offsetBars = Math.max(0, displayCount - data.length);  
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
   const [gapLevels, setGapLevels] = useState(() => {
@@ -5275,6 +5272,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
   // ✨ 動態調整畫布寬度與視角縮放，確保 30 根到 500 根的 K 棒間距永遠清晰舒適、絕不擠壓
   // ✨ 完美等比例縮放與自動撐滿寬度引擎
+  // ✨ 確保畫布寬度隨著滑桿的 displayCount 等比例放大，容納所有 K 棒
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -5286,9 +5284,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       setChartHeight(ch); 
 
       const currentDataLen = data ? data.length : 0;
-      const currentSlots = currentDataLen + extraCandles;
+      const currentSlots = currentDataLen + 2; // 預留 2 根空白
       
-      // ✨ 恢復正常的等比例縮放公式，確保視角放大縮小時 K 棒大小與位置完全精準
+      // 根據視角比例計算總寬度，確保大視角時畫布夠寬
       const calculatedWidth = (cw / displayCount) * currentSlots; 
       
       setChartWidth(Math.max(cw, calculatedWidth));
@@ -5377,16 +5375,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
 
   // ✨ 精準對齊最新 K 棒：計算最新一根 K 棒的座標，讓右側完美剛好留 2 根空白
+  // ✨ 精準對齊最新 K 棒：確保放大滑桿時，最新 K 棒永遠完美釘在右側，右側剛好保留 2 根空白
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (container && !isFullChart && data && data.length > 0) {
       
       const alignChart = () => {
+        const scrollW = container.scrollWidth;
         const clientW = container.clientWidth;
-        const totalSlots = data.length + 2; // 資料長度 + 2 根空白
-        const scrollW = (container.scrollWidth || (totalSlots * ((container.clientWidth || 1200) / displayCount)));
         
-        // 算出每根 K 棒的寬度，並讓最新一根 K 棒剛好停在畫面右側 (扣掉 2 根空白的距離)
+        // ✨ 計算每根 K 棒寬度，並精準將捲動軸停在「右側剛好留 2 根空白」的位置
         const singleSlotWidth = scrollW / totalSlots;
         const targetScrollLeft = scrollW - clientW - (singleSlotWidth * 2);
         
