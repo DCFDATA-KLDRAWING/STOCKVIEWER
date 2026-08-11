@@ -5094,7 +5094,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   // ✨ 2. 補回遺失的 Math.max，這是防止 K 棒被推出畫面的絕對關鍵！
   const totalSlots = Math.max(data.length, displayCount) + extraCandles;
   // 智慧對齊：大視角時自動向右靠齊
-  const offsetBars = Math.max(0, displayCount - data.length);  
+  const offsetBars = Math.max(displayCount, data.length + 15) - (data.length + 15);  
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
   const [gapLevels, setGapLevels] = useState(() => {
     try {
@@ -5218,7 +5218,59 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [chartWidth, setChartWidth] = useState(1200);
   const [chartHeight, setChartHeight] = useState(600);
   const isFullChart = displayCount === 9999; // ✨ 修正：改用 9999 專屬代號，避免小週期的卡死問題
+  // === 📐 終極版縮放與錨定引擎 ===
+  const [containerSize, setContainerSize] = useState({ w: window.innerWidth || 1200, h: 600 });
+  const prevDisplayCountRef = useRef(displayCount);
 
+  // 1. 動態偵測容器尺寸
+  React.useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver((entries) => {
+      setContainerSize({ w: entries[0].contentRect.width, h: entries[0].contentRect.height });
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // 2. 智慧錨定：當滑桿改變時，讓正在看的 K 棒完美定格！
+  React.useLayoutEffect(() => {
+    const prevCount = prevDisplayCountRef.current;
+    const container = scrollContainerRef.current;
+    
+    if (prevCount !== displayCount && container && data.length > 0) {
+      const scrollX = container.scrollLeft;
+      const cw = containerSize.w;
+      
+      const extraCandles = 15; // 預留 15 根空白 
+      const baseTotal = data.length + extraCandles;
+      
+      // 計算舊的對齊狀態
+      const oldVirtual = Math.max(prevCount, baseTotal);
+      const oldSpacing = (cw - 10 - 60) / prevCount; // 扣除左右 padding
+      const oldOffset = oldVirtual - baseTotal;
+      const centerPx = scrollX + cw / 2;
+      const centerIndex = (centerPx - 10) / oldSpacing - oldOffset;
+      
+      // 計算新的對齊狀態
+      const newVirtual = Math.max(displayCount, baseTotal);
+      const newSpacing = (cw - 10 - 60) / displayCount;
+      const newOffset = newVirtual - baseTotal;
+      
+      // 瞬間跳轉到位
+      const targetScroll = 10 + (centerIndex + newOffset) * newSpacing - cw / 2;
+      container.scrollLeft = Math.max(0, targetScroll);
+    }
+    prevDisplayCountRef.current = displayCount;
+  }, [displayCount, data.length, containerSize.w]);
+
+  // 3. 初次載入或切換股票時，自動推到最右側最新 K 棒
+  React.useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container && data.length > 0) {
+      container.scrollLeft = container.scrollWidth;
+    }
+  }, [realSymbol, timeframe]);
   // === 磁吸開關 ===
   const [isMagnetOn, setIsMagnetOn] = useState(false);
 
@@ -5273,35 +5325,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     setHoverPoint(null);
   }, [data.length, timeframe]);
 
-  // ✨ 動態調整畫布寬度與視角縮放，確保 30 根到 500 根的 K 棒間距永遠清晰舒適、絕不擠壓
-  // ✨ 完美等比例縮放與自動撐滿寬度引擎
-  // ✨ 確保畫布寬度隨著滑桿的 displayCount 等比例放大，容納所有 K 棒
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const updateSize = () => {
-      const cw = container.clientWidth || 1200;
-      const ch = container.clientHeight || 600; 
-      
-      setChartHeight(ch); 
-
-      const currentDataLen = data ? data.length : 0;
-      // ✨ 這裡也要同步套用 Math.max，並固定 2 根空白
-      const currentSlots = Math.max(currentDataLen, displayCount) + 2; 
-      
-      // ✨ 恢復正常的等比例縮放公式，確保視角放大縮小時 K 棒大小與位置完全精準
-      const calculatedWidth = (cw / displayCount) * currentSlots; 
-      
-      setChartWidth(Math.max(cw, calculatedWidth));
-    };
-
-    const observer = new ResizeObserver(() => updateSize());
-    observer.observe(container);
-    updateSize();
-
-    return () => observer.disconnect();
-  }, [displayCount, data?.length]);
+  
 
   // ✨ 新增：動態 Y 軸狀態 (加入 symbol 標籤，徹底杜絕舊股票記憶殘留！)
   const [yAxis, setYAxis] = useState({ min: null, max: null, symbol: realSymbol });
@@ -5377,29 +5401,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     };
   }, [realSymbol, timeframe, displayCount, isFullscreen, data?.length]);
 
-
-  // ✨ 精準對齊最新 K 棒：計算最新一根 K 棒的座標，讓右側完美剛好留 2 根空白
-  // ✨ 精準對齊最新 K 棒：確保放大滑桿時，最新 K 棒永遠完美釘在右側，右側剛好保留 2 根空白
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (container && !isFullChart && data && data.length > 0) {
-      
-      const alignChart = () => {
-        // 因為總寬度本身就設定了 data.length + 2，直接推到最右邊極限，自然就會完美呈現 2 根空白
-        container.scrollLeft = container.scrollWidth - container.clientWidth;
-        container.dispatchEvent(new Event('scroll'));
-      };
-
-      const t1 = setTimeout(alignChart, 50);
-      const t2 = setTimeout(alignChart, 150);
-
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-      };
-    }
-  // 🚨 關鍵修正：依賴陣列中刪除了 displayCount 與 chartWidth，確保拉滑桿時絕對不會觸發它！
-  }, [realSymbol, timeframe, isFullscreen, data?.length, isFullChart]);
 
   const commitDrawings = (newDrawings) => {
     setDrawings(newDrawings);
@@ -5509,65 +5510,35 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
   if (!data || data.length === 0) return null;
 
-  const width = chartWidth; // ✨ 使用動態寬度取代原本寫死的 1200
-  // ✨ 修改：將右側空間獨立出來給 Y 軸刻度使用
-  const paddingLeft = 10;   // 左邊留一點點空隙就好
-  const yAxisWidth = 50;    // 右側預留 50px 給價格刻度
+  // === 📐 同步計算畫布總寬與 K 棒位置 ===
+  const paddingLeft = 10;   
+  const yAxisWidth = 50;    
   const paddingRight = yAxisWidth + 10; 
-  
   const indPaddingLeft = 15;
+  const extraCandles = 15; 
   
-  // ✨ 動態分配高度 (完美分流版)：只有橫向放大時才撐滿螢幕，直式恢復原本的舒服高度！
+  const baseTotalSlots = data.length + extraCandles;
+  // 虛擬總數：確保資料少於視角時，K棒依然能乖乖靠右！
+  const virtualTotalSlots = Math.max(displayCount, baseTotalSlots);
+  const offsetBars = virtualTotalSlots - baseTotalSlots;
+  
+  const spacing = (containerSize.w - paddingLeft - paddingRight) / displayCount; 
+  const candleWidth = Math.max(0.5, spacing * 0.85);
+  const width = paddingLeft + paddingRight + virtualTotalSlots * spacing;
+  
+  // ✨ 動態分配高度
   const volHeight = isFullscreen ? 50 : 80;
   const indicatorHeight = indicatorType !== 'None' ? (isFullscreen ? 70 : 140) : 0;
   const chartPaddingTop = isFullscreen ? 25 : 80;
   const bottomLegendHeight = 40; 
   
-  let mainHeight = 400; // 直式預設主圖高度 (固定)
-  let totalSVGHeight = mainHeight + volHeight + indicatorHeight + 80; // 直式預設總高度 (固定)
+  let mainHeight = 400; 
+  let totalSVGHeight = mainHeight + volHeight + indicatorHeight + 80; 
   
-  // 如果是橫向翻轉(放大)，才用實際容器高度來反推主圖高度，解決上下留白
   if (isFullscreen) {
-    totalSVGHeight = Math.max(chartHeight, 350); 
+    totalSVGHeight = Math.max(containerSize.h, 350); 
     mainHeight = totalSVGHeight - volHeight - indicatorHeight - bottomLegendHeight;
   }
-
-  let defaultMax = -Infinity; let defaultMin = Infinity;
-  const activeCustomStrats = customStrategies ? customStrategies.filter(s => s.isActive) : [];
-
-  const latestData = data.slice(Math.max(0, data.length - displayCount));
-  
-  latestData.forEach((d) => { 
-      if (d.high > defaultMax) { defaultMax = d.high; } 
-      if (d.low < defaultMin) { defaultMin = d.low; } 
-  });
-
-  // ✨ 終極動態 Y 軸：檢查 Y 軸記憶是不是屬於目前這檔股票的？
-  // 如果是舊股票的記憶殘留，我們就「無視它」，直接使用剛算好的 default 完美備胎！
-  const isYAxisValid = yAxis.min !== null && yAxis.symbol === realSymbol;
-  const activeMin = isYAxisValid ? yAxis.min : defaultMin;
-  const activeMax = isYAxisValid ? yAxis.max : defaultMax;
-
-  // 1. 實際用來畫圖的座標範圍（保留上下 2% 空間，讓 K 棒不會貼邊）
-  const minPrice = Math.min(activeMin, (toggles.showVolSignal && defensivePrice) ? defensivePrice : Infinity); 
-  const maxPrice = activeMax; 
-
-  const drawMinPrice = minPrice * 0.98;
-  const drawMaxPrice = maxPrice * 1.02;
-  // ✨ 修正：成交量最大值改抓「當下畫面可見範圍」的最大量，才能動態縮放
-  const visibleData = data.slice(Math.max(0, data.length - displayCount));
-  // 真實畫面中的最大成交量（用來在右側刻度顯示真實數字）
-  const realMaxVol = Math.max(...visibleData.map(d => d.volume)) || 100;
-  
-  // 實際上用來畫成交量柱狀圖高度的放大系數（保留上方 10% 留白空間）
-  const maxVol = realMaxVol * 1.1;
-  // ✨ 修改：Y軸轉換公式的上下留白統一改為 20
-  // ✨ 把底部留白固定為 20
-  const getY = (p) => mainHeight - 20 - ((p - minPrice) / (maxPrice - minPrice)) * (mainHeight - 20 - chartPaddingTop);
-  const getVolY = (v) => volHeight - (v / maxVol) * volHeight;
-  
-  const spacing = (width - paddingLeft - paddingRight) / totalSlots; 
-  const candleWidth = Math.max(0.5, spacing * 0.85);
 
   // ✨ 更新畫線工具的輔助函數 (把 padding 改成 paddingLeft)
   const getLinePath = (data, key) => data.map((d, i) => { return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; }).join(' ');
@@ -6549,44 +6520,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              max="500" 
              step="10" 
              value={displayCount} 
-             onChange={(e) => {
-               const newCount = Number(e.target.value);
-               const container = scrollContainerRef.current;
-               
-               if (container && data && data.length > 0) {
-                 const cw = container.clientWidth;
-                 const currentScroll = container.scrollLeft;
-                 
-                 // 1. 抓出目前螢幕「中心點」對應的是哪一根 K 棒
-                 const oldTotalSlots = Math.max(data.length, displayCount) + 2; 
-                 const oldSpacing = container.scrollWidth / oldTotalSlots;
-                 // (扣掉左邊的 paddingLeft 以精準定位)
-                 const centerIdx = (currentScroll + cw / 2 - 10) / oldSpacing;
-
-                 // 2. 更新滑桿的顯示根數
-                 setDisplayCount(newCount);
-                 
-                 // 3. 畫布根據新根數重新計算寬度後，精準將剛剛那根 K 棒「拉回」螢幕中心
-                 setTimeout(() => {
-                   if (!scrollContainerRef.current) return;
-                   
-                   const newTotalSlots = Math.max(data.length, newCount) + 2;
-                   // 用您原本的等比例公式推算新畫布寬度
-                   const newExpectedWidth = Math.max(cw, (cw / newCount) * newTotalSlots);
-                   const newSpacing = newExpectedWidth / newTotalSlots;
-                   
-                   // 計算新的捲動位置，讓 centerIdx 保持在中心 (加上 paddingLeft: 10)
-                   const targetScrollLeft = 10 + (centerIdx * newSpacing) - (cw / 2);
-                   
-                   // 限制捲動範圍，確保絕對不會超過最左或最右
-                   const maxScroll = newExpectedWidth - cw;
-                   scrollContainerRef.current.scrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScroll));
-                 }, 10); // 10 毫秒極速定位，肉眼幾乎看不出閃爍
-                 
-               } else {
-                 setDisplayCount(newCount);
-               }
-             }} 
+             onChange={(e) => setDisplayCount(Number(e.target.value))} 
              className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" 
            />
            <span className="text-slate-300 text-xs font-bold w-6">{displayCount}</span>
