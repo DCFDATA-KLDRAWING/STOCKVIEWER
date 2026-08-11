@@ -5385,31 +5385,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     if (container && !isFullChart && data && data.length > 0) {
       
       const alignChart = () => {
-        const clientW = container.clientWidth;
-        // ✨ 同步套用 Math.max，保證滾動基準點絕對不會算錯
-        const totalSlots = Math.max(data.length, displayCount) + 2; 
-        const scrollW = (container.scrollWidth || (totalSlots * ((container.clientWidth || 1200) / displayCount)));
-        
-        // 算出每根 K 棒的寬度，並讓最新一根 K 棒剛好停在畫面右側 (扣掉 2 根空白的距離)
-        const singleSlotWidth = scrollW / totalSlots;
-        const targetScrollLeft = scrollW - clientW - (singleSlotWidth * 2);
-        
-        container.scrollLeft = Math.max(0, targetScrollLeft);
-        
+        // 因為總寬度本身就設定了 data.length + 2，直接推到最右邊極限，自然就會完美呈現 2 根空白
+        container.scrollLeft = container.scrollWidth - container.clientWidth;
         container.dispatchEvent(new Event('scroll'));
       };
 
       const t1 = setTimeout(alignChart, 50);
       const t2 = setTimeout(alignChart, 150);
-      const t3 = setTimeout(alignChart, 300);
 
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
-        clearTimeout(t3);
       };
     }
-  }, [realSymbol, timeframe, isFullscreen, data?.length, displayCount, isFullChart, chartWidth]);
+  // 🚨 關鍵修正：依賴陣列中刪除了 displayCount 與 chartWidth，確保拉滑桿時絕對不會觸發它！
+  }, [realSymbol, timeframe, isFullscreen, data?.length, isFullChart]);
 
   const commitDrawings = (newDrawings) => {
     setDrawings(newDrawings);
@@ -6559,9 +6549,43 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              max="500" 
              step="10" 
              value={displayCount} 
-             onChange={(e) => { 
-               // ✨ 乾淨俐落：直接更新視角，讓底層的自動對齊與寬度引擎同步展開！
-               setDisplayCount(Number(e.target.value)); 
+             onChange={(e) => {
+               const newCount = Number(e.target.value);
+               const container = scrollContainerRef.current;
+               
+               if (container && data && data.length > 0) {
+                 const cw = container.clientWidth;
+                 const currentScroll = container.scrollLeft;
+                 
+                 // 1. 抓出目前螢幕「中心點」對應的是哪一根 K 棒
+                 const oldTotalSlots = Math.max(data.length, displayCount) + 2; 
+                 const oldSpacing = container.scrollWidth / oldTotalSlots;
+                 // (扣掉左邊的 paddingLeft 以精準定位)
+                 const centerIdx = (currentScroll + cw / 2 - 10) / oldSpacing;
+
+                 // 2. 更新滑桿的顯示根數
+                 setDisplayCount(newCount);
+                 
+                 // 3. 畫布根據新根數重新計算寬度後，精準將剛剛那根 K 棒「拉回」螢幕中心
+                 setTimeout(() => {
+                   if (!scrollContainerRef.current) return;
+                   
+                   const newTotalSlots = Math.max(data.length, newCount) + 2;
+                   // 用您原本的等比例公式推算新畫布寬度
+                   const newExpectedWidth = Math.max(cw, (cw / newCount) * newTotalSlots);
+                   const newSpacing = newExpectedWidth / newTotalSlots;
+                   
+                   // 計算新的捲動位置，讓 centerIdx 保持在中心 (加上 paddingLeft: 10)
+                   const targetScrollLeft = 10 + (centerIdx * newSpacing) - (cw / 2);
+                   
+                   // 限制捲動範圍，確保絕對不會超過最左或最右
+                   const maxScroll = newExpectedWidth - cw;
+                   scrollContainerRef.current.scrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScroll));
+                 }, 10); // 10 毫秒極速定位，肉眼幾乎看不出閃爍
+                 
+               } else {
+                 setDisplayCount(newCount);
+               }
              }} 
              className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" 
            />
