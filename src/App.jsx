@@ -6549,7 +6549,48 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
          {/* ✨ 新增：K棒數量縮放滑桿 */}
          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-600 shrink-0 shadow-inner mr-auto">
            <span className="text-cyan-400 text-xs font-bold whitespace-nowrap">🔎 視角</span>
-           <input type="range" min="30" max="500" step="10" value={displayCount} onChange={(e) => { setDisplayCount(Number(e.target.value)); }} className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" />
+           <input 
+  type="range" 
+  min="30" 
+  max="500" 
+  step="10" 
+  value={displayCount} 
+  onChange={(e) => {
+    const newCount = Number(e.target.value);
+    const container = scrollContainerRef.current;
+    
+    if (container) {
+      // 1. 記錄當前狀態與舊間距
+      const currentScrollLeft = container.scrollLeft;
+      const currentTotalSlots = data.length + extraCandles;
+      const oldWidth = container.scrollWidth;
+      const oldSpacing = oldWidth / currentTotalSlots;
+      
+      // 2. 計算目前畫面最左側對應的 K 棒索引
+      const anchoredIndex = Math.max(0, Math.round((currentScrollLeft - paddingLeft) / oldSpacing) - offsetBars);
+      
+      // 3. 更新視角根數
+      setDisplayCount(newCount);
+      
+      // 4. ✨ 數學精準錨定：根據新視角 (newCount) 直接算出新畫布的預期寬度與新間距
+      setTimeout(() => {
+        if (!scrollContainerRef.current) return;
+        
+        const cw = scrollContainerRef.current.clientWidth || 1200;
+        // 依照您程式碼中原本的等比例縮放公式算出新寬度
+        const expectedNewWidth = Math.max(cw, (cw / newCount) * currentTotalSlots);
+        const newSpacing = expectedNewWidth / currentTotalSlots;
+        
+        // 精準滾動到位，讓您原本停住的那根 K 棒原地不動，左側 K 棒向它靠攏！
+        const targetScrollLeft = paddingLeft + (anchoredIndex + offsetBars) * newSpacing;
+        scrollContainerRef.current.scrollLeft = Math.max(0, targetScrollLeft);
+      }, 30);
+    } else {
+      setDisplayCount(newCount);
+    }
+  }} 
+  className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" 
+/>
            <span className="text-slate-300 text-xs font-bold w-6">{displayCount}</span>
          </div>
 
