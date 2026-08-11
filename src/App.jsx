@@ -5090,7 +5090,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [chartModal, setChartModal] = useState(null);
   
   // ✨ 1. 將預留空白固定為 2 根
-  const extraCandles = 2;
+  const extraCandles = 15;
   // ✨ 2. 補回遺失的 Math.max，這是防止 K 棒被推出畫面的絕對關鍵！
   const totalSlots = Math.max(data.length, displayCount) + extraCandles;
   // 智慧對齊：大視角時自動向右靠齊
