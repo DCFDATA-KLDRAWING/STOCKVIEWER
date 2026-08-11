@@ -5089,8 +5089,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
   
-  const extraCandles = 15; // 永遠只保留 2 根空白
-  const totalSlots = data.length + extraCandles;
+  // ✨ 1. 將預留空白固定為 2 根
+  const extraCandles = 2;
+  // ✨ 2. 補回遺失的 Math.max，這是防止 K 棒被推出畫面的絕對關鍵！
+  const totalSlots = Math.max(data.length, displayCount) + extraCandles;
+  // 智慧對齊：大視角時自動向右靠齊
   const offsetBars = Math.max(0, displayCount - data.length);  
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
   const [gapLevels, setGapLevels] = useState(() => {
@@ -5284,9 +5287,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       setChartHeight(ch); 
 
       const currentDataLen = data ? data.length : 0;
-      const currentSlots = currentDataLen + 2; // 預留 2 根空白
+      // ✨ 這裡也要同步套用 Math.max，並固定 2 根空白
+      const currentSlots = Math.max(currentDataLen, displayCount) + 2; 
       
-      // 根據視角比例計算總寬度，確保大視角時畫布夠寬
+      // ✨ 恢復正常的等比例縮放公式，確保視角放大縮小時 K 棒大小與位置完全精準
       const calculatedWidth = (cw / displayCount) * currentSlots; 
       
       setChartWidth(Math.max(cw, calculatedWidth));
@@ -5381,10 +5385,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     if (container && !isFullChart && data && data.length > 0) {
       
       const alignChart = () => {
-        const scrollW = container.scrollWidth;
         const clientW = container.clientWidth;
+        // ✨ 同步套用 Math.max，保證滾動基準點絕對不會算錯
+        const totalSlots = Math.max(data.length, displayCount) + 2; 
+        const scrollW = (container.scrollWidth || (totalSlots * ((container.clientWidth || 1200) / displayCount)));
         
-        // ✨ 計算每根 K 棒寬度，並精準將捲動軸停在「右側剛好留 2 根空白」的位置
+        // 算出每根 K 棒的寬度，並讓最新一根 K 棒剛好停在畫面右側 (扣掉 2 根空白的距離)
         const singleSlotWidth = scrollW / totalSlots;
         const targetScrollLeft = scrollW - clientW - (singleSlotWidth * 2);
         
