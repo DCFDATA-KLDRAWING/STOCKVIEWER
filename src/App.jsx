@@ -5089,7 +5089,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
   
-  const extraCandles = 2; // 永遠只保留 2 根空白
+  const extraCandles = 15; // 永遠只保留 2 根空白
   const totalSlots = data.length + extraCandles;
   const offsetBars = Math.max(0, displayCount - data.length);  
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
