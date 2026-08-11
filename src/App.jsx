@@ -7431,9 +7431,27 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             const boxWidth = 140; 
             const boxHeight = tooltipLines.length * 22 + 10;
             
-            let tooltipX = crosshair.x + 15; let tooltipY = crosshair.y - boxHeight / 2;
+            // ✨ 智慧翻轉邏輯：預設放右邊 (+15px)；如果靠右邊緣太近，就翻轉到左邊 (-boxWidth - 15px)
+            // 這裡我們用當下螢幕的捲動位置 (scrollLeft) 與螢幕寬度 (clientWidth) 來判斷
+            const container = scrollContainerRef.current;
+            const scrollLeft = container ? container.scrollLeft : 0;
+            const clientW = container ? container.clientWidth : width;
+            
+            // 計算查價線在螢幕上的「相對 X 座標」(0 ~ 螢幕寬度)
+            const screenX = crosshair.x - scrollLeft;
+            
+            // 如果查價線在螢幕的右半邊 (超過 60% 的位置)，就把資訊框放到左邊，避免被擋住
+            let tooltipX = screenX > (clientW * 0.6) 
+                           ? crosshair.x - boxWidth - 15 
+                           : crosshair.x + 15;
+            
+            // 保底防撞邊界：確保絕對不會超出整個 SVG 畫布
             if (tooltipX + boxWidth > width) tooltipX = crosshair.x - boxWidth - 15;
-            if (tooltipY < 0) tooltipY = 5; if (tooltipY + boxHeight > mainHeight + volHeight + indicatorHeight) tooltipY = mainHeight + volHeight + indicatorHeight - boxHeight - 5;
+            if (tooltipX < 0) tooltipX = 15; // 避免跑到左邊畫面外
+
+            let tooltipY = crosshair.y - boxHeight / 2;
+            if (tooltipY < 0) tooltipY = 5; 
+            if (tooltipY + boxHeight > mainHeight + volHeight + indicatorHeight) tooltipY = mainHeight + volHeight + indicatorHeight - boxHeight - 5;
 
             return (
               <g className="pointer-events-none">
