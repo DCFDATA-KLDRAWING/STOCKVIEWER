@@ -2204,7 +2204,7 @@ const App = () => {
   const [symbolInput, setSymbolInput] = useState(''); 
   const [currentViewedSymbol, setCurrentViewedSymbol] = useState(''); // ✨ 新增：用來記錄目前「成功載入並顯示在圖表上」的股號
   const [issuedShares, setIssuedShares] = useState(''); 
-  const [displayCount, setDisplayCount] = useState(60);
+  const [displayCount, setDisplayCount] = useState(300);
   const [timeframe, setTimeframe] = useState('D');
   
   // ✨ 新增副圖指標狀態 (預設關閉 None)
@@ -5090,11 +5090,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [chartModal, setChartModal] = useState(null);
   
   // ✨ 1. 將預留空白固定為 2 根
-  const extraCandles = 15;
-  // ✨ 2. 補回遺失的 Math.max，這是防止 K 棒被推出畫面的絕對關鍵！
-  const totalSlots = Math.max(data.length, displayCount) + extraCandles;
-  // 智慧對齊：大視角時自動向右靠齊
-  const offsetBars = Math.max(0, displayCount - data.length);  
+  // 🌟 關鍵修改：將畫布總格數改為只受 displayCount 控制，不再受歷史總長度 (data.length) 影響
+  const extraCandles = 2; // 右側保留 2 根空白，讓最新 K 棒完美貼齊
+  const totalSlots = displayCount + extraCandles; 
+  const offsetBars = 0;   // 關閉不必要的位移  
   // ✨ 升級：跨股票共用的缺口線狀態管理 (自動存入瀏覽器記憶體)
   const [gapLevels, setGapLevels] = useState(() => {
     try {
