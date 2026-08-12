@@ -6556,7 +6556,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
            <input 
              type="range" 
              min="30" 
-             max="300" 
+             max="230" 
              step="10" 
              value={displayCount} 
              onChange={(e) => { 
