@@ -2204,7 +2204,7 @@ const App = () => {
   const [symbolInput, setSymbolInput] = useState(''); 
   const [currentViewedSymbol, setCurrentViewedSymbol] = useState(''); // ✨ 新增：用來記錄目前「成功載入並顯示在圖表上」的股號
   const [issuedShares, setIssuedShares] = useState(''); 
-  const [displayCount, setDisplayCount] = useState(500);
+  const [displayCount, setDisplayCount] = useState(60);
   const [timeframe, setTimeframe] = useState('D');
   
   // ✨ 新增副圖指標狀態 (預設關閉 None)
@@ -6556,7 +6556,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
            <input 
              type="range" 
              min="30" 
-             max="500" 
+             max="300" 
              step="10" 
              value={displayCount} 
              onChange={(e) => { 
