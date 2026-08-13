@@ -2300,7 +2300,10 @@ const App = () => {
     showZigZag: false, // ✨ 新增：細折線開關
     showVmaTurn: false, // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
     vmaLongOnly: false,  // 🌟 新增：只在多方(收盤價 > 55MA)時顯示
-    vmaShortOnly: false  // 🌟 新增：只在空方(收盤價 < 55MA)時顯示
+    vmaShortOnly: false,  // 🌟 新增：只在空方(收盤價 < 55MA)時顯示
+    showAutoWave: false,      // 🌟 新增：自動波段對照主開關
+    autoWaveLongOnly: false,  // 🌟 新增：自動波段僅多方(>55MA)
+    autoWaveShortOnly: false  // 🌟 新增：自動波段僅空方(<55MA)
     
   });
   // ✨ 新增：SAR 指標的專屬參數
@@ -4305,6 +4308,27 @@ const App = () => {
                     <label className="flex items-center gap-1 cursor-pointer bg-emerald-950/40 px-2 py-1 rounded border border-emerald-900/50 hover:bg-emerald-900/40 transition-colors">
                       <input type="checkbox" checked={toggles.vmaShortOnly} onChange={() => handleToggle('vmaShortOnly')} className="w-3 h-3 text-emerald-500 rounded bg-slate-900 border-slate-600" />
                       <span className="text-[11px] text-emerald-400 font-bold">僅空方(&lt;55MA)</span>
+                    </label>
+                  )}
+                  {/* 🌟 新增：自動波段對照主開關 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+                    <input type="checkbox" checked={toggles.showAutoWave} onChange={() => handleToggle('showAutoWave')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-blue-400 font-bold">自動波段對照</span>
+                  </label>
+
+                  {/* 🌟 新增：自動波段僅多方 */}
+                  {toggles.showAutoWave && (
+                    <label className="flex items-center gap-1 cursor-pointer bg-red-950/40 px-2 py-1 rounded border border-red-900/50 hover:bg-red-900/40 transition-colors">
+                      <input type="checkbox" checked={toggles.autoWaveLongOnly} onChange={() => handleToggle('autoWaveLongOnly')} className="w-3 h-3 text-red-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-[11px] text-red-400 font-bold">自動波段僅多方(&gt;55MA)</span>
+                    </label>
+                  )}
+
+                  {/* 🌟 新增：自動波段僅空方 */}
+                  {toggles.showAutoWave && (
+                    <label className="flex items-center gap-1 cursor-pointer bg-emerald-950/40 px-2 py-1 rounded border border-emerald-900/50 hover:bg-emerald-900/40 transition-colors">
+                      <input type="checkbox" checked={toggles.autoWaveShortOnly} onChange={() => handleToggle('autoWaveShortOnly')} className="w-3 h-3 text-emerald-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-[11px] text-emerald-400 font-bold">自動波段僅空方(&lt;55MA)</span>
                     </label>
                   )}
                   {/* ✨ 新增：細折線 (ZigZag) 打勾按鈕 */}
@@ -7042,7 +7066,109 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 })()}
               </g>
             )}
+            {/* 🌟 自動波段角度與異位對照渲染 (依循 ZigZag 轉折點自動計算) */}
+{toggles.showAutoWave && data.length > 0 && (() => {
+   const lastDay = data[data.length - 1];
+   if (!lastDay || !lastDay.zigzag || !lastDay.zigzag.pivots) return null;
+   
+   const pivots = lastDay.zigzag.pivots;
+   if (pivots.length < 2) return null;
 
+   const waves = [];
+   for (let i = 1; i < pivots.length; i++) {
+       const p0 = pivots[i-1];
+       const p1 = pivots[i];
+       
+       const idx0 = p0.idx;
+       const idx1 = p1.idx;
+       if (idx0 > idx1) continue;
+
+       const c0 = data[idx0];
+       const c1 = data[idx1];
+       if (!c0 || !c1) continue;
+
+       const diff = c1.close - c0.close;
+       const absDiff = Math.abs(diff);
+       const bars = Math.max(1, idx1 - idx0);
+
+       let totalVol = 0;
+       for (let j = idx0; j <= idx1; j++) {
+           if (data[j]) totalVol += data[j].volume;
+       }
+       const startVma5 = c0.vma1 !== null ? c0.vma1 : 0;
+       const endVma5 = c1.vma1 !== null ? c1.vma1 : 0;
+
+       // 55MA 多空位置判斷
+       const ma55 = c1.fixedMa60 ?? c1.ma4 ?? c1.close;
+       const isLong = c1.close >= ma55;
+       const isShort = c1.close < ma55;
+
+       let showWaveInfo = true;
+       if (toggles.autoWaveLongOnly && !isLong) showWaveInfo = false;
+       if (toggles.autoWaveShortOnly && !isShort) showWaveInfo = false;
+
+       waves.push({
+           p0, p1, diff, absDiff, bars,
+           dir: diff >= 0 ? 'up' : 'down',
+           isVmaUp: endVma5 >= startVma5,
+           showWaveInfo
+       });
+   }
+
+   return waves.map((w, i) => {
+       if (!w.showWaveInfo) return null;
+
+       const labels = [];
+       const pct = (w.diff / w.p0.price) * 100;
+       labels.push(`幅: ${w.diff>0?'+':''}${w.diff.toFixed(2)} (${pct>0?'+':''}${pct.toFixed(1)}%)`);
+
+       if (i >= 1) {
+           const prev = waves[i-1];
+           const isVolInc = w.isVmaUp;
+           const isAmpInc = w.absDiff > prev.absDiff;
+           let text = '';
+           if (w.dir === 'up') {
+               text = (isVolInc ? "量增" : "量縮") + (isAmpInc ? "價漲角度陡" : "價彈角度緩");
+           } else {
+               text = (isVolInc ? "量增" : "量縮") + (isAmpInc ? "價跌角度陡" : "價跌角度緩");
+           }
+           labels.push(`[異位] ${text}`);
+       }
+
+       if (i >= 2) {
+           const prevPrev = waves[i-2];
+           if (w.dir === prevPrev.dir) {
+               const ampCmp = w.absDiff > prevPrev.absDiff ? '強' : '弱';
+               const volCmp = w.isVmaUp ? '增' : '縮';
+               labels.push(`[同位] 幅度${ampCmp} / 量${volCmp}`);
+           }
+       }
+
+       const x0 = paddingLeft + w.p0.idx * spacing + spacing / 2;
+       const y0 = getY(w.p0.price);
+       const x1 = paddingLeft + w.p1.idx * spacing + spacing / 2;
+       const y1 = getY(w.p1.price);
+       
+       const midX = (x0 + x1) / 2;
+       const midY = (y0 + y1) / 2;
+       
+       const boxHeight = labels.length * 16 + 8;
+       const boxWidth = 160;
+       const offsetY = w.dir === 'up' ? -boxHeight/2 - 50 : boxHeight/2 + 50;
+
+       return (
+         <g key={`autowave-info-${i}`} pointerEvents="none">
+           <line x1={midX} y1={midY} x2={midX} y2={midY + offsetY} stroke="#38bdf8" strokeWidth="1" strokeDasharray="4,4" opacity="0.6" />
+           <g transform={`translate(${midX}, ${midY + offsetY})`}>
+             <rect x={-boxWidth/2} y={-boxHeight/2} width={boxWidth} height={boxHeight} fill="#0f172a" fillOpacity="0.85" rx="6" stroke="#38bdf8" strokeWidth="1" strokeOpacity="0.6" />
+             {labels.map((lb, lIdx) => (
+               <text key={lIdx} x={0} y={-boxHeight/2 + 15 + lIdx * 16} fill={lIdx === 0 ? "#f8fafc" : (lIdx === 1 ? "#fbbf24" : "#a78bfa")} fontSize="11" fontWeight="bold" textAnchor="middle">{lb}</text>
+             ))}
+           </g>
+         </g>
+       );
+   });
+})()}
             {/* ✨ 新增：ZigZag 細折線繪製 */}
             {toggles.showZigZag && data.length > 0 && (() => {
                const lastDay = data[data.length - 1];
