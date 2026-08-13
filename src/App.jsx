@@ -3496,19 +3496,23 @@ const App = () => {
     const vma1 = calculateSMA(volumes, vmaParams?.vma1?.p || 5); const vma2 = calculateSMA(volumes, vmaParams?.vma2?.p || 13); const vma3 = calculateSMA(volumes, vmaParams?.vma3?.p || 34); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
     
-    // 🌟 貼在這裡！把 5MV / 13MV 的轉折方向預先算好
+    // 🌟 修正版：嚴格捕捉 5MV 與 13MV 的「轉折點」（斜率由負轉正為上揚，由正轉負為下彎）
     const vma1Trend = [];
     const vma2Trend = [];
     for (let i = 0; i < data.length; i++) {
       let t1 = 0;
       let t2 = 0;
-      if (i > 0) {
-        if (vma1[i] !== null && vma1[i - 1] !== null) {
-          t1 = vma1[i] >= vma1[i - 1] ? 1 : -1;
-        }
-        if (vma2[i] !== null && vma2[i - 1] !== null) {
-          t2 = vma2[i] >= vma2[i - 1] ? 1 : -1;
-        }
+      if (i >= 2) {
+        // 計算前一天的斜率與今天的斜率
+        const slope1_prev = vma1[i-1] - vma1[i-2];
+        const slope1_curr = vma1[i] - vma1[i-1];
+        if (slope1_prev <= 0 && slope1_curr > 0) t1 = 1;   // 谷底轉折向上
+        else if (slope1_prev >= 0 && slope1_curr < 0) t1 = -1; // 頭部轉折向下
+
+        const slope2_prev = vma2[i-1] - vma2[i-2];
+        const slope2_curr = vma2[i] - vma2[i-1];
+        if (slope2_prev <= 0 && slope2_curr > 0) t2 = 1;   // 谷底轉折向上
+        else if (slope2_prev >= 0 && slope2_curr < 0) t2 = -1; // 頭部轉折向下
       }
       vma1Trend.push(t1);
       vma2Trend.push(t2);
@@ -7381,10 +7385,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             {data.map((d, i) => {
               const x = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
               
-              const isVma1TurnUp = i > 0 && data[i-1].vma1Slope === -1 && d.vma1Slope === 1;
-              const isVma1TurnDown = i > 0 && data[i-1].vma1Slope === 1 && d.vma1Slope === -1;
-              const isVma2TurnUp = i > 0 && data[i-1].vma2Slope === -1 && d.vma2Slope === 1;
-              const isVma2TurnDown = i > 0 && data[i-1].vma2Slope === -1 && d.vma2Slope === -1;
+              // 🌟 只要 slope 為 1 代表轉折向上，-1 代表轉折向下
+              const isVma1TurnUp = d.vma1Slope === 1;
+              const isVma1TurnDown = d.vma1Slope === -1;
+              const isVma2TurnUp = d.vma2Slope === 1;
+              const isVma2TurnDown = d.vma2Slope === -1;
 
               // 🌟 核心過濾判斷：檢查收盤價與 55MA（這裡以 fixedMa60 為基準）的相對位置
               const ma55 = d.fixedMa60 ?? d.ma4 ?? d.close; // 若 MA 還沒算出來則預設符合
