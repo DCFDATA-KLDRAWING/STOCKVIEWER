@@ -2298,7 +2298,9 @@ const App = () => {
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
     showMaxVolLines: false, // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
     showZigZag: false, // ✨ 新增：細折線開關
-    showVmaTurn: false // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
+    showVmaTurn: false, // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
+    vmaLongOnly: false,  // 🌟 新增：只在多方(收盤價 > 55MA)時顯示
+    vmaShortOnly: false  // 🌟 新增：只在空方(收盤價 < 55MA)時顯示
     
   });
   // ✨ 新增：SAR 指標的專屬參數
@@ -4290,6 +4292,21 @@ const App = () => {
                     <input type="checkbox" checked={toggles.showVmaTurn} onChange={() => handleToggle('showVmaTurn')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
                     <span className="text-xs text-amber-400 font-bold">量線轉折(▲▼)</span>
                   </label>
+                  {/* 🌟 新增：多方篩選 (收盤價 > 55MA) */}
+                  {toggles.showVmaTurn && (
+                    <label className="flex items-center gap-1 cursor-pointer bg-red-950/40 px-2 py-1 rounded border border-red-900/50 hover:bg-red-900/40 transition-colors">
+                      <input type="checkbox" checked={toggles.vmaLongOnly} onChange={() => handleToggle('vmaLongOnly')} className="w-3 h-3 text-red-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-[11px] text-red-400 font-bold">僅多方(&gt;55MA)</span>
+                    </label>
+                  )}
+
+                  {/* 🌟 新增：空方篩選 (收盤價 < 55MA) */}
+                  {toggles.showVmaTurn && (
+                    <label className="flex items-center gap-1 cursor-pointer bg-emerald-950/40 px-2 py-1 rounded border border-emerald-900/50 hover:bg-emerald-900/40 transition-colors">
+                      <input type="checkbox" checked={toggles.vmaShortOnly} onChange={() => handleToggle('vmaShortOnly')} className="w-3 h-3 text-emerald-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-[11px] text-emerald-400 font-bold">僅空方(&lt;55MA)</span>
+                    </label>
+                  )}
                   {/* ✨ 新增：細折線 (ZigZag) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showZigZag} onChange={() => handleToggle('showZigZag')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">細折線</span></label>
                   {/* ✨ 新增：SAR 指標開關與參數設定 */}
@@ -7238,12 +7255,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             {data.map((d, i) => {
               const x = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
               
-              // 🌟 判斷 5MV 是否剛好發生轉折
               const isVma1TurnUp = i > 0 && data[i-1].vma1Slope === -1 && d.vma1Slope === 1;
               const isVma1TurnDown = i > 0 && data[i-1].vma1Slope === 1 && d.vma1Slope === -1;
-              // 🌟 13MV 轉折判斷
               const isVma2TurnUp = i > 0 && data[i-1].vma2Slope === -1 && d.vma2Slope === 1;
-              const isVma2TurnDown = i > 0 && data[i-1].vma2Slope === 1 && d.vma2Slope === -1;
+              const isVma2TurnDown = i > 0 && data[i-1].vma2Slope === -1 && d.vma2Slope === -1;
+
+              // 🌟 核心過濾判斷：檢查收盤價與 55MA（這裡以 fixedMa60 為基準）的相對位置
+              const ma55 = d.fixedMa60 ?? d.ma4 ?? d.close; // 若 MA 還沒算出來則預設符合
+              const isLong = d.close >= ma55;  // 收盤價在 55MA 上方 = 多
+              const isShort = d.close < ma55;  // 收盤價在 55MA 下方 = 空
+
+              // 多空開關過濾器
+              const shouldShow = (() => {
+                if (!toggles.showVmaTurn) return false;
+                if (toggles.vmaLongOnly && !isLong) return false;   // 勾選「僅多方」但現在是空方 -> 隱藏
+                if (toggles.vmaShortOnly && !isShort) return false; // 勾選「僅空方」但現在是多方 -> 隱藏
+                return true;
+              });
 
               return (
                 <g key={`volsignal-${i}`}>
@@ -7251,23 +7279,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                   {toggles.showVolume && vmaParams?.vma2?.show !== false && i === data.length - (vmaParams?.vma2?.p || 13) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma2?.c || '#8b5cf6'} strokeWidth="2" fill="none" />}
                   {toggles.showVolume && vmaParams?.vma3?.show !== false && i === data.length - (vmaParams?.vma3?.p || 34) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth="2" fill="none" />}
                   
-                  {/* 5MV 轉折指標 (▲▼) */}
-                  {toggles.showVmaTurn && isVma1TurnUp && (
+                  {/* 🌟 加上 shouldShow() 條件保護 */}
+                  {shouldShow() && isVma1TurnUp && (
                     <text x={x} y={volHeight - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#ef4444">▲</text>
                   )}
-                  {toggles.showVmaTurn && isVma1TurnDown && (
+                  {shouldShow() && isVma1TurnDown && (
                     <text x={x} y={12} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#22c55e">▼</text>
                   )}
-
-                  {/* 🌟 13MV 轉折指標 (我們用藍紫色的 ◆ 向上與向下鑽石區分) */}
-                  {toggles.showVmaTurn && isVma2TurnUp && (
+                  {shouldShow() && isVma2TurnUp && (
                     <text x={x} y={volHeight - 16} fontSize="9" fontWeight="bold" textAnchor="middle" fill="#38bdf8">◆</text>
                   )}
-                  {toggles.showVmaTurn && isVma2TurnDown && (
+                  {shouldShow() && isVma2TurnDown && (
                     <text x={x} y={23} fontSize="9" fontWeight="bold" textAnchor="middle" fill="#a855f7">◆</text>
                   )}
 
-                  {/* 量能標記 */}
                   {toggles.showVolSignal && d.signalVol && <text x={x} y={getVolY(d.volume) - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill={d.signalVol === '天量' ? '#ef4444' : (d.signalVol === '巨量' ? '#f97316' : '#8b5cf6')}>{d.signalVol === '極限大量' ? '極' : d.signalVol[0]}</text>}
                 </g>
               );
