@@ -2297,7 +2297,8 @@ const App = () => {
     showBBandsCompress: false, // ✨ 新增：布林壓縮區塊 開關
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
     showMaxVolLines: false, // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
-    showZigZag: false // ✨ 新增：細折線開關
+    showZigZag: false, // ✨ 新增：細折線開關
+    showVmaTurn: false // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
     
   });
   // ✨ 新增：SAR 指標的專屬參數
@@ -3489,7 +3490,24 @@ const App = () => {
     const ma4 = calculateSMA(closes, maParams?.ma4?.p || 60); const ma5 = calculateSMA(closes, maParams?.ma5?.p || 120); const ma6 = calculateSMA(closes, maParams?.ma6?.p || 240); 
     const vma1 = calculateSMA(volumes, vmaParams?.vma1?.p || 5); const vma2 = calculateSMA(volumes, vmaParams?.vma2?.p || 13); const vma3 = calculateSMA(volumes, vmaParams?.vma3?.p || 34); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
-
+    
+    // 🌟 貼在這裡！把 5MV / 13MV 的轉折方向預先算好
+    const vma1Trend = [];
+    const vma2Trend = [];
+    for (let i = 0; i < data.length; i++) {
+      let t1 = 0;
+      let t2 = 0;
+      if (i > 0) {
+        if (vma1[i] !== null && vma1[i - 1] !== null) {
+          t1 = vma1[i] >= vma1[i - 1] ? 1 : -1;
+        }
+        if (vma2[i] !== null && vma2[i - 1] !== null) {
+          t2 = vma2[i] >= vma2[i - 1] ? 1 : -1;
+        }
+      }
+      vma1Trend.push(t1);
+      vma2Trend.push(t2);
+    }
     // ✨ 新增固定的 MA 計算，專供策略的「乖離」與「動態均線區間」使用
     const fixedMa5 = calculateSMA(closes, 5);
     const fixedMa8 = calculateSMA(closes, 8);
@@ -3763,6 +3781,9 @@ const App = () => {
       const enrichedCandle = { 
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], ma4: ma4[i], ma5: ma5[i], ma6: ma6[i], bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           fixedMa5: fixedMa5[i], fixedMa10: fixedMa10[i], fixedMa20: fixedMa20[i], fixedMa28: fixedMa28[i], fixedMa60: fixedMa60[i], fixedMv5: fixedMv5[i],
+          // 🌟 貼在這裡！把剛剛算好的 5MV 與 13MV 轉折狀態放進去
+          vma1Slope: vma1Trend[i], 
+          vma2Slope: vma2Trend[i],
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 }, willr,
           obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower,
@@ -4264,6 +4285,11 @@ const App = () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線總開關</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
 
+                  {/* 🌟 新增：均量線轉折指標開關 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+                    <input type="checkbox" checked={toggles.showVmaTurn} onChange={() => handleToggle('showVmaTurn')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-amber-400 font-bold">量線轉折(▲▼)</span>
+                  </label>
                   {/* ✨ 新增：細折線 (ZigZag) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showZigZag} onChange={() => handleToggle('showZigZag')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">細折線</span></label>
                   {/* ✨ 新增：SAR 指標開關與參數設定 */}
@@ -7211,12 +7237,26 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
             {data.map((d, i) => {
               const x = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
+              
+              // 🌟 判斷 5MV 是否剛好發生轉折
+              const isVma1TurnUp = i > 0 && data[i-1].vma1Slope === -1 && d.vma1Slope === 1;
+              const isVma1TurnDown = i > 0 && data[i-1].vma1Slope === 1 && d.vma1Slope === -1;
+
               return (
                 <g key={`volsignal-${i}`}>
                   {toggles.showVolume && vmaParams?.vma1?.show !== false && i === data.length - (vmaParams?.vma1?.p || 5) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth="2" fill="none" />}
                   {toggles.showVolume && vmaParams?.vma2?.show !== false && i === data.length - (vmaParams?.vma2?.p || 13) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma2?.c || '#8b5cf6'} strokeWidth="2" fill="none" />}
                   {toggles.showVolume && vmaParams?.vma3?.show !== false && i === data.length - (vmaParams?.vma3?.p || 34) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth="2" fill="none" />}
-                  {/* ✨ 補回：量能標記 */}
+                  
+                  {/* 🌟 只有當開關打開時才渲染 5MV 轉折 ▲▼ 指標 */}
+                  {toggles.showVmaTurn && isVma1TurnUp && (
+                    <text x={x} y={volHeight - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#ef4444">▲</text>
+                  )}
+                  {toggles.showVmaTurn && isVma1TurnDown && (
+                    <text x={x} y={12} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#22c55e">▼</text>
+                  )}
+
+                  {/* 補回：量能標記 */}
                   {toggles.showVolSignal && d.signalVol && <text x={x} y={getVolY(d.volume) - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill={d.signalVol === '天量' ? '#ef4444' : (d.signalVol === '巨量' ? '#f97316' : '#8b5cf6')}>{d.signalVol === '極限大量' ? '極' : d.signalVol[0]}</text>}
                 </g>
               );
