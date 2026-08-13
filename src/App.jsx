@@ -7241,6 +7241,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
               // 🌟 判斷 5MV 是否剛好發生轉折
               const isVma1TurnUp = i > 0 && data[i-1].vma1Slope === -1 && d.vma1Slope === 1;
               const isVma1TurnDown = i > 0 && data[i-1].vma1Slope === 1 && d.vma1Slope === -1;
+              // 🌟 13MV 轉折判斷
+              const isVma2TurnUp = i > 0 && data[i-1].vma2Slope === -1 && d.vma2Slope === 1;
+              const isVma2TurnDown = i > 0 && data[i-1].vma2Slope === 1 && d.vma2Slope === -1;
 
               return (
                 <g key={`volsignal-${i}`}>
@@ -7248,7 +7251,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                   {toggles.showVolume && vmaParams?.vma2?.show !== false && i === data.length - (vmaParams?.vma2?.p || 13) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma2?.c || '#8b5cf6'} strokeWidth="2" fill="none" />}
                   {toggles.showVolume && vmaParams?.vma3?.show !== false && i === data.length - (vmaParams?.vma3?.p || 34) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth="2" fill="none" />}
                   
-                  {/* 🌟 只有當開關打開時才渲染 5MV 轉折 ▲▼ 指標 */}
+                  {/* 5MV 轉折指標 (▲▼) */}
                   {toggles.showVmaTurn && isVma1TurnUp && (
                     <text x={x} y={volHeight - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#ef4444">▲</text>
                   )}
@@ -7256,7 +7259,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     <text x={x} y={12} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#22c55e">▼</text>
                   )}
 
-                  {/* 補回：量能標記 */}
+                  {/* 🌟 13MV 轉折指標 (我們用藍紫色的 ◆ 向上與向下鑽石區分) */}
+                  {toggles.showVmaTurn && isVma2TurnUp && (
+                    <text x={x} y={volHeight - 16} fontSize="9" fontWeight="bold" textAnchor="middle" fill="#38bdf8">◆</text>
+                  )}
+                  {toggles.showVmaTurn && isVma2TurnDown && (
+                    <text x={x} y={23} fontSize="9" fontWeight="bold" textAnchor="middle" fill="#a855f7">◆</text>
+                  )}
+
+                  {/* 量能標記 */}
                   {toggles.showVolSignal && d.signalVol && <text x={x} y={getVolY(d.volume) - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill={d.signalVol === '天量' ? '#ef4444' : (d.signalVol === '巨量' ? '#f97316' : '#8b5cf6')}>{d.signalVol === '極限大量' ? '極' : d.signalVol[0]}</text>}
                 </g>
               );
