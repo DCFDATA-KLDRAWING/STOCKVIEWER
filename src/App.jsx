@@ -7335,7 +7335,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                       {/* 從提示框底部連到 K 棒最高點的引導線 */}
                       <line 
                         x1={x} 
-                        y1={getY(d.high) - 13} 
+                        y1={getY(d.high) - 43} 
                         x2={x} 
                         y2={getY(d.high)} 
                         stroke="#fbbf24" 
@@ -7346,7 +7346,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                       {/* 提示文字外框 */}
                       <rect 
                         x={x - 65} 
-                        y={getY(d.high) - 45} 
+                        y={getY(d.high) - 75} 
                         width="130" 
                         height="32" 
                         fill="#0f172a" 
@@ -7361,7 +7361,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                         <text 
                           key={lIdx} 
                           x={x} 
-                          y={getY(d.high) - 29 + (lIdx * 13)} 
+                          y={getY(d.high) - 59 + (lIdx * 13)} 
                           fill="#fbbf24" 
                           fontSize="10" 
                           fontWeight="bold" 
