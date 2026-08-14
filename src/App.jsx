@@ -2303,7 +2303,8 @@ const App = () => {
     vmaShortOnly: false,  // 🌟 新增：只在空方(收盤價 < 55MA)時顯示
     showAutoWave: false,      // 🌟 新增：自動波段對照主開關
     autoWaveLongOnly: false,  // 🌟 新增：自動波段僅多方(>55MA)
-    autoWaveShortOnly: false  // 🌟 新增：自動波段僅空方(<55MA)
+    autoWaveShortOnly: false,  // 🌟 新增：自動波段僅空方(<55MA)
+    showDeductionNotice: false // 🌟 新增：扣抵智慧提醒開關
     
   });
   // ✨ 新增：SAR 指標的專屬參數
@@ -3517,6 +3518,7 @@ const App = () => {
       vma1Trend.push(t1);
       vma2Trend.push(t2);
     }
+    
     // ✨ 新增固定的 MA 計算，專供策略的「乖離」與「動態均線區間」使用
     const fixedMa5 = calculateSMA(closes, 5);
     const fixedMa8 = calculateSMA(closes, 8);
@@ -3786,6 +3788,29 @@ const App = () => {
       const bias20 = fixedMa20[i] ? ((current.close - fixedMa20[i]) / fixedMa20[i]) * 100 : null;
       const bias60 = fixedMa60[i] ? ((current.close - fixedMa60[i]) / fixedMa60[i]) * 100 : null;
       
+      // 🌟 1. 在這裡加入「8MA 均價扣抵」與「5MV 均量扣抵」的智慧提醒判定
+      let noticeText = null;
+      const ma8Lag = 8;
+      if (i >= ma8Lag + 20) {
+        const deductIdx = i - ma8Lag;
+        const deductPrice = data[deductIdx].close;
+        let isHighest = true;
+        for (let j = Math.max(0, deductIdx - 10); j <= Math.min(data.length - 1, deductIdx + 10); j++) {
+          if (j !== deductIdx && data[j].close > deductPrice) { isHighest = false; break; }
+        }
+        if (isHighest) noticeText = "⚠️ 8MA扣抵近期最高\n看供需強弱";
+      }
+
+      const vmaLag = 5; 
+      if (i >= vmaLag + 20 && !noticeText) {
+        const deductIdx = i - vmaLag;
+        const deductVol = data[deductIdx].volume;
+        let isMaxVol = true;
+        for (let j = Math.max(0, deductIdx - 10); j <= Math.min(data.length - 1, deductIdx + 10); j++) {
+          if (j !== deductIdx && data[j].volume > deductVol) { isMaxVol = false; break; }
+        }
+        if (isMaxVol) noticeText = "📊 扣量大量最高\n看供需強弱";
+      }
       // ✨ 1. 先把計算好所有指標的 K 棒物件建立出來
       const enrichedCandle = { 
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], ma4: ma4[i], ma5: ma5[i], ma6: ma6[i], bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
@@ -3793,6 +3818,8 @@ const App = () => {
           // 🌟 貼在這裡！把剛剛算好的 5MV 與 13MV 轉折狀態放進去
           vma1Slope: vma1Trend[i], 
           vma2Slope: vma2Trend[i],
+          // 🌟 3. 把算好的提醒文字塞進去
+          deductionNotice: noticeText,
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 }, willr,
           obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower,
@@ -4293,6 +4320,10 @@ const App = () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMA} onChange={() => handleToggle('showMA')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均線總開關</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線總開關</span></label>
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
+                  {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
+                  {/* ✨ 新增：布林壓縮(0.15%) 打勾按鈕 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBandsCompress} onChange={() => handleToggle('showBBandsCompress')} className="w-3.5 h-3.5 text-yellow-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-yellow-400 font-bold">布林壓縮</span></label>
 
                   {/* 🌟 新增：均量線轉折指標開關 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
@@ -4314,6 +4345,11 @@ const App = () => {
                       <span className="text-[11px] text-emerald-400 font-bold">僅空方(&lt;55MA)</span>
                     </label>
                   )}
+                  {/* 🌟 新增：扣抵智慧提醒開關 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-amber-950/40 px-2 py-1 rounded border border-amber-800/50 hover:bg-amber-900/40 transition-colors">
+                    <input type="checkbox" checked={toggles.showDeductionNotice} onChange={() => handleToggle('showDeductionNotice')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-amber-400 font-bold">💬 扣抵智慧提醒</span>
+                  </label>
                   {/* 🌟 新增：自動波段對照主開關 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
                     <input type="checkbox" checked={toggles.showAutoWave} onChange={() => handleToggle('showAutoWave')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" />
@@ -4366,11 +4402,9 @@ const App = () => {
                     />
                     <span className="text-[10px] text-slate-400">之後的指標與策略</span>
                   </div>
-                  {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
+                  
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
-                  {/* ✨ 新增：布林壓縮(0.15%) 打勾按鈕 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBandsCompress} onChange={() => handleToggle('showBBandsCompress')} className="w-3.5 h-3.5 text-yellow-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-yellow-400 font-bold">布林壓縮</span></label>
+                  
                   {/* ✨ 新增：詳細資訊分流勾選鍵 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showTooltipDetail} onChange={() => handleToggle('showTooltipDetail')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-amber-400 font-bold">查價詳細資訊</span></label>
 
@@ -7293,6 +7327,36 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 <g key={`candle-${i}`}>
                   <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
                   <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
+                  
+                  {/* 🌟 就是這裡！把扣抵提示貼在 K 棒本體的後面 */}
+                  {!hideSignals && toggles.showDeductionNotice && d.deductionNotice && (
+                    <g pointerEvents="none">
+                      <rect 
+                        x={x - 65} 
+                        y={getY(d.high) - 45} 
+                        width="130" 
+                        height="32" 
+                        fill="#0f172a" 
+                        fillOpacity="0.9" 
+                        rx="4" 
+                        stroke="#fbbf24" 
+                        strokeWidth="1" 
+                      />
+                      {d.deductionNotice.split('\n').map((line, lIdx) => (
+                        <text 
+                          key={lIdx} 
+                          x={x} 
+                          y={getY(d.high) - 29 + (lIdx * 13)} 
+                          fill="#fbbf24" 
+                          fontSize="10" 
+                          fontWeight="bold" 
+                          textAnchor="middle"
+                        >
+                          {line}
+                        </text>
+                      ))}
+                    </g>
+                  )}
                   {/* ✨ 補回：黑頓與自訂策略標記 (含升級版畫線與價格功能) */}
                   <g textAnchor="middle" fontSize="12" fontWeight="bold">
                     {!hideSignals && toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
