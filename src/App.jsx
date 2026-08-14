@@ -3133,7 +3133,7 @@ const App = () => {
       const fromDate = new Date(); 
       
       // ✨ 判斷是否為分K 或 大盤指數
-      const isIntra = ['1', '5', '15', '30', '60'].includes(currentTf);
+      const isIntra = ['5', '15', '30', '60'].includes(currentTf);
       const targetSymbol = getRealSymbol(targetInput);
       const isIndex = targetSymbol.startsWith('IX'); // 👈 判斷是否為大盤/類股指數
       let candles = [];
@@ -4198,7 +4198,6 @@ const App = () => {
               setTimeframe(e.target.value);
               if (symbolInput || currentViewedSymbol) fetchStockData(null, e.target.value);
             }} className="px-2 py-1.5 border border-cyan-800 bg-slate-900 rounded-lg text-sm font-bold text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer shadow-inner shrink-0">
-              <option value="1">1分</option>
               <option value="5">5分</option>
               <option value="15">15分</option>
               <option value="30">30分</option>
