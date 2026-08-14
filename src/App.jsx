@@ -7492,16 +7492,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                   
                   {/* 🌟 加上 shouldShow() 條件保護 */}
                   {shouldShow() && isVma1TurnUp && (
-                    <text x={x} y={volHeight - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#ef4444">▲</text>
+                    <text x={x} y={volHeight - 5} fontSize="14" fontWeight="bold" textAnchor="middle" fill="#ef4444">▲</text>
                   )}
                   {shouldShow() && isVma1TurnDown && (
-                    <text x={x} y={12} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#22c55e">▼</text>
+                    <text x={x} y={12} fontSize="14" fontWeight="bold" textAnchor="middle" fill="#22c55e">▼</text>
                   )}
                   {shouldShow() && isVma2TurnUp && (
-                    <text x={x} y={volHeight - 16} fontSize="9" fontWeight="bold" textAnchor="middle" fill="#38bdf8">◆</text>
+                    <text x={x} y={volHeight - 16} fontSize="12" fontWeight="bold" textAnchor="middle" fill="#38bdf8">◆</text>
                   )}
                   {shouldShow() && isVma2TurnDown && (
-                    <text x={x} y={23} fontSize="9" fontWeight="bold" textAnchor="middle" fill="#a855f7">◆</text>
+                    <text x={x} y={23} fontSize="12" fontWeight="bold" textAnchor="middle" fill="#a855f7">◆</text>
                   )}
 
                   {toggles.showVolSignal && d.signalVol && <text x={x} y={getVolY(d.volume) - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill={d.signalVol === '天量' ? '#ef4444' : (d.signalVol === '巨量' ? '#f97316' : '#8b5cf6')}>{d.signalVol === '極限大量' ? '極' : d.signalVol[0]}</text>}
