@@ -3155,7 +3155,7 @@ const App = () => {
           }));
       } else {
           // ─── 模式 B：日K/週K/月K 切換成 FinMind (抓取 1200 天超長歷史！) ───
-          fromDate.setDate(toDate.getDate() - 1200); // ✨ 往前推約 3 年多
+          fromDate.setDate(toDate.getDate() - 600); // ✨ 往前推約 3 年多
           let priceUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${targetSymbol}&start_date=${fromDate.toISOString().split('T')[0]}`;
           if (finmindApiKey) priceUrl += `&token=${finmindApiKey}`;
 
