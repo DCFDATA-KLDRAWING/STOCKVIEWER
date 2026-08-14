@@ -7328,20 +7328,35 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                   <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
                   <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
                   
-                  {/* 🌟 就是這裡！把扣抵提示貼在 K 棒本體的後面 */}
+                  {/* 🌟 帶有透明感與引導線的扣抵提示框 */}
                   {!hideSignals && toggles.showDeductionNotice && d.deductionNotice && (
-                    <g pointerEvents="none">
+                    <g pointerEvents="none" opacity="0.6"> {/* 👈 這裡直接整體調整透明度 (例如 0.6 代表 60% 濃度，您可以改成 0.5 或 0.7) */}
+                      
+                      {/* 從提示框底部連到 K 棒最高點的引導線 */}
+                      <line 
+                        x1={x} 
+                        y1={getY(d.high) - 13} 
+                        x2={x} 
+                        y2={getY(d.high)} 
+                        stroke="#fbbf24" 
+                        strokeWidth="1" 
+                        strokeDasharray="2,2" 
+                      />
+
+                      {/* 提示文字外框 */}
                       <rect 
                         x={x - 65} 
                         y={getY(d.high) - 45} 
                         width="130" 
                         height="32" 
                         fill="#0f172a" 
-                        fillOpacity="0.9" 
+                        fillOpacity="0.8" 
                         rx="4" 
                         stroke="#fbbf24" 
                         strokeWidth="1" 
                       />
+                      
+                      {/* 提示文字內容 */}
                       {d.deductionNotice.split('\n').map((line, lIdx) => (
                         <text 
                           key={lIdx} 
