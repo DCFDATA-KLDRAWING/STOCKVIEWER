@@ -2298,7 +2298,7 @@ const App = () => {
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
     showMaxVolLines: false, // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
     showZigZag: false, // ✨ 新增：細折線開關
-    showVmaTurn: false, // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
+    showVmaTurn: True, // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
     vmaLongOnly: false,  // 🌟 新增：只在多方(收盤價 > 55MA)時顯示
     vmaShortOnly: false,  // 🌟 新增：只在空方(收盤價 < 55MA)時顯示
     showAutoWave: false,      // 🌟 新增：自動波段對照主開關
