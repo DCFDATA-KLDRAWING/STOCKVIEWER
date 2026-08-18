@@ -7434,13 +7434,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             targetPrice = d.high;}
                         // 🌟 修改這裡：只抓取公式名稱，不被 customText 覆蓋
                         const formulaName = markObj.formulaName || '標籤';
-                        const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(1);
+                        const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(2);
       
                         // 🌟 組合：如果同時有寫走圖用語與選公式，將兩者完美並列顯示
                         if (markObj.customText) {
-                          fullText = `${markObj.customText} ${formulaName ? `(${formulaName})` : ''} ${priceStr}`;
+                          fullText = `${markObj.customText} ${priceStr}`;
                         } else {
-                          fullText = `${formulaName} ${priceStr}`;
+                          fullText = priceStr;
                         }
                       }
 
