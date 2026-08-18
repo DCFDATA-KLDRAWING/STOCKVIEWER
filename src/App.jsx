@@ -2359,7 +2359,16 @@ const App = () => {
 
   useEffect(() => {
     localStorage.setItem('MY_STOCK_CUSTOM_STRATEGIES', JSON.stringify(customStrategies));
-  }, [customStrategies]); 
+  }, [customStrategies]);
+  // 🌟 [第一處] 請直接貼在這邊：
+  const [customFormulas, setCustomFormulas] = useState(() => {
+    try {
+      const saved = localStorage.getItem('MY_STOCK_CUSTOM_FORMULAS');
+      return saved ? JSON.parse(saved) : [{ id: 1, name: '預設壓力價', expr: 'high + ((high - low) / 2)' }];
+    } catch (e) { return [{ id: 1, name: '預設壓力價', expr: 'high + ((high - low) / 2)' }]; }
+  });
+  useEffect(() => { localStorage.setItem('MY_STOCK_CUSTOM_FORMULAS', JSON.stringify(customFormulas)); }, [customFormulas]);
+  const [selectedFormulaId, setSelectedFormulaId] = useState(''); 
 
   // === ☁️ Firebase 雲端狀態管理 ===
   // 1. 初始化 Auth 登入
@@ -4945,7 +4954,9 @@ const App = () => {
                          customText,      // 👈 新增這行：儲存走圖用語
                          customTextSize,   // 👈 新增這行：儲存字體大小
                          textPlacement,
-                         rawFormula: [...builderFormula] // ✨ 新增這行：把原始積木陣列備份起來！
+                         rawFormula: [...builderFormula], // ✨ 新增這行：把原始積木陣列備份起來！
+                         formulaName: customFormulas.find(f => f.id.toString() === selectedFormulaId)?.name || '',
+   formulaExpr: customFormulas.find(f => f.id.toString() === selectedFormulaId)?.expr || ''
                        };
 
                        setCustomStrategies(prev => {
@@ -4963,6 +4974,39 @@ const App = () => {
                 </button>
                 <button onClick={() => setIsBuilderOpen(false)} className="text-slate-400 hover:text-white font-bold bg-slate-900 px-3 py-1 rounded border border-slate-700">✕</button>
               </div>
+            </div>
+            {/* 📐 動態目標價計算公式管理區 */}
+            <div className="p-3 bg-slate-800/90 border-b border-slate-700 flex flex-col gap-2 shrink-0">
+               <div className="flex items-center justify-between">
+                  <span className="text-xs text-cyan-400 font-bold">📐 動態目標價計算公式管理</span>
+               </div>
+               <div className="flex flex-wrap items-center gap-2">
+                  <input type="text" id="new-formula-name" placeholder="公式名稱 (例: 壓力中線)" className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-cyan-300 font-bold text-xs w-28" />
+                  <input type="text" id="new-formula-expr" placeholder="算式 (例: high + ((high - low) / 2))" className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-pink-300 font-bold text-xs flex-1" />
+                  <button onClick={() => {
+                     const name = document.getElementById('new-formula-name').value.trim();
+                     const expr = document.getElementById('new-formula-expr').value.trim();
+                     if (!name || !expr) return showAlert('請輸入公式名稱與算式！');
+                     setCustomFormulas(prev => [...prev, { id: Date.now(), name, expr }]);
+                     document.getElementById('new-formula-name').value = '';
+                     document.getElementById('new-formula-expr').value = '';
+                  }} className="bg-cyan-700 text-white px-3 py-1 rounded text-xs font-bold">＋ 新增公式</button>
+               </div>
+               <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-slate-400 font-bold">套用公式:</span>
+                  <select value={selectedFormulaId} onChange={(e) => setSelectedFormulaId(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-amber-300 font-bold text-xs flex-1">
+                     <option value="">-- 不顯示計算標籤 --</option>
+                     {customFormulas.map(f => (
+                        <option key={f.id} value={f.id}>{f.name} ({f.expr})</option>
+                     ))}
+                  </select>
+                  {selectedFormulaId && (
+                     <button onClick={() => {
+                        setCustomFormulas(prev => prev.filter(f => f.id.toString() !== selectedFormulaId.toString()));
+                        setSelectedFormulaId('');
+                     }} className="text-red-400 text-xs font-bold hover:underline">🗑️ 刪除</button>
+                  )}
+               </div>
             </div>
 
             {/* 公式顯示螢幕 */}
@@ -7400,36 +7444,46 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                           </text>
                         );
                       } else if (markObj.displayStyle === 'customText') {
-                        // ✨ 走圖用語 (支援自動換行與智慧避讓！)
-                        const text = markObj.customText || '';
-                        const chunkSize = 3; 
+                        // ✨ 走圖用語 + 動態計算目標價
+                        let targetPrice = d.close;
+                        try {
+                          const targetExpr = markObj.formulaExpr || 'high';
+                          const calcFunc = new Function('high', 'low', 'open', 'close', `return ${targetExpr};`);
+                          targetPrice = calcFunc(d.high, d.low, d.open, d.close);
+                        } catch (e) {
+                          targetPrice = d.high;
+                      }
+
+                        const formulaName = markObj.formulaName || markObj.customText || '標籤';
+                        const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(1);
+                        const fullText = `${formulaName} ${priceStr}`;
+
+                        const chunkSize = 6; // 讓字串自動切行
                         const chunks = [];
-                        for (let j = 0; j < text.length; j += chunkSize) {
-                          chunks.push(text.slice(j, j + chunkSize));
+                        for (let j = 0; j < fullText.length; j += chunkSize) {
+                          chunks.push(fullText.slice(j, j + chunkSize));
                         }
                         
                         const textSize = markObj.customTextSize || 12;
                         const lineHeight = textSize + 2; 
                         const totalHeight = (chunks.length + 1) * lineHeight; 
                         
-                        // ✨ 升級：智慧避讓與強制位置邏輯
-                        let isAbove = d.close >= d.open; // 預設 auto 邏輯 (紅K上/綠K下)
+                        let isAbove = d.close >= d.open;
                         if (markObj.textPlacement === 'above') isAbove = true;
                         if (markObj.textPlacement === 'below') isAbove = false;
 
-                        // 根據最後決定的 isAbove，計算文字的 Y 軸位置
                         const textY = isAbove 
                           ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
                           : getY(d.low) + 20 + (mIdx * totalHeight);
 
                         return (
-                          <text key={`s-ctxt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor} fontSize={textSize} fontWeight="bold" textAnchor="middle">
+                          <text key={`s-ctxt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor || '#38bdf8'} fontSize={textSize} fontWeight="bold" textAnchor="middle">
                             <tspan x={x} dy="0">{markObj.marker}</tspan>
                             {chunks.map((chunk, cIdx) => (
                               <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
                             ))}
-                          </text>
-                        );
+                        </text>
+                      );
 
                       } else {
                         // 傳統 Emoji 標籤 (向下相容)
