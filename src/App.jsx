@@ -4842,7 +4842,7 @@ const App = () => {
       {/* ✨ 浮動的策略打造器 (計算機版) */}
       {isBuilderOpen && (
         <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">
-          <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[80vh] overflow-hidden">
+          <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[80vh] overflow-y-auto">
             
             {/* 標題與控制列 */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0 gap-3">
