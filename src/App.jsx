@@ -7494,7 +7494,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       </text>
     </g>
   );
-}
+
 
                       } else {
                         // 傳統 Emoji 標籤 (向下相容)
