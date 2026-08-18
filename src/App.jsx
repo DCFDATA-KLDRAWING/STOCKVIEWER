@@ -7422,74 +7422,79 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                           </text>
                         );
                       } else if (markObj.displayStyle === 'customText') {
-                        // ✨ 走圖用語 + 動態計算目標價
-                        // ✨ 只有在有選擇公式時才計算價格，否則只顯示純文字走圖用語
-                        let fullText = markObj.customText || '';
-                        if (markObj.formulaExpr) {
-                          let targetPrice = d.close;
-                          try {
-                            const calcFunc = new Function('high', 'low', 'open', 'close', `return ${markObj.formulaExpr};`);
-                            targetPrice = calcFunc(d.high, d.low, d.open, d.close);
-                          } catch (e) {
-                            targetPrice = d.high;}
-                        // 🌟 修改這裡：只抓取公式名稱，不被 customText 覆蓋
-                        const formulaName = markObj.formulaName || '標籤';
-                        const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(2);
-      
-                        // 🌟 組合：如果同時有寫走圖用語與選公式，將兩者完美並列顯示
-                        if (markObj.customText) {
-                          fullText = `${markObj.customText} ${priceStr}`;
-                        } else {
-                          fullText = priceStr;
-                        }
-                      }
+  // ✨ 1. 先安全預設 targetPrice 等於當下收盤價，防止未定義崩潰
+  let targetPrice = d.close;
+  
+  // ✨ 2. 只有在有選擇公式時才進行數學算式計算
+  if (markObj.formulaExpr) {
+    try {
+      const calcFunc = new Function('high', 'low', 'open', 'close', `return ${markObj.formulaExpr};`);
+      targetPrice = calcFunc(d.high, d.low, d.open, d.close);
+    } catch (e) {
+      targetPrice = d.close;
+    }
+  }
 
-                        const chunkSize = 6; // 讓字串自動切行
-                        const chunks = [];
-                        for (let j = 0; j < fullText.length; j += chunkSize) {
-                          chunks.push(fullText.slice(j, j + chunkSize));
-                        }
-                        
-                        const textSize = markObj.customTextSize || 12;
-                        const lineHeight = textSize + 2; 
-                        const totalHeight = (chunks.length + 1) * lineHeight; 
-                        
-                        let isAbove = d.close >= d.open;
-                        if (markObj.textPlacement === 'above') isAbove = true;
-                        if (markObj.textPlacement === 'below') isAbove = false;
+  // ✨ 3. 組合文字與價格格式 (小數點後 2 位)
+  const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(2);
+  let fullText = '';
+  if (markObj.customText && markObj.formulaExpr) {
+    fullText = `${markObj.customText} ${priceStr}`;
+  } else if (markObj.customText) {
+    fullText = markObj.customText;
+  } else if (markObj.formulaExpr) {
+    fullText = priceStr;
+  } else {
+    fullText = '';
+  }
 
-                        const textY = isAbove 
-                          ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
-                          : getY(d.low) + 20 + (mIdx * totalHeight);
+  const chunkSize = 6; 
+  const chunks = [];
+  for (let j = 0; j < fullText.length; j += chunkSize) {
+    chunks.push(fullText.slice(j, j + chunkSize));
+  }
+  
+  const textSize = markObj.customTextSize || 12;
+  const lineHeight = textSize + 2; 
+  const totalHeight = (chunks.length + 1) * lineHeight; 
+  
+  let isAbove = d.close >= d.open;
+  if (markObj.textPlacement === 'above') isAbove = true;
+  if (markObj.textPlacement === 'below') isAbove = false;
 
-                        // 🌟 加上防呆：只有當有公式運算時，才去計算 targetY 畫虛線段
-                        let targetY = null;
-                        if (markObj.formulaExpr) {
-                          targetY = getY(targetPrice);
-                        }
-                        return (
-                          <g key={`s-ctxt-${i}-${mIdx}`}>
-                            {/* 🌟 新增：在目標價位置畫一條虛線段指出價格所在位置 */}
-                            <line 
-                              x1={x - 25} 
-                              y1={targetY} 
-                              x2={x + 35} 
-                              y2={targetY} 
-                              stroke={markObj.lineColor || '#38bdf8'} 
-                              strokeWidth="1.5" 
-                              strokeDasharray="3,3" 
-                              opacity="0.8" 
-                             />
+  const textY = isAbove 
+    ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
+    : getY(d.low) + 20 + (mIdx * totalHeight);
 
-                             {/* 原本的文字標籤（走圖用語 + 價格） */}
-                             <text x={x} y={textY} fill={markObj.lineColor || '#38bdf8'} fontSize={textSize} fontWeight="bold" textAnchor="middle">
-                                <tspan x={x} dy="0">{markObj.marker}</tspan>
-                                {chunks.map((chunk, cIdx) => (
-                                  <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
-                                ))}
-                             </text>
-                           </g>
-                         );
+  // ✨ 4. 安全計算 targetY 座標，並加上防呆保護
+  let targetY = null;
+  if (markObj.formulaExpr) {
+    targetY = getY(targetPrice);
+  }
+
+  return (
+    <g key={`s-ctxt-${i}-${mIdx}`}>
+      {targetY !== null && (
+        <line 
+          x1={x - 25} 
+          y1={targetY} 
+          x2={x + 35} 
+          y2={targetY} 
+          stroke={markObj.lineColor || '#38bdf8'} 
+          strokeWidth="1.5" 
+          strokeDasharray="3,3" 
+          opacity="0.8" 
+        />
+      )}
+      <text x={x} y={textY} fill={markObj.lineColor || '#38bdf8'} fontSize={textSize} fontWeight="bold" textAnchor="middle">
+         <tspan x={x} dy="0">{markObj.marker}</tspan>
+         {chunks.map((chunk, cIdx) => (
+           <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
+         ))}
+      </text>
+    </g>
+  );
+}
 
                       } else {
                         // 傳統 Emoji 標籤 (向下相容)
