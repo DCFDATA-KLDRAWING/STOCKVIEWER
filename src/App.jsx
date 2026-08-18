@@ -3861,7 +3861,9 @@ const App = () => {
               priceVal: current[strat.priceTarget || 'close'], // 抓取當下的 開/高/低/收 價格
               customText: strat.customText || '',         // 👈 補上這行
               customTextSize: strat.customTextSize || 12,  // 👈 補上這行
-              textPlacement: strat.textPlacement || 'auto'
+              textPlacement: strat.textPlacement || 'auto',
+              formulaName: strat.formulaName || '',
+              formulaExpr: strat.formulaExpr || ''
             });
           }
         });
