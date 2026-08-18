@@ -7462,14 +7462,31 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                           ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
                           : getY(d.low) + 20 + (mIdx * totalHeight);
 
+                        // 1. 先算出這條虛線在畫布上的 Y 座標位置
+                        const targetY = getY(targetPrice);
                         return (
-                          <text key={`s-ctxt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor || '#38bdf8'} fontSize={textSize} fontWeight="bold" textAnchor="middle">
-                            <tspan x={x} dy="0">{markObj.marker}</tspan>
-                            {chunks.map((chunk, cIdx) => (
-                              <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
-                            ))}
-                        </text>
-                      );
+                          <g key={`s-ctxt-${i}-${mIdx}`}>
+                            {/* 🌟 新增：在目標價位置畫一條虛線段指出價格所在位置 */}
+                            <line 
+                              x1={x - 25} 
+                              y1={targetY} 
+                              x2={x + 35} 
+                              y2={targetY} 
+                              stroke={markObj.lineColor || '#38bdf8'} 
+                              strokeWidth="1.5" 
+                              strokeDasharray="3,3" 
+                              opacity="0.8" 
+                             />
+
+                             {/* 原本的文字標籤（走圖用語 + 價格） */}
+                             <text x={x} y={textY} fill={markObj.lineColor || '#38bdf8'} fontSize={textSize} fontWeight="bold" textAnchor="middle">
+                                <tspan x={x} dy="0">{markObj.marker}</tspan>
+                                {chunks.map((chunk, cIdx) => (
+                                  <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
+                                ))}
+                             </text>
+                           </g>
+                         );
 
                       } else {
                         // 傳統 Emoji 標籤 (向下相容)
