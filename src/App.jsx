@@ -7462,8 +7462,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                           ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
                           : getY(d.low) + 20 + (mIdx * totalHeight);
 
-                        // 1. 先算出這條虛線在畫布上的 Y 座標位置
-                        const targetY = getY(targetPrice);
+                        // 🌟 加上防呆：只有當有公式運算時，才去計算 targetY 畫虛線段
+                        let targetY = null;
+                        if (markObj.formulaExpr) {
+                          targetY = getY(targetPrice);
+                        }
                         return (
                           <g key={`s-ctxt-${i}-${mIdx}`}>
                             {/* 🌟 新增：在目標價位置畫一條虛線段指出價格所在位置 */}
