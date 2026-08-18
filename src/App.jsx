@@ -7448,7 +7448,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     fullText = '';
   }
 
-  const chunkSize = 6; 
+  const chunkSize = 12; 
   const chunks = [];
   for (let j = 0; j < fullText.length; j += chunkSize) {
     chunks.push(fullText.slice(j, j + chunkSize));
