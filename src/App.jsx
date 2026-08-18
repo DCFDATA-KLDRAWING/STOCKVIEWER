@@ -7430,9 +7430,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             targetPrice = calcFunc(d.high, d.low, d.open, d.close);
                           } catch (e) {
                             targetPrice = d.high;}
-                        const formulaName = markObj.formulaName || markObj.customText || '標籤';
+                        // 🌟 修改這裡：只抓取公式名稱，不被 customText 覆蓋
+                        const formulaName = markObj.formulaName || '標籤';
                         const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(1);
-                        fullText = `${formulaName} ${priceStr}`;
+      
+                        // 🌟 組合：如果同時有寫走圖用語與選公式，將兩者完美並列顯示
+                        if (markObj.customText) {
+                          fullText = `${markObj.customText} ${formulaName ? `(${formulaName})` : ''} ${priceStr}`;
+                        } else {
+                          fullText = `${formulaName} ${priceStr}`;
+                        }
                       }
 
                         const chunkSize = 6; // 讓字串自動切行
