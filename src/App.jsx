@@ -4842,7 +4842,7 @@ const App = () => {
       {/* ✨ 浮動的策略打造器 (計算機版) */}
       {isBuilderOpen && (
         <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">
-          <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[80vh] overflow-y-auto">
+          <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[80vh] overflow-hidden">
             
             {/* 標題與控制列 */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0 gap-3">
@@ -5008,7 +5008,8 @@ const App = () => {
                   )}
                </div>
             </div>
-
+            {/* 🌟 新增這行：將下方所有操作區包入捲動容器 */}
+            <div className="flex-1 overflow-y-auto flex flex-col min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-700">
             {/* 公式顯示螢幕 */}
             <div className="p-3 bg-[#020617] shrink-0 border-b border-slate-700">
                <div className="w-full h-32 sm:h-40 bg-slate-800 border-2 border-slate-600 rounded-lg p-3 overflow-y-auto text-lg leading-relaxed flex flex-wrap content-start gap-x-1.5 gap-y-1">
@@ -5208,7 +5209,7 @@ const App = () => {
                  </div>
                )}
             </div>
-
+           </div>
           </div>
         </div>
       )}
