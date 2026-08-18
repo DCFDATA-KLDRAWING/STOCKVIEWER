@@ -7445,18 +7445,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                         );
                       } else if (markObj.displayStyle === 'customText') {
                         // ✨ 走圖用語 + 動態計算目標價
-                        let targetPrice = d.close;
-                        try {
-                          const targetExpr = markObj.formulaExpr || 'high';
-                          const calcFunc = new Function('high', 'low', 'open', 'close', `return ${targetExpr};`);
-                          targetPrice = calcFunc(d.high, d.low, d.open, d.close);
-                        } catch (e) {
-                          targetPrice = d.high;
-                      }
-
+                        // ✨ 只有在有選擇公式時才計算價格，否則只顯示純文字走圖用語
+                        let fullText = markObj.customText || '';
+                        if (markObj.formulaExpr) {
+                          let targetPrice = d.close;
+                          try {
+                            const calcFunc = new Function('high', 'low', 'open', 'close', `return ${markObj.formulaExpr};`);
+                            targetPrice = calcFunc(d.high, d.low, d.open, d.close);
+                          } catch (e) {
+                            targetPrice = d.high;}
                         const formulaName = markObj.formulaName || markObj.customText || '標籤';
                         const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(1);
-                        const fullText = `${formulaName} ${priceStr}`;
+                        fullText = `${formulaName} ${priceStr}`;
+                      }
 
                         const chunkSize = 6; // 讓字串自動切行
                         const chunks = [];
