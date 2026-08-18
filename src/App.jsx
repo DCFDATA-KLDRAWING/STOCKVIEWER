@@ -7462,9 +7462,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   if (markObj.textPlacement === 'above') isAbove = true;
   if (markObj.textPlacement === 'below') isAbove = false;
 
-  const textY = isAbove 
-    ? getY(d.high) - totalHeight - 5 - (mIdx * totalHeight) 
-    : getY(d.low) + 20 + (mIdx * totalHeight);
+  
 
   // ✨ 4. 安全計算 targetY 座標，並加上防呆保護
   let targetY = null;
@@ -7472,13 +7470,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     targetY = getY(targetPrice);
   }
 
+  // 🌟 將文字的垂直中心 (textY)，直接對齊虛線所在的 targetY 位置 (並稍微往上偏移 6px 避免壓到線)
+  const textY = targetY !== null ? targetY - 6 : (isAbove ? getY(d.high) - 20 : getY(d.low) + 20);
   return (
     <g key={`s-ctxt-${i}-${mIdx}`}>
+      {/* 1. 目標價虛線段 */}
       {targetY !== null && (
         <line 
-          x1={x - 25} 
+          x1={x - 30} 
           y1={targetY} 
-          x2={x + 35} 
+          x2={x + 40} 
           y2={targetY} 
           stroke={markObj.lineColor || '#38bdf8'} 
           strokeWidth="1.5" 
@@ -7486,8 +7487,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
           opacity="0.8" 
         />
       )}
+
+      {/* 2. 走圖用語與數值標籤（會自動跟著虛線位置走） */}
       <text x={x} y={textY} fill={markObj.lineColor || '#38bdf8'} fontSize={textSize} fontWeight="bold" textAnchor="middle">
-         <tspan x={x} dy="0">{markObj.marker}</tspan>
+         <tspan x={x} dy="0">{markObj.marker || ''}</tspan>
          {chunks.map((chunk, cIdx) => (
            <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>
          ))}
