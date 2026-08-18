@@ -4840,380 +4840,354 @@ const App = () => {
       )}
       
       {/* ✨ 浮動的策略打造器 (計算機版) */}
-      {isBuilderOpen && (
-        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">
-          <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[80vh] overflow-y-auto">
-            
-            {/* 標題與控制列 */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0 gap-3">
-              
-              {/* 左側：名稱與標記 */}
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <span className="text-xl">🧪</span>
-                <input 
-                  type="text" placeholder="幫策略取個名字..." 
-                  value={strategyName} onChange={(e) => setStrategyName(e.target.value)} 
-                  className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-400 w-40 sm:w-48 shadow-inner placeholder-slate-600" 
-                />
-                <input 
-                  type="text" placeholder="標記" 
-                  value={strategyMarker} onChange={(e) => setStrategyMarker(e.target.value)} 
-                  maxLength="2" 
-                  className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-center text-pink-400 font-bold text-sm outline-none focus:border-pink-400 w-12 shadow-inner" 
-                  title="顯示在 K 線上的圖案" 
-                />
-              </div>
+{isBuilderOpen && (
+  <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">
+    {/* 🌟 1. 外框維持 overflow-hidden，確保整體彈窗大小固定不變形 */}
+    <div className="bg-slate-900 rounded-2xl border border-cyan-700 shadow-[0_0_40px_rgba(8,145,178,0.5)] w-full max-w-2xl flex flex-col h-[90vh] sm:h-[85vh] overflow-hidden">
+      
+      {/* 標題與控制列 (固定在上方，不隨意捲動) */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b border-slate-700 bg-slate-800 shrink-0 gap-3">
+        
+        {/* 左側：名稱與標記 */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <span className="text-xl">🧪</span>
+          <input 
+            type="text" placeholder="幫策略取個名字..." 
+            value={strategyName} onChange={(e) => setStrategyName(e.target.value)} 
+            className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-400 w-40 sm:w-48 shadow-inner placeholder-slate-600" 
+          />
+          <input 
+            type="text" placeholder="標記" 
+            value={strategyMarker} onChange={(e) => setStrategyMarker(e.target.value)} 
+            maxLength="2" 
+            className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-center text-pink-400 font-bold text-sm outline-none focus:border-pink-400 w-12 shadow-inner" 
+            title="顯示在 K 線上的圖案" 
+          />
+        </div>
 
-              {/* ✨ 中間：新增的顯示方式設定區塊 */}
-              <div className="flex flex-wrap items-center gap-2 bg-slate-900/50 p-1.5 rounded border border-slate-700 w-full sm:w-auto">
-                <span className="text-slate-400 font-bold text-xs shrink-0">🎨 顯示：</span>
-                <select value={displayStyle} onChange={e => setDisplayStyle(e.target.value)} className="bg-slate-800 border border-slate-600 text-cyan-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
-                   <option value="marker">📍 圖示標籤</option>
-                   <option value="line">➖ 橫線延展</option>
-                   <option value="text">🏷️ 價格數字</option>
-                   {/* 👇 新增這個選項 👇 */}
-                   <option value="customText">💬 走圖用語</option>
-                </select>
-                {/* 🎯 如果選「走圖用語」，顯示輸入框、大小與顏色 */}
-                {displayStyle === 'customText' && (
-                  <>
-                    <input 
-                      type="text" placeholder="例如: 大量後不過高" 
-                      value={customText} onChange={e => setCustomText(e.target.value)} 
-                      className="bg-slate-800 border border-slate-600 text-amber-300 px-2 py-1 rounded text-xs font-bold outline-none placeholder-slate-500 w-32 sm:w-48"
-                    />
-                    <select value={customTextSize} onChange={e => setCustomTextSize(Number(e.target.value))} className="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
-                      <option value={10}>小 (10px)</option>
-                      <option value={12}>中 (12px)</option>
-                      <option value={14}>大 (14px)</option>
-                      <option value={18}>特大 (18px)</option>
-                    </select>
-                    {/* ✨ 新增這段：位置選擇選單 */}
-                    <select value={textPlacement} onChange={e => setTextPlacement(e.target.value)} className="bg-slate-800 border border-slate-600 text-purple-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
-                      <option value="auto">🤖 自動避讓</option>
-                      <option value="above">⬆️ 強制上方</option>
-                      <option value="below">⬇️ 強制下方</option>
-                    </select>
-                    <select value={lineColor} onChange={e => setLineColor(e.target.value)} className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer" style={{ color: lineColor }}>
-                      <option value="#f8fafc">純白色</option>
-                      <option value="#f472b6">粉紅色</option>
-                      <option value="#34d399">翠綠色</option>
-                      <option value="#60a5fa">亮藍色</option>
-                      <option value="#fbbf24">金黃色</option>
-                    </select>
-                  </>
-                )}
-                
-                {/* 🎯 如果選「橫線」或「價格數字」，秀出 價格對齊與顏色 的選項 */}
-                {(displayStyle === 'line' || displayStyle === 'text') && (
-                  <>
-                    <select value={priceTarget} onChange={e => setPriceTarget(e.target.value)} className="bg-slate-800 border border-slate-600 text-amber-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
-                      <option value="close">收盤價</option>
-                      <option value="open">開盤價</option>
-                      <option value="high">最高價</option>
-                      <option value="low">最低價</option>
-                    </select>
-                    <select value={lineColor} onChange={e => setLineColor(e.target.value)} className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer" style={{ color: lineColor }}>
-                      <option value="#f472b6">粉紅色</option>
-                      <option value="#34d399">翠綠色</option>
-                      <option value="#60a5fa">亮藍色</option>
-                      <option value="#fbbf24">金黃色</option>
-                      <option value="#a78bfa">淡紫色</option>
-                      <option value="#f87171">鮮紅色</option>
-                    </select>
-                  </>
-                )}
-                
-                {/* 🎯 如果選「橫線延展」，就多出 實線/虛線 的選項 */}
-                {displayStyle === 'line' && (
-                  <select value={lineStyle} onChange={e => setLineStyle(e.target.value)} className="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
-                      <option value="dashed">虛線</option>
-                      <option value="solid">實線</option>
-                  </select>
-                )}
-              </div>
+        {/* 中間：顯示方式設定區塊 */}
+        <div className="flex flex-wrap items-center gap-2 bg-slate-900/50 p-1.5 rounded border border-slate-700 w-full sm:w-auto">
+          <span className="text-slate-400 font-bold text-xs shrink-0">🎨 顯示：</span>
+          <select value={displayStyle} onChange={e => setDisplayStyle(e.target.value)} className="bg-slate-800 border border-slate-600 text-cyan-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+             <option value="marker">📍 圖示標籤</option>
+             <option value="line">➖ 橫線延展</option>
+             <option value="text">🏷️ 價格數字</option>
+             <option value="customText">💬 走圖用語</option>
+          </select>
+          {displayStyle === 'customText' && (
+            <>
+              <input 
+                type="text" placeholder="例如: 大量後不過高" 
+                value={customText} onChange={e => setCustomText(e.target.value)} 
+                className="bg-slate-800 border border-slate-600 text-amber-300 px-2 py-1 rounded text-xs font-bold outline-none placeholder-slate-500 w-32 sm:w-48"
+              />
+              <select value={customTextSize} onChange={e => setCustomTextSize(Number(e.target.value))} className="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                <option value={10}>小 (10px)</option>
+                <option value={12}>中 (12px)</option>
+                <option value={14}>大 (14px)</option>
+                <option value={18}>特大 (18px)</option>
+              </select>
+              <select value={textPlacement} onChange={e => setTextPlacement(e.target.value)} className="bg-slate-800 border border-slate-600 text-purple-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                <option value="auto">🤖 自動避讓</option>
+                <option value="above">⬆️ 強制上方</option>
+                <option value="below">⬇️ 強制下方</option>
+              </select>
+              <select value={lineColor} onChange={e => setLineColor(e.target.value)} className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer" style={{ color: lineColor }}>
+                <option value="#f8fafc">純白色</option>
+                <option value="#f472b6">粉紅色</option>
+                <option value="#34d399">翠綠色</option>
+                <option value="#60a5fa">亮藍色</option>
+                <option value="#fbbf24">金黃色</option>
+              </select>
+            </>
+          )}
+          
+          {(displayStyle === 'line' || displayStyle === 'text') && (
+            <>
+              <select value={priceTarget} onChange={e => setPriceTarget(e.target.value)} className="bg-slate-800 border border-slate-600 text-amber-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                <option value="close">收盤價</option>
+                <option value="open">開盤價</option>
+                <option value="high">最高價</option>
+                <option value="low">最低價</option>
+              </select>
+              <select value={lineColor} onChange={e => setLineColor(e.target.value)} className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer" style={{ color: lineColor }}>
+                <option value="#f472b6">粉紅色</option>
+                <option value="#34d399">翠綠色</option>
+                <option value="#60a5fa">亮藍色</option>
+                <option value="#fbbf24">金黃色</option>
+                <option value="#a78bfa">淡紫色</option>
+                <option value="#f87171">鮮紅色</option>
+              </select>
+            </>
+          )}
+          
+          {displayStyle === 'line' && (
+            <select value={lineStyle} onChange={e => setLineStyle(e.target.value)} className="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-1 rounded text-xs font-bold outline-none cursor-pointer">
+                <option value="dashed">虛線</option>
+                <option value="solid">實線</option>
+            </select>
+          )}
+        </div>
+        
+        {/* 右側：儲存按鈕 */}
+        <div className="flex gap-2 shrink-0 self-end sm:self-auto">
+          <button 
+            onClick={() => {
+              if (builderFormula.length === 0) return showAlert('請先輸入公式！');
+              const parsedStrategy = parseFormulaToStrategy(builderFormula, strategyName, strategyMarker);
               
-              {/* 右側：儲存按鈕 (這裡我們要把剛剛的 state 塞進 newStrategy 裡！) */}
-              <div className="flex gap-2 shrink-0 self-end sm:self-auto">
+              if (parsedStrategy.error) {
+                 showAlert(`公式錯誤：${parsedStrategy.error}`);
+              } else {
+                 const newStrategy = {
+                   ...parsedStrategy,
+                   displayStyle,
+                   priceTarget,
+                   lineColor,
+                   lineStyle,
+                   customText,     
+                   customTextSize,   
+                   textPlacement,
+                   rawFormula: [...builderFormula],
+                   formulaName: customFormulas.find(f => f.id.toString() === selectedFormulaId)?.name || '',
+                   formulaExpr: customFormulas.find(f => f.id.toString() === selectedFormulaId)?.expr || ''
+                 };
+
+                 setCustomStrategies(prev => {
+                    const updated = prev.map(s => ({...s, isActive: false}));
+                    return [newStrategy, ...updated];
+                 });
+                 setBuilderFormula([]); 
+                 setIsBuilderOpen(false); 
+                 showAlert(`策略「${newStrategy.name}」已儲存並啟用！請在圖表上查看。`);
+              }
+            }}
+            className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1 rounded text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+          >
+            💾 儲存策略
+          </button>
+          <button onClick={() => setIsBuilderOpen(false)} className="text-slate-400 hover:text-white font-bold bg-slate-900 px-3 py-1 rounded border border-slate-700">✕</button>
+        </div>
+      </div>
+
+      {/* 動態目標價計算公式管理區 (固定在上方) */}
+      <div className="p-3 bg-slate-800/90 border-b border-slate-700 flex flex-col gap-2 shrink-0">
+         <div className="flex items-center justify-between">
+            <span className="text-xs text-cyan-400 font-bold">📐 動態目標價計算公式管理</span>
+         </div>
+         <div className="flex flex-wrap items-center gap-2">
+            <input type="text" id="new-formula-name" placeholder="公式名稱 (例: 壓力中線)" className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-cyan-300 font-bold text-xs w-28" />
+            <input type="text" id="new-formula-expr" placeholder="算式 (例: high + ((high - low) / 2))" className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-pink-300 font-bold text-xs flex-1" />
+            <button onClick={() => {
+               const name = document.getElementById('new-formula-name').value.trim();
+               const expr = document.getElementById('new-formula-expr').value.trim();
+               if (!name || !expr) return showAlert('請輸入公式名稱與算式！');
+               setCustomFormulas(prev => [...prev, { id: Date.now(), name, expr }]);
+               document.getElementById('new-formula-name').value = '';
+               document.getElementById('new-formula-expr').value = '';
+            }} className="bg-cyan-700 text-white px-3 py-1 rounded text-xs font-bold">＋ 新增公式</button>
+         </div>
+         <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-slate-400 font-bold">套用公式:</span>
+            <select value={selectedFormulaId} onChange={(e) => setSelectedFormulaId(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-amber-300 font-bold text-xs flex-1">
+               <option value="">-- 不顯示計算標籤 --</option>
+               {customFormulas.map(f => (
+                  <option key={f.id} value={f.id}>{f.name} ({f.expr})</option>
+               ))}
+            </select>
+            {selectedFormulaId && (
+               <button onClick={() => {
+                  setCustomFormulas(prev => prev.filter(f => f.id.toString() !== selectedFormulaId.toString()));
+                  setSelectedFormulaId('');
+               }} className="text-red-400 text-xs font-bold hover:underline">🗑️ 刪除</button>
+            )}
+         </div>
+      </div>
+
+      {/* 🌟 2. 將下方「公式螢幕 + 頁籤 + 鍵盤按鈕區」全部包入一個可以獨立滑動的容器中 */}
+      <div className="flex-1 overflow-y-auto flex flex-col min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-700">
+        
+        {/* 公式顯示螢幕 */}
+        <div className="p-3 bg-[#020617] shrink-0 border-b border-slate-700">
+           <div className="w-full h-24 sm:h-32 bg-slate-800 border-2 border-slate-600 rounded-lg p-3 overflow-y-auto text-lg leading-relaxed flex flex-wrap content-start gap-x-1.5 gap-y-1">
+              {builderFormula.length === 0 && <span className="text-slate-500 italic text-sm">請使用下方鍵盤輸入公式，或點擊下方貼上...</span>}
+              {builderFormula.map((token, idx) => {
+                 let colorClass = "text-cyan-300";
+                 if (['而且', '或者', '>', '<', '≥', '≤', '=', '+', '-', '×', '÷'].includes(token)) colorClass = "text-red-400 font-bold";
+                 else if (!isNaN(token)) colorClass = "text-amber-400 font-mono";
+                 
+                 return (
+                    <span 
+                      key={idx} 
+                      className={`${colorClass} cursor-pointer hover:line-through hover:opacity-70 hover:text-red-400 transition-all px-1 rounded hover:bg-red-900/30`}
+                      onClick={() => setBuilderFormula(prev => prev.filter((_, i) => i !== idx))}
+                      title="點擊移除此條件"
+                    >
+                      {token}
+                    </span>
+                 );
+              })}
+           </div>
+           
+           <div className="flex justify-between items-center mt-2">
+              <div className="flex gap-2">
                 <button 
                   onClick={() => {
-                    if (builderFormula.length === 0) return showAlert('請先輸入公式！');
-                    // 先翻譯出基本的策略
-                    const parsedStrategy = parseFormulaToStrategy(builderFormula, strategyName, strategyMarker);
-                    
-                    if (parsedStrategy.error) {
-                       showAlert(`公式錯誤：${parsedStrategy.error}`);
-                    } else {
-                       // ✨ 翻譯成功！把我們剛剛選的顯示設定，偷偷塞進去
-                       const newStrategy = {
-                         ...parsedStrategy,
-                         displayStyle,
-                         priceTarget,
-                         lineColor,
-                         lineStyle,
-                         customText,      // 👈 新增這行：儲存走圖用語
-                         customTextSize,   // 👈 新增這行：儲存字體大小
-                         textPlacement,
-                         rawFormula: [...builderFormula], // ✨ 新增這行：把原始積木陣列備份起來！
-                         formulaName: customFormulas.find(f => f.id.toString() === selectedFormulaId)?.name || '',
-   formulaExpr: customFormulas.find(f => f.id.toString() === selectedFormulaId)?.expr || ''
-                       };
-
-                       setCustomStrategies(prev => {
-                          const updated = prev.map(s => ({...s, isActive: false}));
-                          return [newStrategy, ...updated];
-                       });
-                       setBuilderFormula([]); 
-                       setIsBuilderOpen(false); 
-                       showAlert(`策略「${newStrategy.name}」已儲存並啟用！請在圖表上查看。`);
-                    }
-                  }}
-                  className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1 rounded text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all"
+                    setAppModal({
+                      type: 'prompt',
+                      message: '📝 請貼上策略公式 (每個詞彙之間請用「空白鍵」隔開，例如：收盤價 > 60日均線) ：',
+                      onConfirm: (text) => {
+                        if (text && text.trim()) {
+                          setBuilderFormula(text.trim().split(/\s+/));
+                        }
+                        setAppModal(null);
+                      },
+                      onCancel: () => setAppModal(null)
+                    });
+                  }} 
+                  className="px-3 py-1 bg-indigo-900/50 border border-indigo-700 hover:bg-indigo-800 text-indigo-200 rounded font-bold shadow-sm text-xs sm:text-sm flex items-center gap-1"
                 >
-                  💾 儲存策略
+                  📋 貼上
                 </button>
-                <button onClick={() => setIsBuilderOpen(false)} className="text-slate-400 hover:text-white font-bold bg-slate-900 px-3 py-1 rounded border border-slate-700">✕</button>
+
+                <button 
+                  onClick={() => {
+                    if (builderFormula.length === 0) return showAlert('公式是空的，沒東西可以複製喔！');
+                    const formulaText = builderFormula.join(' ');
+                    navigator.clipboard.writeText(formulaText)
+                      .then(() => showAlert('✅ 公式已成功複製到剪貼簿！'))
+                      .catch(() => showAlert('❌ 瀏覽器阻擋了複製功能。'));
+                  }} 
+                  className="px-3 py-1 bg-emerald-900/50 border border-emerald-700 hover:bg-emerald-800 text-emerald-200 rounded font-bold shadow-sm text-xs sm:text-sm flex items-center gap-1"
+                >
+                  📄 複製
+                </button>
               </div>
-            </div>
-            {/* 📐 動態目標價計算公式管理區 */}
-            <div className="p-3 bg-slate-800/90 border-b border-slate-700 flex flex-col gap-2 shrink-0">
-               <div className="flex items-center justify-between">
-                  <span className="text-xs text-cyan-400 font-bold">📐 動態目標價計算公式管理</span>
-               </div>
-               <div className="flex flex-wrap items-center gap-2">
-                  <input type="text" id="new-formula-name" placeholder="公式名稱 (例: 壓力中線)" className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-cyan-300 font-bold text-xs w-28" />
-                  <input type="text" id="new-formula-expr" placeholder="算式 (例: high + ((high - low) / 2))" className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-pink-300 font-bold text-xs flex-1" />
-                  <button onClick={() => {
-                     const name = document.getElementById('new-formula-name').value.trim();
-                     const expr = document.getElementById('new-formula-expr').value.trim();
-                     if (!name || !expr) return showAlert('請輸入公式名稱與算式！');
-                     setCustomFormulas(prev => [...prev, { id: Date.now(), name, expr }]);
-                     document.getElementById('new-formula-name').value = '';
-                     document.getElementById('new-formula-expr').value = '';
-                  }} className="bg-cyan-700 text-white px-3 py-1 rounded text-xs font-bold">＋ 新增公式</button>
-               </div>
-               <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-slate-400 font-bold">套用公式:</span>
-                  <select value={selectedFormulaId} onChange={(e) => setSelectedFormulaId(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-amber-300 font-bold text-xs flex-1">
-                     <option value="">-- 不顯示計算標籤 --</option>
-                     {customFormulas.map(f => (
-                        <option key={f.id} value={f.id}>{f.name} ({f.expr})</option>
-                     ))}
-                  </select>
-                  {selectedFormulaId && (
-                     <button onClick={() => {
-                        setCustomFormulas(prev => prev.filter(f => f.id.toString() !== selectedFormulaId.toString()));
-                        setSelectedFormulaId('');
-                     }} className="text-red-400 text-xs font-bold hover:underline">🗑️ 刪除</button>
-                  )}
-               </div>
-            </div>
-            {/* 🌟 新增這行：將下方所有操作區包入捲動容器 */}
-            <div className="flex-1 overflow-y-auto flex flex-col min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-700">
-            {/* 公式顯示螢幕 */}
-            <div className="p-3 bg-[#020617] shrink-0 border-b border-slate-700">
-               <div className="w-full h-32 sm:h-40 bg-slate-800 border-2 border-slate-600 rounded-lg p-3 overflow-y-auto text-lg leading-relaxed flex flex-wrap content-start gap-x-1.5 gap-y-1">
-                  {builderFormula.length === 0 && <span className="text-slate-500 italic">請使用下方鍵盤輸入公式，或點擊右下角貼上別人分享的策略...</span>}
-                  {builderFormula.map((token, idx) => {
-                     // 讓邏輯字眼變紅色，數字變黃色，其他變藍色
-                     let colorClass = "text-cyan-300";
-                     if (['而且', '或者', '>', '<', '≥', '≤', '=', '+', '-', '×', '÷'].includes(token)) colorClass = "text-red-400 font-bold";
-                     else if (!isNaN(token)) colorClass = "text-amber-400 font-mono";
-                     
-                     // ✨ 升級 1：加入「點擊刪除」功能與視覺特效 (hover 時出現刪除線)
-                     return (
-                        <span 
-                          key={idx} 
-                          className={`${colorClass} cursor-pointer hover:line-through hover:opacity-70 hover:text-red-400 transition-all px-1 rounded hover:bg-red-900/30`}
-                          onClick={() => setBuilderFormula(prev => prev.filter((_, i) => i !== idx))}
-                          title="點擊移除此條件"
-                        >
-                          {token}
-                        </span>
-                     );
-                  })}
-               </div>
-               
-               <div className="flex justify-between items-center mt-2">
-                  <div className="flex gap-2">
-                    {/* ✨ 一鍵貼上 / 匯入公式按鈕 */}
-                    <button 
-                      onClick={() => {
-                        setAppModal({
-                          type: 'prompt',
-                          message: '📝 請貼上策略公式 (每個詞彙之間請用「空白鍵」隔開，例如：收盤價 > 60日均線) ：',
-                          onConfirm: (text) => {
-                            if (text && text.trim()) {
-                              setBuilderFormula(text.trim().split(/\s+/));
-                            }
-                            setAppModal(null);
-                          },
-                          onCancel: () => setAppModal(null)
-                        });
-                      }} 
-                      className="px-3 sm:px-4 py-1.5 bg-indigo-900/50 border border-indigo-700 hover:bg-indigo-800 text-indigo-200 rounded font-bold shadow-sm flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base"
-                    >
-                      📋 貼上
-                    </button>
 
-                    {/* ✨ 新增：一鍵複製 / 匯出公式按鈕 */}
-                    <button 
-                      onClick={() => {
-                        if (builderFormula.length === 0) return showAlert('公式是空的，沒東西可以複製喔！');
-                        // 把陣列裡的積木用「空白鍵」串接成一段乾淨的純文字
-                        const formulaText = builderFormula.join(' ');
-                        navigator.clipboard.writeText(formulaText)
-                          .then(() => showAlert('✅ 公式已成功複製到剪貼簿！您可以直接貼給朋友了！'))
-                          .catch(() => showAlert('❌ 瀏覽器阻擋了複製功能，請手動圈選文字複製。'));
-                      }} 
-                      className="px-3 sm:px-4 py-1.5 bg-emerald-900/50 border border-emerald-700 hover:bg-emerald-800 text-emerald-200 rounded font-bold shadow-sm flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base"
-                    >
-                      📄 複製
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button onClick={handleBackspace} className="px-3 sm:px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm text-sm sm:text-base">⌫ 退格</button>
-                    <button onClick={() => setBuilderFormula([])} className="px-3 sm:px-4 py-1.5 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm text-sm sm:text-base">🗑️ 清除</button>
-                  </div>
-               </div>
-            </div>
-
-            {/* 鍵盤頁籤 */}
-            <div className="flex bg-slate-800 shrink-0">
-               {['運算', '價量', '指標', '盤後'].map(tab => (
-                 <button 
-                   key={tab} 
-                   onClick={() => setBuilderTab(tab)}
-                   className={`flex-1 py-3 font-bold text-sm sm:text-base border-b-2 transition-all ${builderTab === tab ? 'border-cyan-400 text-cyan-300 bg-slate-700/50' : 'border-transparent text-slate-400 hover:bg-slate-700/30'}`}
-                 >
-                   {tab}
-                 </button>
-               ))}
-            </div>
-
-            {/* 鍵盤按鈕區 */}
-            <div className="flex-1 overflow-y-auto p-2 bg-slate-900">
-               {builderTab === '運算' && (
-                 <div className="flex flex-col gap-5 h-full content-start overflow-y-auto pr-1 pb-4">
-                    
-                    {/* 1. 邏輯與括號區 */}
-                    <div>
-                      <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">邏輯與群組</div>
-                      {/* ✨ 第三步：策略組合器 (插入現有策略) */}
-                      {customStrategies.length > 0 && (
-                        <div className="flex items-center gap-2 mb-3 bg-indigo-900/30 p-2 rounded border border-indigo-700/50">
-                          <span className="text-indigo-300 font-bold text-xs shrink-0">🧬 插入條件：</span>
-                          <select 
-                            className="bg-slate-900 border border-indigo-600 text-indigo-300 px-2 py-1.5 rounded text-xs font-bold outline-none flex-1"
-                            onChange={(e) => {
-                              if (!e.target.value) return;
-                              const targetStrat = customStrategies.find(s => s.id.toString() === e.target.value);
-                              if (targetStrat && targetStrat.rawFormula) {
-                                // 把舊公式用括號包起來，塞進現在的公式裡！
-                                setBuilderFormula(prev => [...prev, '(', ...targetStrat.rawFormula, ')']);
-                              }
-                              e.target.value = ""; // 選完歸零
-                            }}
-                          >
-                            <option value="">-- 選擇並插入已存策略 --</option>
-                            {customStrategies.map(s => (
-                              <option key={`inject-${s.id}`} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                        {['而且', '或者', '(', ')', '如果', '成立取', '否則取'].map(btn => (
-                          <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 rounded font-bold text-sm bg-slate-800 border-slate-700 text-pink-400 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 2. 比較符號區 */}
-                    <div>
-                      <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">比較符號</div>
-                      <div className="grid grid-cols-6 gap-2">
-                        {['>', '≥', '<', '≤', '=', '≠'].map(btn => (
-                          <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 rounded font-bold text-lg bg-slate-800 border-slate-700 text-cyan-300 hover:bg-slate-700 border active:scale-95 transition-transform shadow-sm">{btn}</button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 3. 數字與四則運算區 (九宮格排列) */}
-                    <div>
-                      <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">數字與基本運算</div>
-                      <div className="grid grid-cols-4 gap-2 max-w-[280px]">
-                         {/* 第 1 排 */}
-                         {['7', '8', '9', '+'].map(btn => (
-                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
-                         ))}
-                         {/* 第 2 排 */}
-                         {['4', '5', '6', '-'].map(btn => (
-                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
-                         ))}
-                         {/* 第 3 排 */}
-                         {['1', '2', '3', '×'].map(btn => (
-                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
-                         ))}
-                         {/* 第 4 排 */}
-                         {['.', '0', '00', '÷'].map(btn => (
-                           <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xl border active:scale-95 transition-transform shadow-sm ${btn === '÷' ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600'}`}>{btn}</button>
-                         ))}
-                      </div>
-                    </div>
-
-                 </div>
-               )}
-               
-               {builderTab === '價量' && (
-                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
-                    {/* ✨ 將固定天數按鈕換成全新的動態後綴組合鍵 */}
-                    {['開盤價', '最高價', '最低價', '收盤價', '成交量', '漲跌幅', '實體漲幅', '振幅', '1日前的', '日前的', '日內最高', '日內最低', '日內均值'].map(btn => {
-                      // 讓時間偏移的按鈕顯示粉紅色，一般價量顯示靛藍色
-                      const isTimeOffset = btn.includes('日前的') || btn.includes('日內');
-                      return (
-                        <button 
-                          key={btn} 
-                          onClick={() => handleFormulaInput(btn)} 
-                          className={`py-3 sm:py-4 rounded font-bold text-sm sm:text-base border active:scale-95 transition-transform ${isTimeOffset ? 'bg-pink-900/30 border-pink-700/50 text-pink-300 hover:bg-pink-800/50' : 'bg-indigo-900/40 border-indigo-700/50 text-indigo-300 hover:bg-indigo-800/60'}`}
-                        >
-                          {btn}
-                        </button>
-                      );
-                    })}
-                 </div>
-               )}
-
-               {builderTab === '指標' && (
-                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-full content-start">
-                    {['5日均線', '10日均線', '20日均線', '28日均線', '60日均線', '5日均線乖離', '10日均線乖離', '20日均線乖離', '60日均線乖離', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OSC值', 'OBV值', '威廉指標', '布林上軌', '布林下軌'].map(btn => (
-                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-4 bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 rounded font-bold hover:bg-emerald-800/60 active:scale-95 transition-transform">{btn}</button>
-                    ))}
-                 </div>
-               )}
-
-               {builderTab === '盤後' && (
-                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 h-full content-start overflow-y-auto pr-2 pb-10">
-                    {/* 籌碼面分類 */}
-                    <div className="col-span-full text-xs font-bold text-slate-500 mb-1 tracking-widest border-b border-slate-700/50 pb-1">籌碼面</div>
-                    {['外資買賣超', '投信買賣超', '自營商買賣超', '主力進出', '融資增減', '融券增減'].map(btn => (
-                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-3 bg-purple-900/40 border border-purple-700/50 text-purple-300 rounded font-bold hover:bg-purple-800/60 active:scale-95 transition-transform text-sm">{btn}</button>
-                    ))}
-                    
-                    {/* 基本面與估值分類 */}
-                    <div className="col-span-full text-xs font-bold text-slate-500 mt-2 mb-1 tracking-widest border-b border-slate-700/50 pb-1">基本面與估值</div>
-                    {['月營收年增率', '月營收月增率', '單季EPS', '近四季EPS', '單季毛利率'].map(btn => (
-                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-3 bg-amber-900/40 border border-amber-700/50 text-amber-300 rounded font-bold hover:bg-amber-800/60 active:scale-95 transition-transform text-sm">{btn}</button>
-                    ))}
-                 </div>
-               )}
-            </div>
-           
-          </div>
-          </div>
+              <div className="flex gap-2">
+                <button onClick={handleBackspace} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold shadow-sm text-xs sm:text-sm">⌫ 退格</button>
+                <button onClick={() => setBuilderFormula([])} className="px-3 py-1 bg-red-900/50 border border-red-700 hover:bg-red-800 text-red-200 rounded font-bold shadow-sm text-xs sm:text-sm">🗑️ 清除</button>
+              </div>
+           </div>
         </div>
-      )}
+
+        {/* 鍵盤頁籤 */}
+        <div className="flex bg-slate-800 shrink-0 sticky top-0 z-10">
+           {['運算', '價量', '指標', '盤後'].map(tab => (
+             <button 
+               key={tab} 
+               onClick={() => setBuilderTab(tab)}
+               className={`flex-1 py-2.5 font-bold text-xs sm:text-sm border-b-2 transition-all ${builderTab === tab ? 'border-cyan-400 text-cyan-300 bg-slate-700/50' : 'border-transparent text-slate-400 hover:bg-slate-700/30'}`}
+             >
+               {tab}
+             </button>
+           ))}
+        </div>
+
+        {/* 鍵盤按鈕區 */}
+        <div className="p-3 bg-slate-900 flex-1">
+           {builderTab === '運算' && (
+             <div className="flex flex-col gap-4">
+                <div>
+                  <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">邏輯與群組</div>
+                  {customStrategies.length > 0 && (
+                    <div className="flex items-center gap-2 mb-3 bg-indigo-900/30 p-2 rounded border border-indigo-700/50">
+                      <span className="text-indigo-300 font-bold text-xs shrink-0">🧬 插入條件：</span>
+                      <select 
+                        className="bg-slate-900 border border-indigo-600 text-indigo-300 px-2 py-1.5 rounded text-xs font-bold outline-none flex-1"
+                        onChange={(e) => {
+                          if (!e.target.value) return;
+                          const targetStrat = customStrategies.find(s => s.id.toString() === e.target.value);
+                          if (targetStrat && targetStrat.rawFormula) {
+                            setBuilderFormula(prev => [...prev, '(', ...targetStrat.rawFormula, ')']);
+                          }
+                          e.target.value = "";
+                        }}
+                      >
+                        <option value="">-- 選擇並插入已存策略 --</option>
+                        {customStrategies.map(s => (
+                          <option key={`inject-${s.id}`} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                    {['而且', '或者', '(', ')', '如果', '成立取', '否則取'].map(btn => (
+                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2 rounded font-bold text-xs sm:text-sm bg-slate-800 border-slate-700 text-pink-400 hover:bg-slate-700 border">{btn}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">比較符號</div>
+                  <div className="grid grid-cols-6 gap-2">
+                    {['>', '≥', '<', '≤', '=', '≠'].map(btn => (
+                      <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2 rounded font-bold text-base bg-slate-800 border-slate-700 text-cyan-300 hover:bg-slate-700 border">{btn}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold text-slate-500 mb-2 tracking-widest">數字與基本運算</div>
+                  <div className="grid grid-cols-4 gap-2 max-w-[280px]">
+                     {['7', '8', '9', '+'].map(btn => (
+                       <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-2.5 rounded font-bold text-lg border ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-slate-700 border-slate-600 text-white'}`}>{btn}</button>
+                     ))}
+                     {['4', '5', '6', '-'].map(btn => (
+                       <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-2.5 rounded font-bold text-lg border ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-slate-700 border-slate-600 text-white'}`}>{btn}</button>
+                     ))}
+                     {['1', '2', '3', '×'].map(btn => (
+                       <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-2.5 rounded font-bold text-lg border ${isNaN(btn) ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-slate-700 border-slate-600 text-white'}`}>{btn}</button>
+                     ))}
+                     {['.', '0', '00', '÷'].map(btn => (
+                       <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-2.5 rounded font-bold text-lg border ${btn === '÷' ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-slate-700 border-slate-600 text-white'}`}>{btn}</button>
+                     ))}
+                  </div>
+                </div>
+             </div>
+           )}
+           
+           {builderTab === '價量' && (
+             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {['開盤價', '最高價', '最低價', '收盤價', '成交量', '漲跌幅', '實體漲幅', '振幅', '1日前的', '日前的', '日內最高', '日內最低', '日內均值'].map(btn => {
+                  const isTimeOffset = btn.includes('日前的') || btn.includes('日內');
+                  return (
+                    <button key={btn} onClick={() => handleFormulaInput(btn)} className={`py-3 rounded font-bold text-xs sm:text-sm border ${isTimeOffset ? 'bg-pink-900/30 border-pink-700/50 text-pink-300' : 'bg-indigo-900/40 border-indigo-700/50 text-indigo-300'}`}>
+                      {btn}
+                    </button>
+                  );
+                })}
+             </div>
+           )}
+
+           {builderTab === '指標' && (
+             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {['5日均線', '10日均線', '20日均線', '28日均線', '60日均線', '5日均線乖離', '10日均線乖離', '20日均線乖離', '60日均線乖離', '5日均量', 'K值', 'D值', 'RSI值', 'MACD值', 'DIF值', 'OSC值', 'OBV值', '威廉指標', '布林上軌', '布林下軌'].map(btn => (
+                  <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-3 bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 rounded font-bold text-xs sm:text-sm">{btn}</button>
+                ))}
+             </div>
+           )}
+
+           {builderTab === '盤後' && (
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pb-6">
+                <div className="col-span-full text-xs font-bold text-slate-500 mb-1 tracking-widest border-b border-slate-700/50 pb-1">籌碼面</div>
+                {['外資買賣超', '投信買賣超', '自營商買賣超', '主力進出', '融資增減', '融券增減'].map(btn => (
+                  <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 bg-purple-900/40 border border-purple-700/50 text-purple-300 rounded font-bold text-xs sm:text-sm">{btn}</button>
+                ))}
+                
+                <div className="col-span-full text-xs font-bold text-slate-500 mt-2 mb-1 tracking-widest border-b border-slate-700/50 pb-1">基本面與估值</div>
+                {['月營收年增率', '月營收月增率', '單季EPS', '近四季EPS', '單季毛利率'].map(btn => (
+                  <button key={btn} onClick={() => handleFormulaInput(btn)} className="py-2.5 bg-amber-900/40 border border-amber-700/50 text-amber-300 rounded font-bold text-xs sm:text-sm">{btn}</button>
+                ))}
+             </div>
+           )}
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+)}
     </div>   
   );         
 };
