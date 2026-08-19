@@ -7477,7 +7477,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       {/* 1. 目標價虛線段 */}
       {targetY !== null && (
         <line 
-          x1={x - 30} 
+          x1={x} 
           y1={targetY} 
           x2={x + 65} 
           y2={targetY} 
