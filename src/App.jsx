@@ -7477,9 +7477,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       {/* 1. 目標價虛線段 */}
       {targetY !== null && (
         <line 
-          x1={x} 
+          x1={x - 30} 
           y1={targetY} 
-          x2={x + 40} 
+          x2={x + 65} 
           y2={targetY} 
           stroke={markObj.lineColor || '#38bdf8'} 
           strokeWidth="1.5" 
