@@ -7802,7 +7802,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 tooltipLines.push({ color: vmaParams?.vma1?.c || '#f59e0b', text: `VMA${vmaParams?.vma1?.p || 5}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
             }
 
-            
+            // 👇 將愛德恩動能指標加入查價線 Tooltip 中 👇
+            if (indicatorType === 'EdwinMomentum' && hoverD?.edwinMomentum !== undefined) {
+                const momVal = hoverD.edwinMomentum;
+                // 大於等於 0 顯示紅色，小於 0 顯示綠色
+                const momColor = momVal >= 0 ? '#ef4444' : '#22c55e';
+                tooltipLines.push({ color: momColor, text: `動能： ${momVal.toFixed(2)}` });
+            }
+
             // ==========================================
             // 2. 進階進階資訊（必須勾選「查價詳細資訊」才顯示）
             // ==========================================
