@@ -7662,7 +7662,37 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                         <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
                         <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
                         
+                        {/* 1. 預設的黃色基礎折線 */}
                         <path d={data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${getMomY(d.edwinMomentum)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                        
+                        {/* 2. ✨ 疊加上符合「動能 >= 7.5 且 成交值 >= 5億」的特殊線段與圓點 */}
+                        {data.map((d, i) => {
+                            if (i === 0) return null;
+                            
+                            // 計算成交金額 (volume是張數，所以 * 1000 換算成股，再 * 收盤價)
+                            const tradingValue = (d.volume * 1000) * d.close;
+                            
+                            // 條件：動能 >= 7.5 且 成交值 >= 500,000,000 (5億)
+                            const isStrong = d.edwinMomentum >= 7.5 && tradingValue >= 500000000;
+                            
+                            if (isStrong) {
+                                const prevD = data[i-1];
+                                const x1 = paddingLeft + (i - 1 + offsetBars) * spacing + spacing / 2;
+                                const y1 = getMomY(prevD.edwinMomentum);
+                                const x2 = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
+                                const y2 = getMomY(d.edwinMomentum);
+                                
+                                return (
+                                    <g key={`mom-strong-${i}`}>
+                                        {/* 用紅色加粗線段覆蓋原本的黃線 */}
+                                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ef4444" strokeWidth="3" />
+                                        {/* 畫一個紅色圓點強調觸發位置 */}
+                                        <circle cx={x2} cy={y2} r="3.5" fill="#ef4444" />
+                                    </g>
+                                );
+                            }
+                            return null;
+                        })}
                         
                         <text x={paddingLeft + 5} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 (基準線)</text>
                         <text x={paddingLeft + 5} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強勢警戒線)</text>
