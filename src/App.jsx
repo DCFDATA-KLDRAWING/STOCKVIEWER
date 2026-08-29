@@ -7786,7 +7786,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             
             tooltipLines.push({ color: changeColor, text: `漲跌： ${changeSign}${changeRatio.toFixed(2)}%` });
             tooltipLines.push({ color: '#e2e8f0', text: `量： ${hoverD?.volume} 張` });
-
+            
+            // 👇 將愛德恩動能指標加入查價線 Tooltip 中 👇
+            if (indicatorType === 'EdwinMomentum' && hoverD?.edwinMomentum !== undefined) {
+                const momVal = hoverD.edwinMomentum;
+                // 大於等於 0 顯示紅色，小於 0 顯示綠色
+                const momColor = momVal >= 0 ? '#ef4444' : '#22c55e';
+                tooltipLines.push({ color: momColor, text: `動能： ${momVal.toFixed(2)}` });
+            }
             // 顯示 6 條主圖均線 MA
             if (toggles.showMA) {
                 if (maParams?.ma1?.show !== false) tooltipLines.push({ color: maParams?.ma1?.c || '#ef4444', text: `MA${maParams?.ma1?.p || 5}： ${hoverD?.ma1?.toFixed(2) || '-'}` });
@@ -7800,14 +7807,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             // 只顯示 1 條 VMA1 (預設5日均量線)
             if (toggles.showVolume && vmaParams?.vma1?.show !== false) {
                 tooltipLines.push({ color: vmaParams?.vma1?.c || '#f59e0b', text: `VMA${vmaParams?.vma1?.p || 5}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
-            }
-
-            // 👇 將愛德恩動能指標加入查價線 Tooltip 中 👇
-            if (indicatorType === 'EdwinMomentum' && hoverD?.edwinMomentum !== undefined) {
-                const momVal = hoverD.edwinMomentum;
-                // 大於等於 0 顯示紅色，小於 0 顯示綠色
-                const momColor = momVal >= 0 ? '#ef4444' : '#22c55e';
-                tooltipLines.push({ color: momColor, text: `動能： ${momVal.toFixed(2)}` });
             }
 
             // ==========================================
