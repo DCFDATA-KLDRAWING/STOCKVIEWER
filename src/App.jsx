@@ -2206,6 +2206,7 @@ const App = () => {
   const [issuedShares, setIssuedShares] = useState(''); 
   const [displayCount, setDisplayCount] = useState(60);
   const [timeframe, setTimeframe] = useState('D');
+
   
   // ✨ 新增副圖指標狀態 (預設關閉 None)
   const [indicatorType, setIndicatorType] = useState('None');
@@ -2215,9 +2216,9 @@ const App = () => {
     try {
       const saved = localStorage.getItem('MY_STOCK_INDICATOR_PARAMS');
       return saved ? JSON.parse(saved) : {
-        macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }
+        macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 } // ✨ 確保這裡有愛德恩動能的預設參數
       };
-    } catch (e) { return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 } }; }
+    } catch (e) { return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 } }; }
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
 
@@ -3697,6 +3698,39 @@ const App = () => {
     }
     const obvMaArr = calculateSMA(obvArr, indParams.obv?.ma || 20);
 
+    // ==========================================
+    // 🌟 [新增] 愛德恩風格動能指標 (Edwin Momentum) 計算
+    // ==========================================
+    const edwinLen = indParams.edwinMomentum?.length || 20;
+    const edwinMomArr = [];
+    for (let i = 0; i < data.length; i++) {
+        if (i < edwinLen) {
+            edwinMomArr.push(0);
+            continue;
+        }
+        // 1. 計算 20日價格乖離率 (PriceMom)
+        const maSlice = closes.slice(i - edwinLen + 1, i + 1);
+        const maVal = maSlice.reduce((a,b)=>a+b,0) / edwinLen;
+        const priceMom = maVal > 0 ? ((data[i].close - maVal) / maVal) * 100 : 0;
+
+        // 2. 計算量能動能倍數 (VolRatio)
+        const volSlice = volumes.slice(i - edwinLen + 1, i + 1);
+        const volMaVal = volSlice.reduce((a,b)=>a+b,0) / edwinLen;
+        const volRatio = volMaVal > 0 ? (data[i].volume / volMaVal) : 1;
+
+        // 3. 當日漲幅 (RateOfChange 1日)
+        const roc = (i > 0 && data[i-1].close > 0) ? ((data[i].close - data[i-1].close) / data[i-1].close) * 100 : 0;
+
+        // 4. 綜合動能值 (MomentumVal)
+        let momentumVal = 0;
+        if (priceMom >= 0) {
+            momentumVal = (priceMom * 0.7) + (roc * 0.3) * Math.min(volRatio, 3);
+        } else {
+            momentumVal = (priceMom * 0.7) + (roc * 0.3);
+        }
+        edwinMomArr.push(momentumVal);
+    }
+
     let emaFast = closes[0], emaSlow = closes[0], macdSig = 0, prevK = 50, prevD = 50;
     let gainSum1 = 0, lossSum1 = 0, avgGain1 = 0, avgLoss1 = 0, gainSum2 = 0, lossSum2 = 0, avgGain2 = 0, avgLoss2 = 0;
     let prevTowerColor = '#ef4444'; // ✨ 記錄寶塔線顏色的狀態變數
@@ -3832,6 +3866,7 @@ const App = () => {
           signalVol: volType, signalHeidun: isHeidun, signalTrend: isStartTrend ? '起漲K' : null,
           macd: { dif, macd: macdSig, osc }, kd: { k, d }, rsi: { rsi1, rsi2 }, willr,
           obv: obvArr[i], obvMa: obvMaArr[i], bbands: { up: bbUp, mid: bbMid, down: bbDown, up3: bbUp3, down3: bbDown3 }, tower,
+          edwinMomentum: edwinMomArr[i],
           maxVolPrice: isLastDay ? topVolPrice : undefined,
           secondVolPrice: isLastDay ? secVolPrice : undefined,
           topVolIdx: isLastDay ? topVolIdx : undefined,
@@ -4507,12 +4542,19 @@ const App = () => {
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 mt-2">副圖指標：</span>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {['None', 'MACD', 'KD', 'RSI', 'OBV', 'TOWER', '外資', '投信', '自營', '投+外', '資券'].map(type => (
+                  {['None', 'MACD', 'KD', 'RSI', 'OBV', 'TOWER', 'EdwinMomentum', '外資', '投信', '自營', '投+外', '資券'].map(type => (
                     <button key={type} onClick={() => setIndicatorType(type)} className={`px-3 py-1.5 text-xs rounded font-bold ${indicatorType === type ? 'bg-cyan-700 text-white border border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                      {type === 'None' ? '關閉' : (type === 'TOWER' ? '寶塔線' : type)}
+                      {type === 'None' ? '關閉' : (type === 'TOWER' ? '寶塔線' : (type === 'EdwinMomentum' ? '🌊 資金動能' : type))}
                     </button>
                   ))}
                 </div>
+                {/* ✨ 資金動能的參數設定框 */}
+                {indicatorType === 'EdwinMomentum' && (
+                  <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
+                    <span className="text-[10px] text-slate-400 font-bold">計算週期 (Length)</span>
+                    <input type="number" value={indicatorParams.edwinMomentum?.length || 20} onChange={e => setIndicatorParams({...indicatorParams, edwinMomentum: {...indicatorParams.edwinMomentum, length: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
+                  </div>
+                )}
                 {/* 動態參數調整輸入框 */}
                 {indicatorType === 'MACD' && (
                   <div className="flex flex-wrap items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
@@ -7601,6 +7643,32 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     {data.map((d, i) => <rect key={`tw-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
                     <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
                 </g>);
+            })()}
+            {/* 👇 第五步：愛德恩動能指標 SVG 繪製 👇 */}
+            {indicatorType === 'EdwinMomentum' && (() => {
+                let maxM = -Infinity, minM = Infinity;
+                data.forEach(d => {
+                    if (d.edwinMomentum > maxM) maxM = d.edwinMomentum;
+                    if (d.edwinMomentum < minM) minM = d.edwinMomentum;
+                });
+                const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
+                const getMomY = (val) => indicatorHeight / 2 - (val / absLimit) * (indicatorHeight / 2 - 15);
+                
+                const zeroY = getMomY(0);
+                const alertY = getMomY(7.5);
+
+                return (
+                    <g>
+                        <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
+                        <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
+                        
+                        <path d={data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${getMomY(d.edwinMomentum)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                        
+                        <text x={paddingLeft + 5} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 (基準線)</text>
+                        <text x={paddingLeft + 5} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強勢警戒線)</text>
+                        <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">🌊 愛德恩綜合動能</text>
+                    </g>
+                );
             })()}
 
             {/* 👇 第四步的程式碼貼在這裡 👇 */}
