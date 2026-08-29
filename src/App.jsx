@@ -4827,7 +4827,7 @@ const App = () => {
                 <button onClick={() => window.open('https://gemini.google.com/share/fc1361ef0f25?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-pink-500 text-pink-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>📊</span> 2. 財報分析
                 </button>
-                <button onClick={() => window.open('https://gemini.google.com/share/671a85db4a96?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-blue-500 text-blue-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                <button onClick={() => window.open('https://gemini.google.com/share/d38ef70d1847?skid=81d870f0-5bde-484f-a640-7f0e37136e3f?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-blue-500 text-blue-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>🌍</span> 3. 產業規模
                 </button>
                 <button onClick={() => window.open('https://gemini.google.com/share/cbe5a830f8a7?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-amber-500 text-amber-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
