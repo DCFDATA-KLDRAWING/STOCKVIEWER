@@ -2298,7 +2298,7 @@ const App = () => {
     showBBandsCompress: false, // ✨ 新增：布林壓縮區塊 開關
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
     showMaxVolLines: false, // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
-    showZigZag: false, // ✨ 新增：細折線開關
+    showZigZag: true, // ✨ 新增：細折線開關
     showVmaTurn: true, // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
     vmaLongOnly: false,  // 🌟 新增：只在多方(收盤價 > 55MA)時顯示
     vmaShortOnly: false,  // 🌟 新增：只在空方(收盤價 < 55MA)時顯示
@@ -4463,7 +4463,7 @@ const App = () => {
                       <input type="checkbox" checked={toggles.showMaxVolLines} onChange={() => handleToggle('showMaxVolLines')} className="w-3.5 h-3.5 text-red-500 rounded bg-slate-900 border-slate-600" />
                       <span className="text-xs text-red-400 font-bold">近</span>
                     </label>
-                    <input type="number" min="1" max="999" value={toggles.maxVolDays ?? 120} onChange={(e) => setToggles(p => ({...p, maxVolDays: Number(e.target.value)}))} className="w-10 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="天數" />
+                    <input type="number" min="1" max="999" value={toggles.maxVolDays ?? 180} onChange={(e) => setToggles(p => ({...p, maxVolDays: Number(e.target.value)}))} className="w-10 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="天數" />
                     <span className="text-xs text-red-400 font-bold">日大量線</span>
                     
                     
