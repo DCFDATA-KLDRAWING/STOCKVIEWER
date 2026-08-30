@@ -7037,7 +7037,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
           <text 
             id="chart-title" 
             x={width / 2} 
-            y={totalSVGHeight / 3} 
+            y={totalSVGHeight / 5} 
             fill="none" 
             stroke="#475569" 
             strokeWidth="2" 
