@@ -3971,6 +3971,100 @@ const App = () => {
       if (klineData[i].signalVol === '天量' || klineData[i].signalVol === '巨量') { globalDefensivePrice = klineData[i].low * 0.9; break; }
     }
   }
+  
+  // ==========================================
+  // ✨ [新增] 類股資金動能看板掃描引擎
+  // ==========================================
+  const [isSectorMomentumOpen, setIsSectorMomentumOpen] = useState(false);
+  const [isSectorScanning, setIsSectorScanning] = useState(false);
+  const [sectorScanProgress, setSectorScanProgress] = useState({ current: 0, total: 0 });
+  const [sectorMomentumData, setSectorMomentumData] = useState([]);
+
+  const handleOpenSectorMomentum = async () => {
+    setIsSectorMomentumOpen(true);
+    if (sectorMomentumData.length > 0) return; // 如果已經有資料就不用重抓，除非按重新掃描
+    setIsSectorScanning(true);
+
+    // 抓取所有類股指數 (排除大盤 IX0001 與 櫃買綜合 IX0043，只看純產業)
+    const sectors = STOCKS.filter(s => s.id.startsWith('IX') && !['IX0001', 'IX0043'].includes(s.id));
+    setSectorScanProgress({ current: 0, total: sectors.length });
+
+    const results = [];
+    const toDate = new Date();
+    const fromDate = new Date();
+    fromDate.setDate(toDate.getDate() - 45); // 抓45天確保有足夠的20根交易日
+    const fromStr = fromDate.toISOString().split('T')[0];
+    const toStr = toDate.toISOString().split('T')[0];
+    const period = indicatorParams?.edwinMomentum?.length || 20;
+
+    for (let i = 0; i < sectors.length; i++) {
+      const sector = sectors[i];
+      try {
+        const url = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${sector.id}?timeframe=D&from=${fromStr}&to=${toStr}`;
+        const res = await fetch(url, { headers: { 'X-API-KEY': userApiKey } });
+        if (res.ok) {
+          const json = await res.json();
+          let candles = json.data.reverse();
+
+          // 嘗試補上今天的盤中即時報價
+          try {
+            const quoteRes = await fetch(`https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${sector.id}`, { headers: { 'X-API-KEY': userApiKey } });
+            if (quoteRes.ok) {
+               const quote = await quoteRes.json();
+               if (quote && quote.closePrice) {
+                  const todayDate = quote.date || toStr;
+                  const lastIdx = candles.length - 1;
+                  const newCandle = { close: quote.closePrice || quote.lastPrice, volume: Math.round((quote.total?.tradeVolume || 0) / 1000) };
+                  if (lastIdx >= 0 && candles[lastIdx].date === todayDate) {
+                     candles[lastIdx].close = newCandle.close;
+                     candles[lastIdx].volume = newCandle.volume;
+                  } else {
+                     candles.push({ date: todayDate, ...newCandle });
+                  }
+               }
+            }
+          } catch(e) {}
+
+          // 核心：套用您的愛德恩動能公式
+          if (candles.length >= period) {
+            const recent = candles.slice(-period);
+            const latest = recent[recent.length - 1];
+            const prev = recent[recent.length - 2];
+
+            const maVal = recent.reduce((a, b) => a + b.close, 0) / period;
+            const priceMom = maVal > 0 ? ((latest.close - maVal) / maVal) * 100 : 0;
+
+            const volMaVal = recent.reduce((a, b) => a + (b.volume || 0), 0) / period;
+            const volRatio = volMaVal > 0 ? ((latest.volume || 0) / volMaVal) : 1;
+
+            const roc = prev && prev.close > 0 ? ((latest.close - prev.close) / prev.close) * 100 : 0;
+
+            let momentumVal = 0;
+            if (priceMom >= 0) {
+                momentumVal = (priceMom * 0.7) + (roc * 0.3) * Math.min(volRatio, 3);
+            } else {
+                momentumVal = (priceMom * 0.7) + (roc * 0.3);
+            }
+
+            results.push({
+                id: sector.id,
+                name: sector.name,
+                momentum: momentumVal,
+                change: roc
+            });
+          }
+        }
+      } catch (e) { console.warn(`無法取得 ${sector.name} 的資料`, e); }
+      
+      setSectorScanProgress({ current: i + 1, total: sectors.length });
+      await new Promise(r => setTimeout(r, 150)); // ⏳ 延遲0.15秒防禦 Fugle API 阻擋
+    }
+
+    // 將結果依照動能值由大到小排序
+    results.sort((a, b) => b.momentum - a.momentum);
+    setSectorMomentumData(results);
+    setIsSectorScanning(false);
+  };
 
   // ==========================================
   // ✨ [新增] 自選股策略掃描引擎
@@ -4861,6 +4955,9 @@ const App = () => {
           <button onClick={handleGoogleAIAnalysis} className="w-full bg-purple-900/60 border border-purple-500 text-purple-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:bg-purple-800 transition-all flex items-center justify-center gap-2">
             <span className="text-lg">🤖</span> AI 產業深度診斷
           </button>
+          <button onClick={handleOpenSectorMomentum} className="w-full bg-blue-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0">
+            <span className="text-lg">🌊</span> 類股資金動能看板
+          </button>
           {isAdmin ? (
             <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
               <div className="flex flex-col gap-3">
@@ -4922,6 +5019,75 @@ const App = () => {
             <button onClick={handlePasteRanking} className="w-full bg-emerald-700 text-white font-bold py-3 rounded-lg hover:bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all">
               🔍 開始解析並轉成名單
             </button>
+          </div>
+        </div>
+      )}
+      
+      {/* ✨ 🌊 類股資金動能看板彈出視窗 */}
+      {isSectorMomentumOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 pointer-events-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-[0_0_40px_rgba(59,130,246,0.4)] w-full max-w-3xl h-[85vh] flex flex-col animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-700 p-4 bg-slate-800 shrink-0 rounded-t-xl gap-3">
+              <div>
+                <h3 className="text-blue-400 font-bold text-lg flex items-center gap-2"><span>🌊</span> 今日類股資金動能看板</h3>
+                <p className="text-xs text-slate-400 mt-1">即時掃描全市場，找出資金正在湧入的強勢產業板塊 (數值 ≥ 7.5 為極強勢)</p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <button onClick={() => { setSectorMomentumData([]); handleOpenSectorMomentum(); }} disabled={isSectorScanning} className="flex-1 sm:flex-none justify-center text-emerald-400 hover:text-white font-bold bg-slate-900 px-4 py-2 rounded-lg border border-slate-700 disabled:opacity-50 flex items-center gap-1 transition-all">🔄 重新掃描</button>
+                <button onClick={() => setIsSectorMomentumOpen(false)} className="text-slate-400 hover:text-white font-bold bg-slate-900 px-4 py-2 rounded-lg border border-slate-700">✕ 關閉</button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-700">
+              {isSectorScanning ? (
+                <div className="flex flex-col items-center justify-center h-full gap-5">
+                  <span className="text-6xl animate-bounce">📡</span>
+                  <span className="text-blue-300 font-bold text-lg">正在掃描全市場類股資金流向...</span>
+                  <div className="w-64 bg-slate-800 rounded-full h-3 border border-slate-700 overflow-hidden relative">
+                     <div className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full transition-all duration-300" style={{ width: `${(sectorScanProgress.current / sectorScanProgress.total) * 100}%` }}></div>
+                  </div>
+                  <span className="text-slate-400 text-sm font-bold">進度：{sectorScanProgress.current} / {sectorScanProgress.total}</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {sectorMomentumData.map((sec, idx) => (
+                    <div 
+                      key={sec.id} 
+                      onClick={() => { fetchStockData(sec.id); setIsSectorMomentumOpen(false); }} 
+                      className={`flex justify-between items-center p-3 rounded-lg border cursor-pointer transition-all active:scale-[0.98] ${
+                        sec.momentum >= 7.5 
+                          ? 'bg-red-950/20 border-red-900/50 hover:bg-red-900/40 hover:border-red-500 shadow-[inset_2px_0_0_#ef4444]' 
+                          : 'bg-slate-800/80 border-slate-700 hover:border-blue-500 hover:bg-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx < 3 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50' : 'bg-slate-800 text-slate-500'}`}>
+                          {idx + 1}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-cyan-300 font-bold text-base">{sec.name}</span>
+                          <span className="text-slate-500 text-[10px]">{sec.id}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500">動能</span>
+                          <span className={`font-mono font-bold text-lg ${sec.momentum >= 7.5 ? 'text-red-400 drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]' : (sec.momentum >= 0 ? 'text-amber-400' : 'text-green-400')}`}>
+                            {sec.momentum.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-slate-500">漲幅</span>
+                          <span className={`text-xs font-bold font-mono ${sec.change > 0 ? 'text-red-400' : (sec.change < 0 ? 'text-green-400' : 'text-slate-400')}`}>
+                            {sec.change > 0 ? '+' : ''}{sec.change.toFixed(2)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
