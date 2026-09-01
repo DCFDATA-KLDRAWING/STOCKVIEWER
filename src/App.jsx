@@ -4020,8 +4020,9 @@ const handleOpenSectorMomentum = async () => {
                 const todayDate = quote.date || toStr;
                 const lastIdx = candles.length - 1;
                 
-                // 直接使用當下實際成交張數
-                const actualVol = Math.round((quote.total?.tradeVolume || 0) / 1000);
+                // ⚠️ 統一使用「股數」以對齊歷史資料
+                // (否則當日張數與歷史股數混算，會導致均量倍數 volRatio 趨近於零，動能值嚴重失真)
+                const actualVol = quote.total?.tradeVolume || 0;
 
                 const newCandle = { 
                     close: currentClose, 
