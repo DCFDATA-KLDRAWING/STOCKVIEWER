@@ -18,57 +18,63 @@ try {
 // === 股票清單 (完整載入 1700+ 檔) ===
 const RAW_STOCK_LIST = `IX0001 加權指數(大盤)
 IX0043 櫃買綜合股價指數
-IX0007 未含金融指數上市
-IX0008 未含電子指數上市
+IX0007 電子加權股價指數
+IX0008 金融保險股價指數
 IX0010 水泥類指數
 IX0011 食品類指數
 IX0012 塑膠類指數
 IX0016 紡織纖維類指數
 IX0017 電機機械類指數
 IX0018 電器電纜類指數
-IX0019 化學生技醫療類指數
-IX0020 化學類指數上市
-IX0021 生技醫療類指數
-IX0022 陶瓷玻璃類指數
-IX0023 造紙類指數
-IX0024 鋼鐵類指數
-IX0025 橡膠類指數
-IX0026 汽車類指數
-IX0027 電子工業類指數
-IX0028 半導體類指數
-IX0029 電腦及週邊設備類指數
-IX0030 光電類股價指數
-IX0031 通信網路類指數上市
-IX0032 電子零組件類指數上市
-IX0033 電子通路類指數上市
-IX0034 資訊服務類指數上市
-IX0035 其他電子類指數上市
-IX0036 建材營造類指數上市
-IX0037 航運類指數上市
-IX0038 觀光餐旅類指數上市
-IX0039 金融保險類指數上市
-IX0040 貿易百貨類指數上市
-IX0041 油電燃氣類指數上市
-IX0042 其他類指數上市
-IX0014 塑膠化工類指數上市
-IX0015 機電類指數
-IX0044 櫃檯紡織類指數
-IX0045 櫃檯機械類指數
-IX0046 櫃檯鋼鐵類指數
+IX0019 化學工業類指數
+IX0020 生技醫療類指數
+IX0021 玻璃陶瓷類指數
+IX0022 電子零組件類指數
+IX0023 電子通路類指數
+IX0024 資訊服務類指數
+IX0025 其他電子類指數
+IX0026 建材營造類指數
+IX0027 航運業類指數
+IX0028 觀光餐旅類指數
+IX0029 金融保險類指數
+IX0030 百貨貿易類指數
+IX0031 油脂燃氣類指數
+IX0032 造紙類指數
+IX0033 鋼鐵類指數
+IX0034 橡膠類指數
+IX0035 汽車類指數
+IX0036 電子類指數
+IX0037 半導體類指數
+IX0038 綠能環保類指數
+IX0039 數位雲端類指數
+IX0040 運動休閒類指數
+IX0041 居家生活類指數
+IX0042 其他類指數
+IX0014 電腦及週邊設備類指數
+IX0015 光電類指數
+IX0044 櫃檯紡織纖維類指數
+IX0045 櫃檯電機機械類指數
+IX0046 櫃檯鋼鐵工業類指數
 IX0047 櫃檯電子類指數
 IX0048 櫃檯建材營造類指數
 IX0049 櫃檯航運業類指數
 IX0050 櫃檯觀光餐旅類指數
-IX0051 櫃檯化工類指數
-IX0052 櫃檯生技醫療類指數
-IX0053 櫃檯半導體類指數
-IX0054 櫃檯電腦及週邊類指數
-IX0055 櫃檯光電類指數
-IX0056 櫃檯通信網路類指數
-IX0057 櫃檯電子零組件業類指數
-IX0058 櫃檯電子通路業類指數
-IX0059 櫃檯資訊服務業類指數
-IX0075 櫃檯文化創意類指數
+IX0051 櫃檯其他類指數
+IX0052 櫃檯化學工業類指數
+IX0053 櫃檯生技醫療類指數
+IX0054 櫃檯半導體類指數
+IX0055 櫃檯電腦及週邊設備類指數
+IX0056 櫃檯光電業類指數
+IX0057 櫃檯通信網路業類指數
+IX0058 櫃檯電子零組件業類指數
+IX0059 櫃檯電子通路業類指數
+IX0060 櫃檯資訊服務業類指數
+IX0061 櫃檯其他電子業類指數
+IX0062 櫃檯文化創意業類指數
+IX0075 櫃檯綠能環保類指數
+IX0076 櫃檯數位雲端類指數
+IX0077 櫃檯運動休閒類指數
+IX0078 櫃檯居家生活類指數
 0050 元大台灣50
 0056 元大高股息
 00713 元大台灣高息低波
@@ -3970,95 +3976,119 @@ const App = () => {
   // ✨ [新增] 類股資金動能看板掃描引擎
   // ==========================================
   const [isSectorMomentumOpen, setIsSectorMomentumOpen] = useState(false);
-  const [isSectorScanning, setIsSectorScanning] = useState(false);
-  const [sectorScanProgress, setSectorScanProgress] = useState({ current: 0, total: 0 });
-  const [sectorMomentumData, setSectorMomentumData] = useState([]);
+const [isSectorScanning, setIsSectorScanning] = useState(false);
+const [sectorScanProgress, setSectorScanProgress] = useState({ current: 0, total: 0 });
+const [sectorMomentumData, setSectorMomentumData] = useState([]);
 
-  const handleOpenSectorMomentum = async () => {
-    setIsSectorMomentumOpen(true);
-    if (sectorMomentumData.length > 0) return; // 如果已經有資料就不用重抓，除非按重新掃描
-    setIsSectorScanning(true);
+const handleOpenSectorMomentum = async () => {
+  setIsSectorMomentumOpen(true);
+  if (sectorMomentumData.length > 0) return;
+  setIsSectorScanning(true);
 
-    // 抓取所有類股指數 (排除大盤 IX0001 與 櫃買綜合 IX0043，只看純產業)
-    const sectors = STOCKS.filter(s => s.id.startsWith('IX') && !['IX0001', 'IX0043'].includes(s.id));
-    setSectorScanProgress({ current: 0, total: sectors.length });
+  // 篩選出類股指數 (排除大盤 IX0001 與 櫃買綜合 IX0043)
+  const sectors = STOCKS.filter(s => s.id.startsWith('IX') && !['IX0001', 'IX0043'].includes(s.id));
+  setSectorScanProgress({ current: 0, total: sectors.length });
 
-    const results = [];
-    const toDate = new Date();
-    const fromDate = new Date();
-    fromDate.setDate(toDate.getDate() - 45); // 抓45天確保有足夠的20根交易日
-    const fromStr = fromDate.toISOString().split('T')[0];
-    const toStr = toDate.toISOString().split('T')[0];
-    const period = indicatorParams?.edwinMomentum?.length || 20;
+  const results = [];
 
-    for (let i = 0; i < sectors.length; i++) {
-      const sector = sectors[i];
-      try {
-        const url = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${sector.id}?timeframe=D&from=${fromStr}&to=${toStr}`;
-        const res = await fetch(url, { headers: { 'X-API-KEY': userApiKey } });
-        if (res.ok) {
-          const json = await res.json();
-          let candles = json.data.reverse();
+  // 強制確保抓取到台灣時區的「今天」
+  const tzOffset = new Date().getTime() + 8 * 60 * 60 * 1000;
+  const tzDate = new Date(tzOffset);
+  const toStr = tzDate.toISOString().split('T')[0];
 
-          // 嘗試補上今天的盤中即時報價
-          try {
-            const quoteRes = await fetch(`https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${sector.id}`, { headers: { 'X-API-KEY': userApiKey } });
-            if (quoteRes.ok) {
-               const quote = await quoteRes.json();
-               if (quote && quote.closePrice) {
-                  const todayDate = quote.date || toStr;
-                  const lastIdx = candles.length - 1;
-                  const newCandle = { close: quote.closePrice || quote.lastPrice, volume: Math.round((quote.total?.tradeVolume || 0) / 1000) };
-                  if (lastIdx >= 0 && candles[lastIdx].date === todayDate) {
-                     candles[lastIdx].close = newCandle.close;
-                     candles[lastIdx].volume = newCandle.volume;
-                  } else {
-                     candles.push({ date: todayDate, ...newCandle });
-                  }
-               }
-            }
-          } catch(e) {}
+  const fromDate = new Date(tzOffset);
+  fromDate.setDate(fromDate.getDate() - 45);
+  const fromStr = fromDate.toISOString().split('T')[0];
 
-          // 核心：套用您的愛德恩動能公式
-          if (candles.length >= period) {
-            const recent = candles.slice(-period);
-            const latest = recent[recent.length - 1];
-            const prev = recent[recent.length - 2];
+  const period = indicatorParams?.edwinMomentum?.length || 20;
 
-            const maVal = recent.reduce((a, b) => a + b.close, 0) / period;
-            const priceMom = maVal > 0 ? ((latest.close - maVal) / maVal) * 100 : 0;
-
-            const volMaVal = recent.reduce((a, b) => a + (b.volume || 0), 0) / period;
-            const volRatio = volMaVal > 0 ? ((latest.volume || 0) / volMaVal) : 1;
-
-            const roc = prev && prev.close > 0 ? ((latest.close - prev.close) / prev.close) * 100 : 0;
-
-            let momentumVal = 0;
-            if (priceMom >= 0) {
-                momentumVal = (priceMom * 0.7) + (roc * 0.3) * Math.min(volRatio, 3);
-            } else {
-                momentumVal = (priceMom * 0.7) + (roc * 0.3);
-            }
-
-            results.push({
-                id: sector.id,
-                name: sector.name,
-                momentum: momentumVal,
-                change: roc
-            });
-          }
-        }
-      } catch (e) { console.warn(`無法取得 ${sector.name} 的資料`, e); }
+  //  for (let i = 0; i < sectors.length; i++) {
+    const sector = sectors[i];
+    try {
+      // ⚠️ 這裡補上了反引號 (Template literals)
+      const url = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${sector.id}?timeframe=D&from=${fromStr}&to=${toStr}`;
+      const res = await fetch(url, { headers: { 'X-API-KEY': userApiKey } });
       
-      setSectorScanProgress({ current: i + 1, total: sectors.length });
-      await new Promise(r => setTimeout(r, 150)); // ⏳ 延遲0.15秒防禦 Fugle API 阻擋
+      if (res.ok) {
+        const json = await res.json();
+        let candles = json.data.reverse();
+        
+        // 🌟 盤中即時報價與當前實際成交量直接縫合 (不作預估量時間放大)
+        try {
+          const quoteRes = await fetch(`https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${sector.id}`, { headers: { 'X-API-KEY': userApiKey } });
+          if (quoteRes.ok) {
+             const quote = await quoteRes.json();
+             
+             // 盤中 (lastPrice) 與盤後 (closePrice) 通吃
+             const currentClose = quote.closePrice || quote.lastPrice || quote.previousClose;
+             
+             if (quote && currentClose) {
+                const todayDate = quote.date || toStr;
+                const lastIdx = candles.length - 1;
+                
+                // 直接使用當下實際成交張數
+                const actualVol = Math.round((quote.total?.tradeVolume || 0) / 1000);
+
+                const newCandle = { 
+                    close: currentClose, 
+                    volume: actualVol 
+                };
+                
+                if (lastIdx >= 0 && candles[lastIdx].date === todayDate) {
+                   candles[lastIdx].close = newCandle.close;
+                   if (actualVol > 0) candles[lastIdx].volume = newCandle.volume; 
+                } else {
+                   candles.push({ date: todayDate, ...newCandle });
+                }
+             }
+          }
+        } catch(e) {}
+
+        //        if (candles.length >= period) {
+          const recent = candles.slice(-period);
+          const latest = recent[recent.length - 1];
+          const prev = recent[recent.length - 2];
+
+          // 1. 20日均價乖離
+          const maVal = recent.reduce((a, b) => a + b.close, 0) / period;
+          const priceMom = maVal > 0 ? ((latest.close - maVal) / maVal) * 100 : 0;
+
+          // 2. 20日均量倍數 (直接用實際量)
+          const volMaVal = recent.reduce((a, b) => a + (b.volume || 0), 0) / period;
+          const volRatio = volMaVal > 0 ? ((latest.volume || 0) / volMaVal) : 1;
+
+          // 3. 當日漲跌幅
+          const roc = prev && prev.close > 0 ? ((latest.close - prev.close) / prev.close) * 100 : 0;
+
+          // 4. 愛德恩動能值計算
+          let momentumVal = 0;
+          if (priceMom >= 0) {
+              momentumVal = (priceMom * 0.7) + (roc * 0.3) * Math.min(volRatio, 3);
+          } else {
+              momentumVal = (priceMom * 0.7) + (roc * 0.3);
+          }
+
+          results.push({
+              id: sector.id,
+              name: sector.name,
+              momentum: momentumVal,
+              change: roc
+          });
+        }
+      }
+    } catch (e) { 
+      console.warn(`無法取得 ${sector.name} 的資料`, e); 
     }
 
-    // 將結果依照動能值由大到小排序
-    results.sort((a, b) => b.momentum - a.momentum);
-    setSectorMomentumData(results);
-    setIsSectorScanning(false);
-  };
+    setSectorScanProgress({ current: i + 1, total: sectors.length });
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  //  // 依動能高低排序
+  results.sort((a, b) => b.momentum - a.momentum);
+  setSectorMomentumData(results);
+  setIsSectorScanning(false);
+};
 
   // ==========================================
   // ✨ [新增] 自選股策略掃描引擎
