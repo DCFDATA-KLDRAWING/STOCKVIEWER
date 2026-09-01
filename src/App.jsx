@@ -7893,18 +7893,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                         {/* 1. 預設的黃色基礎折線 */}
                         <path d={data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${getMomY(d.edwinMomentum)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
                         
-                        {/* 2. ✨ 疊加上符合「動能 >= 7.5 且 成交值 >= 5億」的特殊線段與圓點 */}
+                        {/* 2. ✨ 疊加上符合「今日動能 >= 7.5 且 昨日成交值 >= 5億」的特殊線段與圓點 */}
                         {data.map((d, i) => {
                             if (i === 0) return null;
                             
-                            // 計算成交金額 (volume是張數，所以 * 1000 換算成股，再 * 收盤價)
-                            const tradingValue = (d.volume * 1000) * d.close;
+                            // 取得昨日的資料
+                            const prevD = data[i-1];
                             
-                            // 條件：動能 >= 7.5 且 成交值 >= 500,000,000 (5億)
-                            const isStrong = d.edwinMomentum >= 7.5 && tradingValue >= 500000000;
+                            // 計算「昨日」的成交金額 (volume是張數，所以 * 1000 換算成股，再 * 收盤價)
+                            const prevTradingValue = (prevD.volume * 1000) * prevD.close;
+                            
+                            // 條件：當日動能 >= 7.5 且 昨日成交值 >= 500,000,000 (5億)
+                            const isStrong = d.edwinMomentum >= 7.5 && prevTradingValue >= 500000000;
                             
                             if (isStrong) {
-                                const prevD = data[i-1];
                                 const x1 = paddingLeft + (i - 1 + offsetBars) * spacing + spacing / 2;
                                 const y1 = getMomY(prevD.edwinMomentum);
                                 const x2 = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
