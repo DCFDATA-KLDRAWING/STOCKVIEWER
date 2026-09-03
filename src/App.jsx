@@ -7922,8 +7922,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             return null;
                         })}
                         
-                        <text x={paddingLeft + 5} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 (基準線)</text>
-                        <text x={width - paddingRight - 80} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強勢警戒線)</text>
+                        <text x={width - paddingRight - 80} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 </text>
+                        <text x={width - paddingRight - 80} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強)</text>
                         <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
                     </g>
                 );
