@@ -2243,8 +2243,7 @@ const App = () => {
   const [issuedShares, setIssuedShares] = useState(''); 
   const [displayCount, setDisplayCount] = useState(60);
   const [timeframe, setTimeframe] = useState('D');
-
-  
+    
   // ✨ 新增副圖指標狀態 (預設關閉 None)
   const [indicatorType, setIndicatorType] = useState('EdwinMomentum');
   
@@ -5486,6 +5485,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
+  // ✨ 放大 K 棒 (減少顯示數量，放在這裡！)
+  const handleZoomIn = (e) => {
+    if (e) e.stopPropagation();
+    setDisplayCount(prev => Math.max(30, prev - 10)); 
+  };
+
+  // ✨ 縮小 K 棒 (增加顯示數量，放在這裡！)
+  const handleZoomOut = (e) => {
+    if (e) e.stopPropagation();
+    setDisplayCount(prev => Math.min(300, prev + 10));
+  };
   
   // ✨ 1. 將預留空白固定為 2 根
   const extraCandles = 15;
@@ -7232,6 +7242,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       {/* 🏆 關鍵：左右並排總成容器 (flex-row) */}
       <div className="flex-1 flex flex-row relative overflow-hidden w-full h-full min-h-0">
         
+        {/* ✨ 專業版：浮動縮放按鈕 (釘在圖表右下角，Y軸的旁邊) */}
+        <div className="absolute bottom-[100px] right-[65px] flex flex-col gap-3 z-[110] pointer-events-auto">
+           <button onClick={handleZoomIn} className="w-10 h-10 rounded-full bg-slate-900/80 border border-cyan-700 text-cyan-400 font-bold text-xl shadow-[0_0_15px_rgba(6,182,212,0.5)] backdrop-blur-md hover:bg-slate-800 active:scale-95 flex items-center justify-center transition-all" title="放大 K 棒">➕</button>
+           <button onClick={handleZoomOut} className="w-10 h-10 rounded-full bg-slate-900/80 border border-slate-600 text-slate-300 font-bold text-xl shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md hover:bg-slate-800 active:scale-95 flex items-center justify-center transition-all" title="縮小 K 棒">➖</button>
+        </div>
         {/* 左側：可水平滑動的 K 線圖表區 */}
         <div 
           ref={scrollContainerRef}
@@ -8283,6 +8298,27 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             </g>
           )}
         </svg>
+      </div>
+      {/* ✨ 加入 PRO 級浮動縮放按鈕 */}
+      <div className="absolute bottom-4 right-[65px] flex gap-2 z-[60]">
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setDisplayCount(prev => Math.min(300, prev + 15));
+          }} 
+          className="w-10 h-10 rounded-full bg-slate-800/80 border border-slate-600 text-slate-300 font-bold text-xl shadow-[0_0_10px_rgba(0,0,0,0.5)] backdrop-blur hover:bg-slate-700 active:scale-95 flex items-center justify-center pointer-events-auto"
+        >
+          -
+        </button>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setDisplayCount(prev => Math.max(30, prev - 15)); 
+          }} 
+          className="w-10 h-10 rounded-full bg-slate-800/80 border border-slate-600 text-cyan-400 font-bold text-xl shadow-[0_0_10px_rgba(0,0,0,0.5)] backdrop-blur hover:bg-slate-700 active:scale-95 flex items-center justify-center pointer-events-auto"
+        >
+          +
+        </button>
       </div>  
      </div>
     </div> 
