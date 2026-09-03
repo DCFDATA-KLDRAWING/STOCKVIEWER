@@ -5491,10 +5491,22 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     setDisplayCount(prev => Math.max(30, prev - 10)); 
   };
 
-  // ✨ 縮小 K 棒 (增加顯示數量，放在這裡！)
+  // ✨ 縮小 K 棒 (增加顯示數量，讓 K 棒變細)
+  // 💡 關鍵修正：在縮小瞬間，強制讓捲軸往右貼齊，防止畫面被擠出
   const handleZoomOut = (e) => {
     if (e) e.stopPropagation();
-    setDisplayCount(prev => Math.min(300, prev + 10));
+    setDisplayCount(prev => {
+      const newCount = Math.min(300, prev + 10);
+      
+      // 延遲一點點，等待 React 將 SVG 寬度重算完畢後，強制捲軸向右貼齊
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+        }
+      }, 50);
+      
+      return newCount;
+    });
   };
   
   // ✨ 1. 將預留空白固定為 2 根
