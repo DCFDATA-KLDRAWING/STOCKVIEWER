@@ -5829,8 +5829,36 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     commitDrawings([...drawings, newShape]); setEditingPoint(null);
   };
 
+  // ✨ 6. 【電腦版專屬】滑鼠滾輪與觸控板控制引擎 (請貼在 handlePointerDown 上面)
+  const handleWheel = (e) => {
+    // 只有在純看盤(游標)模式下，才允許滾輪控制
+    if (activeTool !== 'cursor') return;
+    
+    // 判斷是橫向滾動 (觸控板) 還是直向滾動 (一般滑鼠滾輪)
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        // 橫向滑動 -> 平移 K 線
+        e.preventDefault(); 
+        const shiftBars = -(e.deltaX / spacing); 
+        const maxOffset = Math.max(0, data.length - Math.min(30, displayCount));
+        setRightOffset(Math.min(maxOffset, Math.max(0, rightOffset + shiftBars)));
+    } else {
+        // 直向滾動 -> 縮放 K 線
+        e.preventDefault(); 
+        if (e.deltaY < 0) {
+            handleZoomIn(); 
+        } else if (e.deltaY > 0) {
+            handleZoomOut(); 
+        }
+    }
+  };
+
   // ✨ 5. 【絲滑平移手勢引擎】
   const handlePointerDown = (e) => {
+    // ✨ 阻擋電腦滑鼠原生的文字反白與拖曳干擾
+    if (e.type === 'mousedown') {
+       e.preventDefault();
+    }
+    
     if (e.type === 'mousedown' && (Date.now() - lastTouchTime.current < 500)) return;
     if (e.type.startsWith('touch')) lastTouchTime.current = Date.now();
 
@@ -6543,10 +6571,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
            <button onClick={handleZoomOut} className="w-10 h-10 rounded-full bg-slate-900/80 border border-slate-600 text-slate-300 font-bold text-xl shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md hover:bg-slate-800 active:scale-95 flex items-center justify-center transition-all">➖</button>
         </div>
 
-        {/* ✨ 取消了原本的 overflow-x-auto */}
+        {/* ✨ 修正：拿掉 touch-pan-y 的強制限制，讓 SVG 內部自由接管滾輪事件 */}
         <div 
           ref={scrollContainerRef}
-          className={`${isFullscreen ? "flex-1" : ""} flex-1 min-w-0 p-2 pt-1 relative ${(activeTool !== 'cursor' || toggles.showCrosshair) ? 'touch-none' : 'touch-pan-y'} h-full flex flex-col overflow-hidden`}
+          className={`${isFullscreen ? "flex-1" : ""} flex-1 min-w-0 p-2 pt-1 relative h-full flex flex-col overflow-hidden`}
         >  
           {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 text-cyan-300 font-bold bg-slate-800/80 backdrop-blur-sm border border-cyan-800 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.2)] text-sm pointer-events-none z-10">✏️ 作圖模式：拖曳放開即畫完</div>
@@ -6554,7 +6582,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
         <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} 
           className={`select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} 
-          style={{ width: `${width}px`, minWidth: `${width}px`, height: `${totalSVGHeight}px` }}
+          style={{ width: `${width}px`, minWidth: `${width}px`, height: `${totalSVGHeight}px`, touchAction: (activeTool !== 'cursor' || toggles.showCrosshair) ? 'none' : 'pan-y' }}
+          onWheel={handleWheel}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove} 
           onMouseUp={handlePointerUp}
