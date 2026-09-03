@@ -4039,7 +4039,7 @@ const handleOpenSectorMomentum = async () => {
           }
         } catch(e) {}
 
-        //        if (candles.length >= period) {
+          if (candles.length >= period) {
           const recent = candles.slice(-period);
           const latest = recent[recent.length - 1];
           const prev = recent[recent.length - 2];
