@@ -5709,7 +5709,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const width = chartWidth; 
   const paddingLeft = 10;   
   const yAxisWidth = 50;    
-  const paddingRight = yAxisWidth + 10; 
+  // ✨ 修正1：因為 Y 軸已經被獨立到外面，這裡不需要再扣除 50px，只要留 5px 給邊緣呼吸即可！
+  const paddingRight = 5; 
   const indPaddingLeft = 15;
   
   const volHeight = isFullscreen ? 50 : 80;
@@ -6563,8 +6564,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
           onTouchEnd={handlePointerUp}
           onTouchCancel={handlePointerUp}
         >
-          {/* ✨ 畫布邊界，確保只畫在指定的區域內 */}
-          <defs><clipPath id="chartClip"><rect x={paddingLeft} y={0} width={width - paddingRight * 2} height={totalSVGHeight} /></clipPath></defs>
+          {/* ✨ 修正2：精準對齊遮罩，解除被誤剪掉的「右側黑洞」！ */}
+          <defs><clipPath id="chartClip"><rect x={paddingLeft} y={0} width={width - paddingLeft - paddingRight} height={totalSVGHeight} /></clipPath></defs>
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           <text id="chart-title" x={width / 2} y={totalSVGHeight / 5} fill="none" stroke="#475569" strokeWidth="2" fontSize={isFullscreen ? "4vw" : "8vw"} fontWeight="900" opacity="0.5" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" className="tracking-widest watermark-text">
@@ -7138,7 +7139,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     </div> 
   );
 };
-
 const generateMockData = () => {
   let price = 500;
   const today = new Date();
