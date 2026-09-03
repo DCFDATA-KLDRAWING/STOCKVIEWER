@@ -2246,7 +2246,7 @@ const App = () => {
 
   
   // ✨ 新增副圖指標狀態 (預設關閉 None)
-  const [indicatorType, setIndicatorType] = useState('None');
+  const [indicatorType, setIndicatorType] = useState('EdwinMomentum');
   
   // 1. 副圖指標參數記憶
   const [indicatorParams, setIndicatorParams] = useState(() => {
