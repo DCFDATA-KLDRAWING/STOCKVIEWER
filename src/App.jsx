@@ -6852,8 +6852,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
                 const range = (maxO - minO) || 1; const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - 20) - 10;
                 return (<g>
-                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
-                    <path d={data.map((d, i) => d.obvMa != null ? `${i===0||data[i-1]?.obvMa== null?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                    <path d={data.map((d, i) => d.obvMa != null ? `${i===0||data[i-1]?.obvMa== null?'M':'L'} ${getX(i)} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
                     <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
                     <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
                 </g>);
@@ -6863,7 +6863,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 let maxT = -Infinity, minT = Infinity; data.forEach(d => { if (d.tower?.top > maxT) maxT = d.tower.top; if (d.tower?.bottom < minT) minT = d.tower.bottom; });
                 const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - 20) - 10;
                 return (<g>
-                    {data.map((d, i) => { if(!d.tower) return null; return <rect key={`tw-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, Math.abs(getTY(d.tower.bottom) - getTY(d.tower.top)))} fill={d.tower.color} opacity="0.85" />; })}
+                    {data.map((d, i) => { if(!d.tower) return null; return <rect key={`tw-${i}`} x={getX(i) - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, Math.abs(getTY(d.tower.bottom) - getTY(d.tower.top)))} fill={d.tower.color} opacity="0.85" />; })}
                     <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
                 </g>);
             })()}
@@ -6885,7 +6885,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                         <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
                         <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
                         
-                        <path d={data.map((d, i) => d.edwinMomentum != null ? `${i === 0 ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${getMomY(d.edwinMomentum)}` : '').join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                        <path d={data.map((d, i) => d.edwinMomentum != null ? `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getMomY(d.edwinMomentum)}` : '').join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
                         
                         {data.map((d, i) => {
                             if (i === 0 || d.edwinMomentum == null) return null;
@@ -6896,9 +6896,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             if (isStrong) {
                                 const prevD = data[i-1];
                                 if (prevD.edwinMomentum == null) return null;
-                                const x1 = paddingLeft + (i - 1 + offsetBars) * spacing + spacing / 2;
+                                const x1 = getX(i-1);
                                 const y1 = getMomY(prevD.edwinMomentum);
-                                const x2 = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
+                                const x2 = getX(i);
                                 const y2 = getMomY(d.edwinMomentum);
                                 
                                 return (
@@ -6946,7 +6946,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
                             const y = getInstY(val);
                             const color = val >= 0 ? '#ef4444' : '#22c55e';
-                            return <rect key={`inst-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
+                            return <rect key={`inst-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
                         })}
                         <text x={paddingLeft} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
                             {indicatorType === '外資' ? '外資買賣超(張)' : indicatorType === '投信' ? '投信買賣超(張)' : indicatorType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
@@ -6967,9 +6967,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
                     {data.map((d, i) => {
                         const y = getMarginY(d.marginDiff || 0); const zeroY = getMarginY(0);
-                        return <rect key={`margin-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={(d.marginDiff || 0) >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
+                        return <rect key={`margin-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={(d.marginDiff || 0) >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
                     })}
-                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getMarginY(d.shortDiff || 0)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getMarginY(d.shortDiff || 0)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
                     <text x={paddingLeft} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
                     <text x={paddingLeft + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
                 </g>);
@@ -6990,10 +6990,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             {data.map((d, i) => { 
                                 if(!d.macd || d.macd.osc == null) return null;
                                 const y = getMyY(d.macd.osc); const zeroY = getMyY(0); 
-                                return <rect key={`osc-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; 
+                                return <rect key={`osc-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; 
                             })}
-                            <path d={data.map((d, i) => (d.macd && d.macd.dif != null) ? `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getMyY(d.macd.dif)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => (d.macd && d.macd.macd != null) ? `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getMyY(d.macd.macd)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => (d.macd && d.macd.dif != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.dif)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => (d.macd && d.macd.macd != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.macd)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
             
@@ -7001,8 +7001,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     const getKdY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
                     return (<g>
                             <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => (d.kd && d.kd.k != null) ? `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getKdY(d.kd.k)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => (d.kd && d.kd.d != null) ? `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getKdY(d.kd.d)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => (d.kd && d.kd.k != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.k)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => (d.kd && d.kd.d != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.d)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
             
@@ -7010,8 +7010,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     const getRsiY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
                     return (<g>
                             <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => (d.rsi && d.rsi.rsi1 != null) ? `${i===0||data[i-1]?.rsi?.rsi1==null?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => (d.rsi && d.rsi.rsi2 != null) ? `${i===0||data[i-1]?.rsi?.rsi2==null?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => (d.rsi && d.rsi.rsi1 != null) ? `${i===0||data[i-1]?.rsi?.rsi1==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => (d.rsi && d.rsi.rsi2 != null) ? `${i===0||data[i-1]?.rsi?.rsi2==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
           </g>
