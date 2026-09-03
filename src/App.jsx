@@ -6900,11 +6900,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 
                 const zeroY = getMomY(0);
                 const alertY = getMomY(7.5);
+                const alertLowY = getMomY(-4); // ✨ 新增：計算 -4 的垂直座標
 
                 return (
                     <g>
                         <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
                         <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
+                        {/* ✨ 新增：畫出 -4 的綠色虛線與標籤 */}
+                        <line x1={0} y1={alertLowY} x2={width} y2={alertLowY} stroke="#22c55e" strokeDasharray="2,2" opacity="0.8" />
                         
                         <path d={data.map((d, i) => d.edwinMomentum != null ? `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getMomY(d.edwinMomentum)}` : '').join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
                         
@@ -6913,19 +6916,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             
                             const tradingValue = (d.volume * 1000) * d.close;
                             const isStrong = d.edwinMomentum >= 7.5 && tradingValue >= 500000000;
+                            // 2. ✨ 新增的綠色弱勢條件：動能 <= -4 且 成交值 >= 5億
+                            const isWeak = d.edwinMomentum <= -4 && tradingValue >= 500000000;
                             
-                            if (isStrong) {
+                            if (isStrong || isWeak) {
                                 const prevD = data[i-1];
                                 if (prevD.edwinMomentum == null) return null;
-                                const x1 = getX(i-1);
+                                const x1 = getX(i - 1);
                                 const y1 = getMomY(prevD.edwinMomentum);
                                 const x2 = getX(i);
                                 const y2 = getMomY(d.edwinMomentum);
                                 
+                                const lineColor = isStrong ? '#ef4444' : '#22c55e'; // 紅色或綠色
+                                
                                 return (
-                                    <g key={`mom-strong-${i}`}>
-                                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ef4444" strokeWidth="3" />
-                                        <circle cx={x2} cy={y2} r="3.5" fill="#ef4444" />
+                                    <g key={`mom-signal-${i}`}>
+                                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={lineColor} strokeWidth="3" />
+                                        <circle cx={x2} cy={y2} r="3.5" fill={lineColor} />
                                     </g>
                                 );
                             }
@@ -6934,6 +6941,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                         
                         <text x={width - paddingRight - 80} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 </text>
                         <text x={width - paddingRight - 80} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強)</text>
+                        {/* ✨ 新增：右側 -4 的文字標籤 */}
+                        <text x={width - paddingRight - 80} y={alertLowY - 4} fill="#22c55e" fontSize="10" fontWeight="bold">-4 (弱)</text>
                         <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
                     </g>
                 );
