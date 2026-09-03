@@ -6863,7 +6863,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 let maxT = -Infinity, minT = Infinity; data.forEach(d => { if (d.tower.top > maxT) maxT = d.tower.top; if (d.tower.bottom < minT) minT = d.tower.bottom; });
                 const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - 20) - 10;
                 return (<g>
-                    {data.map((d, i) => <rect key={`tw-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
+                    {data.map((d, i) => { return <rect key={`tw-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />; })}
                     <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
                 </g>);
             })()}
