@@ -5630,8 +5630,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
   useEffect(() => {
     if (!data || data.length === 0) return;
-    const startIdx = Math.max(0, Math.floor(data.length - displayCount - rightOffset));
-    const endIdx = Math.min(data.length - 1, Math.ceil(data.length - 1 - rightOffset));
+    
+    // 🌟 在計算可見範圍時，同步加上 rightMarginBars 的偏移量 (這裡我們直接拿上面宣告的數字 15 來用)
+    const rightMarginBars = 5; 
+    const startIdx = Math.max(0, Math.floor(data.length - displayCount - rightOffset + rightMarginBars));
+    const endIdx = Math.min(data.length - 1, Math.ceil(data.length - 1 - rightOffset + rightMarginBars));
 
     let tempMax = -Infinity, tempMin = Infinity;
     for (let i = startIdx; i <= endIdx; i++) {
@@ -5751,9 +5754,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const spacing = (width - paddingLeft - paddingRight) / Math.max(1, displayCount); 
   const candleWidth = Math.max(0.5, spacing * 0.85);
 
+  // 🌟 新增：右側預留的空白 K 棒數量 (供未來畫線預測用)
+  const rightMarginBars = 5; 
+
   const getX = (idx) => {
      // idx 是一開始資料陣列的絕對位置 (0 ~ data.length-1)
-     const relativeIdx = idx - (data.length - displayCount - rightOffset);
+     // ✨ 加上 rightMarginBars，讓整個圖表往左平移，空出右側未來空間
+     const relativeIdx = idx - (data.length - displayCount - rightOffset + rightMarginBars);
      return paddingLeft + relativeIdx * spacing + spacing / 2;
   };
 
@@ -5771,10 +5778,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     
     // 由畫面座標反推對應的是陣列第幾根
     const relativeIdxFloat = (pos.x - paddingLeft - spacing/2) / spacing;
-    let exactIdxFloat = (data.length - displayCount - rightOffset) + relativeIdxFloat;
+    // ✨ 加上 rightMarginBars，讓滑鼠在未來空白區也能精準反推出未來的 Index
+    let exactIdxFloat = (data.length - displayCount - rightOffset + rightMarginBars) + relativeIdxFloat;
     
     if (exactIdxFloat < 0) exactIdxFloat = 0; 
-    const maxFutureIdx = data.length - 1 + 2; // 預留右側 2 根空白空間
+    // ✨ 允許游標往右側未來空間延伸 (多預留 50 根的未來判定空間)
+    const maxFutureIdx = data.length - 1 + rightMarginBars + 50; 
     if (exactIdxFloat > maxFutureIdx) exactIdxFloat = maxFutureIdx; 
     
     const snappedIdx = Math.round(exactIdxFloat);
@@ -5796,6 +5805,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     return { idxFromEnd: finalIdxFromEnd, price: finalPrice, rawX: pos.x, rawY: pos.y, exactIdx: snappedIdx };
   };
 
+ 
   const resolvePoint = (pt) => { 
     // 💡 畫線工具的座標也全自動對齊到新引擎
     const absoluteIndex = data.length - 1 - pt.idxFromEnd;
@@ -7024,8 +7034,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
           </g>
 
           {/* 查價線 */}
-          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && (() => {
-            const hoverD = data[crosshair.idx];
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && (() => {
+            // ✨ 如果滑鼠移動到未來空白區，data[crosshair.idx] 會是 undefined，防呆處理
+            const hoverD = data[crosshair.idx] || { date: '未來預測區', open: 0, high: 0, low: 0, close: 0, volume: 0 };
+            
             const tooltipLines = [];
             tooltipLines.push({ color: '#94a3b8', text: hoverD?.date });
             tooltipLines.push({ color: '#e2e8f0', text: `開： ${hoverD?.open?.toFixed(2)}` });
@@ -7033,7 +7045,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             tooltipLines.push({ color: '#e2e8f0', text: `低： ${hoverD?.low?.toFixed(2)}` });
             tooltipLines.push({ color: '#e2e8f0', text: `收： ${hoverD?.close?.toFixed(2)}` });
             
-            const prevD = crosshair.idx > 0 ? data[crosshair.idx - 1] : null;
+            const prevD = crosshair.idx > 0 && data[crosshair.idx - 1] ? data[crosshair.idx - 1] : null;
             const changeRatio = (prevD && prevD.close > 0) ? ((hoverD.close - prevD.close) / prevD.close) * 100 : 0;
             const changeColor = changeRatio > 0 ? '#ef4444' : (changeRatio < 0 ? '#22c55e' : '#e2e8f0');
             const changeSign = changeRatio > 0 ? '+' : '';
