@@ -2246,7 +2246,7 @@ const App = () => {
 
   
   // ✨ 新增副圖指標狀態 (預設關閉 None)
-  const [indicatorType, setIndicatorType] = useState('None');
+  const [indicatorType, setIndicatorType] = useState('EdwinMomentum');
   
   // 1. 副圖指標參數記憶
   const [indicatorParams, setIndicatorParams] = useState(() => {
@@ -3996,7 +3996,7 @@ const handleOpenSectorMomentum = async () => {
 
   const period = indicatorParams?.edwinMomentum?.length || 20;
 
-  //  for (let i = 0; i < sectors.length; i++) {
+    for (let i = 0; i < sectors.length; i++) {
     const sector = sectors[i];
     try {
       // ⚠️ 這裡補上了反引號 (Template literals)
@@ -4039,7 +4039,7 @@ const handleOpenSectorMomentum = async () => {
           }
         } catch(e) {}
 
-        //        if (candles.length >= period) {
+          if (candles.length >= period) {
           const recent = candles.slice(-period);
           const latest = recent[recent.length - 1];
           const prev = recent[recent.length - 2];
@@ -7922,8 +7922,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             return null;
                         })}
                         
-                        <text x={paddingLeft + 5} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 (基準線)</text>
-                        <text x={paddingLeft + 5} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強勢警戒線)</text>
+                        <text x={width - paddingRight - 80} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 </text>
+                        <text x={width - paddingRight - 80} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強)</text>
                         <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
                     </g>
                 );
