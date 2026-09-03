@@ -5764,12 +5764,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
      return paddingLeft + relativeIdx * spacing + spacing / 2;
   };
 
-  const getLinePath = (data, key) => data.map((d, i) => { 
+  // ✨ 修正：拿掉強制截斷邏輯，改用智慧型 M/L 判斷，確保均線完美連貫不消失
+  const getLinePath = (data, key) => {
+    let isFirst = true;
+    return data.map((d, i) => {
+      if (d[key] == null) {
+        isFirst = true; // 遇到空值斷層，下一次重新起頭
+        return '';
+      }
       const x = getX(i);
-      // 效能優化：把徹底離開畫面的線段截斷
-      if (x < -200 || x > width + 200) return '';
-      return d[key] === null ? '' : `${i === 0 || data[i-1][key] === null ? 'M' : 'L'} ${x} ${key.startsWith('ma') ? getY(d[key]) : getVolY(d[key])}`; 
-  }).join(' ');
+      const y = key.startsWith('vma') ? getVolY(d[key]) : getY(d[key]);
+      const cmd = isFirst ? 'M' : 'L';
+      isFirst = false;
+      return `${cmd} ${x} ${y}`;
+    }).filter(Boolean).join(' ');
+  };
 
   const getSnappedDataPoint = (clientX, clientY) => {
     const svg = svgRef.current; if (!svg) return null;
@@ -6634,15 +6643,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             {toggles.showMA && maParams?.ma5?.show !== false && <path d={getLinePath(data, 'ma5')} stroke={maParams?.ma5?.c || '#a855f7'} strokeWidth={maParams?.ma5?.w || 1.5} fill="none" opacity="0.8"/>}
             {toggles.showMA && maParams?.ma6?.show !== false && <path d={getLinePath(data, 'ma6')} stroke={maParams?.ma6?.c || '#f472b6'} strokeWidth={maParams?.ma6?.w || 1.5} fill="none" opacity="0.8"/>}
 
+            {/* ✨ 修正布林通道：同步拿掉 x < -100 的截斷，確保 SVG 語法正確 */}
             {toggles.showBBands && (<g opacity="0.6">
-                <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${x} ${getY(d.bbands.up)}` : ''; }).join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-                <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.bbands?.mid != null ? `${i===0 || data[i-1]?.bbands?.mid == null ? 'M' : 'L'} ${x} ${getY(d.bbands.mid)}` : ''; }).join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
-                <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.bbands?.down != null ? `${i===0 || data[i-1]?.bbands?.down == null ? 'M' : 'L'} ${x} ${getY(d.bbands.down)}` : ''; }).join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1]?.bbands?.mid == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1]?.bbands?.down == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
             </g>)}
 
             {toggles.showBBands3 && (<g opacity="0.5">
-                <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.bbands?.up3 != null ? `${i===0 || data[i-1]?.bbands?.up3 == null ? 'M' : 'L'} ${x} ${getY(d.bbands.up3)}` : ''; }).join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
-                <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${x} ${getY(d.bbands.down3)}` : ''; }).join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.up3 != null ? `${i===0 || data[i-1]?.bbands?.up3 == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.up3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
+                <path d={data.map((d, i) => d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.down3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
             </g>)}
 
             {toggles.showSAR && data.map((d, i) => {
