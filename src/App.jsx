@@ -3996,7 +3996,7 @@ const handleOpenSectorMomentum = async () => {
 
   const period = indicatorParams?.edwinMomentum?.length || 20;
 
-  //  for (let i = 0; i < sectors.length; i++) {
+    for (let i = 0; i < sectors.length; i++) {
     const sector = sectors[i];
     try {
       // ⚠️ 這裡補上了反引號 (Template literals)
