@@ -6576,9 +6576,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
       {/* ✨ 6. 【引擎輸出層】加入 touch-pan-y 確保可以上下滾動網頁，但攔截水平滑動 */}
       <div className="flex-1 flex flex-row relative overflow-hidden w-full h-full min-h-0">
         
-        <div className="absolute bottom-[100px] right-[65px] flex flex-col gap-3 z-[110] pointer-events-auto">
-           <button onClick={handleZoomIn} className="w-10 h-10 rounded-full bg-slate-900/80 border border-cyan-700 text-cyan-400 font-bold text-xl shadow-[0_0_15px_rgba(6,182,212,0.5)] backdrop-blur-md hover:bg-slate-800 active:scale-95 flex items-center justify-center transition-all">➕</button>
-           <button onClick={handleZoomOut} className="w-10 h-10 rounded-full bg-slate-900/80 border border-slate-600 text-slate-300 font-bold text-xl shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md hover:bg-slate-800 active:scale-95 flex items-center justify-center transition-all">➖</button>
+        {/* ✨ 專業版：浮動縮放按鈕 (帶有智慧透明度，平時半透明不遮擋指標) */}
+        <div className="absolute bottom-[90px] right-[65px] flex flex-col gap-3 z-[110] pointer-events-auto opacity-30 hover:opacity-100 active:opacity-100 transition-opacity duration-300">
+           <button onClick={handleZoomIn} className="w-10 h-10 rounded-full bg-slate-900/50 border border-cyan-700/50 text-cyan-400 font-bold text-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-sm hover:bg-slate-800/90 active:scale-95 flex items-center justify-center transition-all" title="放大 K 棒">➕</button>
+           <button onClick={handleZoomOut} className="w-10 h-10 rounded-full bg-slate-900/50 border border-slate-600/50 text-slate-300 font-bold text-xl shadow-[0_0_15px_rgba(0,0,0,0.3)] backdrop-blur-sm hover:bg-slate-800/90 active:scale-95 flex items-center justify-center transition-all" title="縮小 K 棒">➖</button>
         </div>
 
         {/* ✨ 修正：拿掉 touch-pan-y 的強制限制，讓 SVG 內部自由接管滾輪事件 */}
