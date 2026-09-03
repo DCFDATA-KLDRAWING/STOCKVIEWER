@@ -6852,8 +6852,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
                 const range = (maxO - minO) || 1; const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - 20) - 10;
                 return (<g>
-                    <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return `${i===0?'M':'L'} ${x} ${getObvY(d.obv)}`; }).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
-                    <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.obvMa !== null ? `${i===0||data[i-1].obvMa===null?'M':'L'} ${x} ${getObvY(d.obvMa)}` : ''; }).join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                    <path d={data.map((d, i) => d.obvMa !== null ? `${i===0||data[i-1].obvMa===null?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
                     <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
                     <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
                 </g>);
@@ -6863,30 +6863,43 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 let maxT = -Infinity, minT = Infinity; data.forEach(d => { if (d.tower.top > maxT) maxT = d.tower.top; if (d.tower.bottom < minT) minT = d.tower.bottom; });
                 const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - 20) - 10;
                 return (<g>
-                    {data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return null; return <rect key={`tw-${i}`} x={x - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />; })}
+                    {data.map((d, i) => <rect key={`tw-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, getTY(d.tower.bottom) - getTY(d.tower.top))} fill={d.tower.color} opacity="0.85" />)}
                     <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
                 </g>);
             })()}
             
             {indicatorType === 'EdwinMomentum' && (() => {
                 let maxM = -Infinity, minM = Infinity;
-                data.forEach(d => { if (d.edwinMomentum > maxM) maxM = d.edwinMomentum; if (d.edwinMomentum < minM) minM = d.edwinMomentum; });
-                const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1; const getMomY = (val) => indicatorHeight / 2 - (val / absLimit) * (indicatorHeight / 2 - 15);
-                const zeroY = getMomY(0); const alertY = getMomY(7.5);
+                data.forEach(d => {
+                    if (d.edwinMomentum > maxM) maxM = d.edwinMomentum;
+                    if (d.edwinMomentum < minM) minM = d.edwinMomentum;
+                });
+                const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
+                const getMomY = (val) => indicatorHeight / 2 - (val / absLimit) * (indicatorHeight / 2 - 15);
+                
+                const zeroY = getMomY(0);
+                const alertY = getMomY(7.5);
 
                 return (
                     <g>
                         <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
                         <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
                         
-                        <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return `${i === 0 ? 'M' : 'L'} ${x} ${getMomY(d.edwinMomentum)}`; }).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                        <path d={data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${paddingLeft + (i + offsetBars) * spacing + spacing / 2} ${getMomY(d.edwinMomentum)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
                         
                         {data.map((d, i) => {
                             if (i === 0) return null;
-                            const x2 = getX(i); if (x2 < -100 || x2 > width + 100) return null;
+                            
                             const tradingValue = (d.volume * 1000) * d.close;
-                            if (d.edwinMomentum >= 7.5 && tradingValue >= 500000000) {
-                                const prevD = data[i-1]; const x1 = getX(i-1); const y1 = getMomY(prevD.edwinMomentum); const y2 = getMomY(d.edwinMomentum);
+                            const isStrong = d.edwinMomentum >= 7.5 && tradingValue >= 500000000;
+                            
+                            if (isStrong) {
+                                const prevD = data[i-1];
+                                const x1 = paddingLeft + (i - 1 + offsetBars) * spacing + spacing / 2;
+                                const y1 = getMomY(prevD.edwinMomentum);
+                                const x2 = paddingLeft + (i + offsetBars) * spacing + spacing / 2;
+                                const y2 = getMomY(d.edwinMomentum);
+                                
                                 return (
                                     <g key={`mom-strong-${i}`}>
                                         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ef4444" strokeWidth="3" />
@@ -6906,30 +6919,58 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
             {['外資', '投信', '自營', '投+外'].includes(indicatorType) && (() => {
                 let maxV = -Infinity, minV = Infinity;
-                data.forEach(d => { let val = 0; if (indicatorType === '外資') val = d.foreign || 0; else if (indicatorType === '投信') val = d.trust || 0; else if (indicatorType === '自營') val = d.dealer || 0; else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0); if (val > maxV) maxV = val; if (val < minV) minV = val; });
-                const absMax = Math.max(Math.abs(maxV), Math.abs(minV)) || 1; const getInstY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft); const zeroY = getInstY(0);
+                data.forEach(d => {
+                    let val = 0;
+                    if (indicatorType === '外資') val = d.foreign || 0;
+                    else if (indicatorType === '投信') val = d.trust || 0;
+                    else if (indicatorType === '自營') val = d.dealer || 0;
+                    else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+
+                    if (val > maxV) maxV = val;
+                    if (val < minV) minV = val;
+                });
+                const absMax = Math.max(Math.abs(maxV), Math.abs(minV)) || 1;
+                const getInstY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft);
+                const zeroY = getInstY(0);
+
                 return (
                     <g>
                         <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
                         {data.map((d, i) => {
-                            const x = getX(i); if (x < -100 || x > width + 100) return null;
-                            let val = 0; if (indicatorType === '外資') val = d.foreign || 0; else if (indicatorType === '投信') val = d.trust || 0; else if (indicatorType === '自營') val = d.dealer || 0; else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
-                            const y = getInstY(val); const color = val >= 0 ? '#ef4444' : '#22c55e';
-                            return <rect key={`inst-${i}`} x={x - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
+                            let val = 0;
+                            if (indicatorType === '外資') val = d.foreign || 0;
+                            else if (indicatorType === '投信') val = d.trust || 0;
+                            else if (indicatorType === '自營') val = d.dealer || 0;
+                            else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+
+                            const y = getInstY(val);
+                            const color = val >= 0 ? '#ef4444' : '#22c55e';
+                            return <rect key={`inst-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
                         })}
-                        <text x={paddingLeft} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">{indicatorType === '外資' ? '外資買賣超(張)' : indicatorType === '投信' ? '投信買賣超(張)' : indicatorType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}</text>
+                        <text x={paddingLeft} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
+                            {indicatorType === '外資' ? '外資買賣超(張)' : indicatorType === '投信' ? '投信買賣超(張)' : indicatorType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
+                        </text>
                     </g>
                 );
             })()}
 
             {indicatorType === '資券' && (() => {
-                let maxM = -Infinity, minM = Infinity; data.forEach(d => { if (d.marginDiff > maxM) maxM = d.marginDiff; if (d.marginDiff < minM) minM = d.marginDiff; if (d.shortDiff > maxM) maxM = d.shortDiff; if (d.shortDiff < minM) minM = d.shortDiff; });
-                const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; const getMarginY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft);
+                let maxM = -Infinity, minM = Infinity; 
+                data.forEach(d => { 
+                    if (d.marginDiff > maxM) maxM = d.marginDiff; if (d.marginDiff < minM) minM = d.marginDiff; 
+                    if (d.shortDiff > maxM) maxM = d.shortDiff; if (d.shortDiff < minM) minM = d.shortDiff; 
+                });
+                const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
+                const getMarginY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft);
                 return (<g>
                     <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
-                    {data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return null; const y = getMarginY(d.marginDiff); const zeroY = getMarginY(0); return <rect key={`margin-${i}`} x={x - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.marginDiff >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; })}
-                    <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return `${i===0?'M':'L'} ${x} ${getMarginY(d.shortDiff)}`; }).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
-                    <text x={paddingLeft} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text><text x={paddingLeft + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
+                    {data.map((d, i) => {
+                        const y = getMarginY(d.marginDiff); const zeroY = getMarginY(0);
+                        return <rect key={`margin-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.marginDiff >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
+                    })}
+                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getMarginY(d.shortDiff)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
+                    <text x={paddingLeft} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
+                    <text x={paddingLeft + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
                 </g>);
             })()}
             
@@ -6938,25 +6979,25 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; const getMyY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - 10);
                     return (<g>
                             <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
-                            {data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return null; const y = getMyY(d.macd.osc); const zeroY = getMyY(0); return <rect key={`osc-${i}`} x={x - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; })}
-                            <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return `${i===0?'M':'L'} ${x} ${getMyY(d.macd.dif)}`; }).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return `${i===0?'M':'L'} ${x} ${getMyY(d.macd.macd)}`; }).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                            {data.map((d, i) => { const y = getMyY(d.macd.osc); const zeroY = getMyY(0); return <rect key={`osc-${i}`} x={paddingLeft + (i + offsetBars) * spacing + spacing / 2 - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; })}
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getMyY(d.macd.dif)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getMyY(d.macd.macd)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
             {indicatorType === 'KD' && (() => {
                     const getKdY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
                     return (<g>
                             <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return `${i===0?'M':'L'} ${x} ${getKdY(d.kd.k)}`; }).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return `${i===0?'M':'L'} ${x} ${getKdY(d.kd.d)}`; }).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getKdY(d.kd.k)}`).join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => `${i===0?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getKdY(d.kd.d)}`).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
             {indicatorType === 'RSI' && (() => {
                     const getRsiY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
                     return (<g>
                             <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.rsi.rsi1 !== null ? `${i===0||data[i-1].rsi.rsi1===null?'M':'L'} ${x} ${getRsiY(d.rsi.rsi1)}` : ''; }).join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => { const x = getX(i); if (x < -100 || x > width + 100) return ''; return d.rsi.rsi2 !== null ? `${i===0||data[i-1].rsi.rsi2===null?'M':'L'} ${x} ${getRsiY(d.rsi.rsi2)}` : ''; }).join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => d.rsi.rsi1 !== null ? `${i===0||data[i-1].rsi.rsi1===null?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
+                            <path d={data.map((d, i) => d.rsi.rsi2 !== null ? `${i===0||data[i-1].rsi.rsi2===null?'M':'L'} ${paddingLeft + (i + offsetBars)*spacing + spacing/2} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                         </g>);
             })()}
           </g>
