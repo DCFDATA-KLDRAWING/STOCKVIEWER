@@ -6015,10 +6015,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   };
 
   const handlePointerMove = (e) => {
-    // 處理雙指縮放
+    // 1. 處理雙指縮放 (開啟查價線時禁止)
     if (e.touches && e.touches.length === 2 && pinchDist !== null) {
-        // ✨ 如果開啟查價線，禁止雙指縮放，避免圖表亂動
-        if (toggles.showCrosshair) return;
+        if (toggles.showCrosshair) return; 
+        
         const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
         const diff = dist - pinchDist;
         if (Math.abs(diff) > 10) {
@@ -6029,27 +6029,30 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         return;
     }
 
-    // 處理畫面平移 (游標模式下)
-    if (activeTool === 'cursor' && dragInfo.current.isDragging) {
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        // ✨ 如果開啟查價線，禁止雙指縮放，避免圖表亂動
-        if (toggles.showCrosshair) return;
-        const dx = clientX - dragInfo.current.startX;
-        const shiftBars = dx / spacing;
-        const maxOffset = Math.max(0, data.length - Math.min(30, displayCount));
-        
-        // 算出平移結果
-        setRightOffset(Math.min(maxOffset, Math.max(0, dragInfo.current.startOffset + shiftBars)));
-        
-        // 同步更新查價線坐標
-        // 🌟 無論圖表有沒有平移，都要同步更新查價線坐標 (這樣手指/滑鼠在圖上滑動時，查價線才會跟著跑)
-        const snap = getSnappedDataPoint(clientX, e.touches ? e.touches[0].clientY : e.clientY);
-        if (snap && toggles.showCrosshair !== false) {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    // 🌟 2. 無論有沒有拖曳，只要開啟查價線，就即時更新座標！(解放查價線的自由)
+    if (toggles.showCrosshair !== false) {
+        const snap = getSnappedDataPoint(clientX, clientY);
+        if (snap) {
            let priceHover = null;
            if (snap.rawY >= 0 && snap.rawY <= mainHeight) {
                priceHover = minPrice + (maxPrice - minPrice) * ((mainHeight - paddingLeft - snap.rawY) / (mainHeight - paddingLeft - chartPaddingTop));
            }
            setCrosshair({ x: snap.rawX, y: snap.rawY, idx: snap.exactIdx, priceHover });
+        }
+    }
+
+    // 3. 處理畫面平移 (游標模式下，且正在拖曳中)
+    if (activeTool === 'cursor' && dragInfo.current.isDragging) {
+        // ✨ 關鍵：只有在「未開啟查價線」時，才執行背景圖表的平移運算
+        if (!toggles.showCrosshair) {
+            const dx = clientX - dragInfo.current.startX;
+            const shiftBars = dx / spacing;
+            const maxOffset = Math.max(0, data.length - Math.min(30, displayCount));
+            // 算出平移結果並更新圖表位置
+            setRightOffset(Math.min(maxOffset, Math.max(0, dragInfo.current.startOffset + shiftBars)));
         }
         return;
     }
