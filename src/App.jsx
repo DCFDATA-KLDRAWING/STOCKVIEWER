@@ -4009,7 +4009,7 @@ const App = () => {
           secondVolPrice: isLastDay ? secVolPrice : undefined,
           topVolIdx: isLastDay ? topVolIdx : undefined,
           secondVolIdx: isLastDay ? secVolIdx : undefined,
-          zigzag: isLastDay ? { pivots: zigzagPivots, floatPoint } : undefined // ✨ 傳出 ZigZag 資料 
+          zigzag: isLastDay ? { pivots: zigzagPivots, floatPoint } : undefined, // ✨ 傳出 ZigZag 資料 
           macroZigZag: isLastDay ? { pivots: macroPivots, floatPoint: macroFloatPoint } : undefined // ✨ 輸出更新後的粗折與虛線
       };
       // ✨ 2. 推入準備好的陣列中
