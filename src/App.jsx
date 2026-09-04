@@ -3646,7 +3646,7 @@ const App = () => {
         if (macroTrend === 1) {
             if (curr.type === 'High') {
                 if (curr.price > currentExtreme.price) currentExtreme = { ...curr };
-                if (lastFineHigh !== null && curr.price < lastFineHigh.price) {
+                if (lastFineHigh !== null && curr.price <= lastFineHigh.price) {
                     macroPivots.push({ ...currentExtreme });
                     macroTrend = -1;
                     // ✨ 核心修正：轉空頭時，極值追蹤點必須從前一個「細折低點」開始算！
@@ -3665,7 +3665,7 @@ const App = () => {
         } else if (macroTrend === -1) {
             if (curr.type === 'Low') {
                 if (curr.price < currentExtreme.price) currentExtreme = { ...curr };
-                if (lastFineLow !== null && curr.price > lastFineLow.price) {
+                if (lastFineLow !== null && curr.price >= lastFineLow.price) {
                     macroPivots.push({ ...currentExtreme });
                     macroTrend = 1;
                     // ✨ 核心修正：轉多頭時，極值追蹤點必須從前一個「細折高點」開始算！
