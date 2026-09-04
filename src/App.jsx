@@ -6017,6 +6017,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const handlePointerMove = (e) => {
     // 處理雙指縮放
     if (e.touches && e.touches.length === 2 && pinchDist !== null) {
+        // ✨ 如果開啟查價線，禁止雙指縮放，避免圖表亂動
+        if (toggles.showCrosshair) return;
         const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
         const diff = dist - pinchDist;
         if (Math.abs(diff) > 10) {
@@ -6030,6 +6032,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     // 處理畫面平移 (游標模式下)
     if (activeTool === 'cursor' && dragInfo.current.isDragging) {
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        // ✨ 如果開啟查價線，禁止雙指縮放，避免圖表亂動
+        if (toggles.showCrosshair) return;
         const dx = clientX - dragInfo.current.startX;
         const shiftBars = dx / spacing;
         const maxOffset = Math.max(0, data.length - Math.min(30, displayCount));
@@ -6038,10 +6042,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         setRightOffset(Math.min(maxOffset, Math.max(0, dragInfo.current.startOffset + shiftBars)));
         
         // 同步更新查價線坐標
+        // 🌟 無論圖表有沒有平移，都要同步更新查價線坐標 (這樣手指/滑鼠在圖上滑動時，查價線才會跟著跑)
         const snap = getSnappedDataPoint(clientX, e.touches ? e.touches[0].clientY : e.clientY);
         if (snap && toggles.showCrosshair !== false) {
            let priceHover = null;
-           if (snap.rawY >= 0 && snap.rawY <= mainHeight) priceHover = minPrice + (maxPrice - minPrice) * ((mainHeight - paddingLeft - snap.rawY) / (mainHeight - paddingLeft - chartPaddingTop));
+           if (snap.rawY >= 0 && snap.rawY <= mainHeight) {
+               priceHover = minPrice + (maxPrice - minPrice) * ((mainHeight - paddingLeft - snap.rawY) / (mainHeight - paddingLeft - chartPaddingTop));
+           }
            setCrosshair({ x: snap.rawX, y: snap.rawY, idx: snap.exactIdx, priceHover });
         }
         return;
