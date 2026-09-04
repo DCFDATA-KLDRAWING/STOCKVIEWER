@@ -3662,7 +3662,7 @@ const App = () => {
         d.sar = calculatedSar;
         d.sarTrend = sarTrend;
         
-        // === ✨ 新增：ZigZag 細折線與粗折線 (大小級別共振) 核心運算 ===
+        // === ✨ 細折線與粗折線 (大小級別共振) 核心運算 ===
     let seekingHigh = true;
     let lastHigh = null, lastHighIdx = null;
     let lastLow = null, lastLowIdx = null;
@@ -3670,14 +3670,14 @@ const App = () => {
     let tempLow = null, tempLowIdx = null, tempLowHigh = null;
     const zigzagPivots = []; 
 
-    // 🌟 粗折線 (Macro ZigZag) 狀態變數
+    // 🌟 粗折線狀態變數
     let macroTrend = 0; 
     let macroPivots = []; 
     let currentExtreme = null; 
     let lastFineHigh = null; 
     let lastFineLow = null;  
     
-    // ✨ 紀錄「粗細同轉」的關鍵 K 棒位置
+    // ✨ 紀錄「粗細同轉」的關鍵 K 棒位置字典
     const macroTurnSignals = {}; 
 
     // 輔助引擎：當細折線產生轉折時，檢查粗折是否也跟著轉折
@@ -3774,16 +3774,15 @@ const App = () => {
         }
     }
 
-    // 處理尚未確認的最後一段「浮動線」
+    // 處理尚未確認的最後一段細折浮動線
     let floatPoint = null;
     if (lastHigh !== null || lastLow !== null) {
         if (seekingHigh) floatPoint = { idx: tempHighIdx, price: tempHigh, type: 'High', isFloat: true };
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
-    let macroFloatPoint = null;
-    
     // ✨ 虛線懸浮在波動區間的「正中間」
+    let macroFloatPoint = null;
     if (data.length > 0) {
         const lastIdx = data.length - 1;
         let lastPivotIdx = 0;
