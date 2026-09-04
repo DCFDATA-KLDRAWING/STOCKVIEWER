@@ -3809,12 +3809,15 @@ const App = () => {
         macroFloatPoint = { ...currentExtreme };
     }
 
-    // ✨ 如果細折線的即時浮動點 (floatPoint) 比粗折的極端點更創新高/低，則採用細折線的浮動點畫虛線
-    if (floatPoint && floatPoint.idx !== null) {
-        if (macroTrend === 1 && (!macroFloatPoint || floatPoint.price > macroFloatPoint.price)) {
-            macroFloatPoint = { ...floatPoint };
-        } else if (macroTrend === -1 && (!macroFloatPoint || floatPoint.price < macroFloatPoint.price)) {
-            macroFloatPoint = { ...floatPoint };
+    // ✨ 讓虛線對齊最新的「收盤價」，而非浮動的最高/最低點
+    // 這樣藍色虛線就會平滑地穿梭在 K 棒的中間，不再亂跳！
+    if (isLastDay) {
+        // 如果還沒有未確認的極端點，或者極端點與最後一個確認點重複，就以目前收盤價為浮動起點
+        if (!macroFloatPoint || macroFloatPoint.idx === macroPivots[macroPivots.length - 1].idx) {
+            macroFloatPoint = { idx: i, price: current.close, type: 'Float' };
+        } else {
+            // 已經有行進中的波段，確保它連到最新的收盤價
+            macroFloatPoint = { idx: i, price: current.close, type: 'Float' };
         }
     }
 
@@ -6847,11 +6850,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                  <g pointerEvents="none">
                     {/* 🌟 已確立的波段 (實線) */}
                     {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#38bdf8" strokeWidth="3" fill="none" opacity="0.9" />)}
-                    {/* 🌟 行進中的波段 (虛線) */}
-                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6,4" opacity="0.6" />)}
-                    {/* 🌟 轉折點 */}
+                    {/* 🌟 行進中的波段 (虛線，對準收盤價) */}
+                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6,6" opacity="0.5" />)}
+                    {/* 🌟 轉折點 (只畫確立的實體點) */}
                     {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`mzz-pt-${i}`} cx={px} cy={getY(p.price)} r={4.5} fill="#38bdf8" shadow="0 0 10px #38bdf8" />; })}
-                    {floatPoint && floatPoint.idx !== null && (<circle cx={getX(floatPoint.idx)} cy={getY(floatPoint.price)} r={4} fill="#38bdf8" opacity="0.6" />)}
                  </g>
                );
             })()}
