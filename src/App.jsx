@@ -3796,11 +3796,32 @@ const App = () => {
     // 處理尚未確認的粗折虛線 (行進中的波段)
     let macroFloatPoint = null;
     
-    // ✨ 讓虛線對齊最新的「收盤價」，走在波動中間，不亂畫連線
+    // ✨ 虛線懸浮在波動區間的「正中間」
     if (data.length > 0) {
         const lastIdx = data.length - 1;
-        const lastClose = data[lastIdx].close;
-        macroFloatPoint = { idx: lastIdx, price: lastClose, type: 'Float' };
+        
+        // 找出最後一個細折轉折點的位置
+        let lastPivotIdx = 0;
+        if (zigzagPivots.length > 0) {
+            lastPivotIdx = zigzagPivots[zigzagPivots.length - 1].idx;
+        }
+
+        // 取出從最後一個轉折點到「今天」之間的所有 K 棒，這代表「正在進行中的短波段」
+        const recentCandles = data.slice(lastPivotIdx);
+        
+        if (recentCandles.length > 0) {
+            // 找出這段期間的最高點與最低點
+            const recentHigh = Math.max(...recentCandles.map(c => c.high));
+            const recentLow = Math.min(...recentCandles.map(c => c.low));
+            
+            // 計算正中間的價格
+            const midPrice = recentLow + ((recentHigh - recentLow) / 2);
+            
+            // 將虛線末端對準最新的一天(lastIdx)，高度對準區間的中心點
+            macroFloatPoint = { idx: lastIdx, price: midPrice, type: 'Float' };
+        } else {
+            macroFloatPoint = { idx: lastIdx, price: data[lastIdx].close, type: 'Float' };
+        }
     }
 
     const bbPeriod = 20; const bbStdDev = 2; const bbMa = calculateSMA(closes, bbPeriod);
