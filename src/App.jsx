@@ -2335,6 +2335,7 @@ const App = () => {
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
     showMaxVolLines: false, // ✨ 補上這個預設值，就能徹底消除 React 的紅字警告！
     showZigZag: true, // ✨ 新增：細折線開關
+    showMacroZigZag: true, // 🌟 新增：粗折線開關
     showVmaTurn: true, // 🌟 新增：控制 5MV/13MV 轉折指標的開關 (預設關閉)
     vmaLongOnly: false,  // 🌟 新增：只在多方(收盤價 > 55MA)時顯示
     vmaShortOnly: false,  // 🌟 新增：只在空方(收盤價 < 55MA)時顯示
@@ -3715,6 +3716,107 @@ const App = () => {
             floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
         }
     }
+    // === 🌟 粗折線 (Macro ZigZag) 多空結構波段核心運算 ===
+    let macroTrend = 0; // 1代表多頭波段, -1代表空頭波段
+    let macroPivots = []; // 紀錄確認轉折的粗折點 [{idx, price, type}]
+    let currentExtreme = null; // 追蹤當前波段的極值點 (空頭最低點，多頭最高點)
+    let lastFineHigh = null; // 紀錄前一個細折高點
+    let lastFineLow = null;  // 紀錄前一個細折低點
+
+    // 輔助函式：取得上一個確立的粗折高點或低點
+    const getLastMacroPrice = (type) => {
+        for (let i = macroPivots.length - 1; i >= 0; i--) {
+            if (macroPivots[i].type === type) return macroPivots[i].price;
+        }
+        return type === 'High' ? Infinity : -Infinity;
+    };
+
+    if (zigzagPivots.length >= 2) {
+        for (let pIdx = 0; pIdx < zigzagPivots.length; pIdx++) {
+            const curr = zigzagPivots[pIdx];
+            
+            // 1. 初始化第一個波段起點
+            if (macroTrend === 0) {
+                if (pIdx === 0) {
+                    macroPivots.push({ idx: curr.idx, price: curr.price, type: curr.type });
+                } else if (pIdx === 1) {
+                    macroTrend = curr.type === 'High' ? 1 : -1;
+                    currentExtreme = { ...curr };
+                }
+                if (curr.type === 'High') lastFineHigh = curr;
+                else lastFineLow = curr;
+                continue;
+            }
+
+            // 2. 空頭波段 (-1) 邏輯
+            if (macroTrend === -1) {
+                if (curr.type === 'Low') {
+                    // 追蹤更低的低點
+                    if (!currentExtreme || curr.price < currentExtreme.price) {
+                        currentExtreme = { ...curr };
+                    }
+                    
+                    // ✨ 條件 B：底底高 (未過前高，但細折線低點已經高於前一個細折低點)
+                    if (lastFineLow && curr.price > lastFineLow.price) {
+                        macroPivots.push({ ...currentExtreme }); // 確立空頭最低點為粗折轉折
+                        macroTrend = 1; // 翻轉為多頭
+                        currentExtreme = lastFineHigh ? { ...lastFineHigh } : { ...curr };
+                    }
+                } else if (curr.type === 'High') {
+                    // ✨ 條件 A：過前高 (突破前一個粗折高點)
+                    const lastMacroHigh = getLastMacroPrice('High');
+                    if (curr.price > lastMacroHigh) {
+                        macroPivots.push({ ...currentExtreme }); // 確立空頭最低點為粗折轉折
+                        macroTrend = 1; // 翻轉為多頭
+                        currentExtreme = { ...curr };
+                    }
+                }
+            } 
+            // 3. 多頭波段 (1) 邏輯
+            else if (macroTrend === 1) {
+                if (curr.type === 'High') {
+                    // 追蹤更高的高點
+                    if (!currentExtreme || curr.price > currentExtreme.price) {
+                        currentExtreme = { ...curr };
+                    }
+
+                    // ✨ 條件 B：頭頭低 (未破前低，但細折線高點已經低於前一個細折高點)
+                    if (lastFineHigh && curr.price < lastFineHigh.price) {
+                        macroPivots.push({ ...currentExtreme }); // 確立多頭最高點為粗折轉折
+                        macroTrend = -1; // 翻轉為空頭
+                        currentExtreme = lastFineLow ? { ...lastFineLow } : { ...curr };
+                    }
+                } else if (curr.type === 'Low') {
+                    // ✨ 條件 A：破前低 (跌破前一個粗折低點)
+                    const lastMacroLow = getLastMacroPrice('Low');
+                    if (curr.price < lastMacroLow) {
+                        macroPivots.push({ ...currentExtreme }); // 確立多頭最高點為粗折轉折
+                        macroTrend = -1; // 翻轉為空頭
+                        currentExtreme = { ...curr };
+                    }
+                }
+            }
+
+            // 紀錄上一筆細折點供下一次迴圈比對
+            if (curr.type === 'High') lastFineHigh = curr;
+            else lastFineLow = curr;
+        }
+    }
+
+    // 處理尚未確認的粗折虛線 (行進中的波段)
+    let macroFloatPoint = null;
+    if (currentExtreme && macroPivots.length > 0 && macroPivots[macroPivots.length - 1].idx !== currentExtreme.idx) {
+        macroFloatPoint = { ...currentExtreme };
+    }
+
+    // ✨ 如果細折線的即時浮動點 (floatPoint) 比粗折的極端點更創新高/低，則採用細折線的浮動點畫虛線
+    if (floatPoint && floatPoint.idx !== null) {
+        if (macroTrend === 1 && (!macroFloatPoint || floatPoint.price > macroFloatPoint.price)) {
+            macroFloatPoint = { ...floatPoint };
+        } else if (macroTrend === -1 && (!macroFloatPoint || floatPoint.price < macroFloatPoint.price)) {
+            macroFloatPoint = { ...floatPoint };
+        }
+    }
 
     const bbPeriod = 20; const bbStdDev = 2; const bbMa = calculateSMA(closes, bbPeriod);
     const bbStd = data.map((d, i) => {
@@ -3908,6 +4010,7 @@ const App = () => {
           topVolIdx: isLastDay ? topVolIdx : undefined,
           secondVolIdx: isLastDay ? secVolIdx : undefined,
           zigzag: isLastDay ? { pivots: zigzagPivots, floatPoint } : undefined // ✨ 傳出 ZigZag 資料 
+          macroZigZag: isLastDay ? { pivots: macroPivots, floatPoint: macroFloatPoint } : undefined // ✨ 輸出更新後的粗折與虛線
       };
       // ✨ 2. 推入準備好的陣列中
       enrichedData.push(enrichedCandle);
@@ -4575,6 +4678,8 @@ const handleOpenSectorMomentum = async () => {
                   )}
                   {/* ✨ 新增：細折線 (ZigZag) 打勾按鈕 */}
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showZigZag} onChange={() => handleToggle('showZigZag')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">細折線</span></label>
+                  {/* 🌟 新增：粗折線 打勾按鈕 */}
+                <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMacroZigZag} onChange={() => handleToggle('showMacroZigZag')} className="w-3.5 h-3.5 text-cyan-400 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-cyan-300 font-bold">粗折線</span></label>
                   {/* ✨ 新增：SAR 指標開關與參數設定 */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -6732,6 +6837,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#facc15" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />)}
                     {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`zz-pt-${i}`} cx={px} cy={getY(p.price)} r={3.5} fill="#facc15" />; })}
                     {floatPoint && floatPoint.idx !== null && (<circle cx={getX(floatPoint.idx)} cy={getY(floatPoint.price)} r={3} fill="#facc15" opacity="0.5" />)}
+                 </g>
+               );
+            })()}
+            {toggles.showMacroZigZag && data.length > 0 && (() => {
+               const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.macroZigZag) return null;
+               const { pivots, floatPoint } = lastDay.macroZigZag;
+               return (
+                 <g pointerEvents="none">
+                    {/* 🌟 已確立的波段 (實線) */}
+                    {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#38bdf8" strokeWidth="3" fill="none" opacity="0.9" />)}
+                    {/* 🌟 行進中的波段 (虛線) */}
+                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6,4" opacity="0.6" />)}
+                    {/* 🌟 轉折點 */}
+                    {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`mzz-pt-${i}`} cx={px} cy={getY(p.price)} r={4.5} fill="#38bdf8" shadow="0 0 10px #38bdf8" />; })}
+                    {floatPoint && floatPoint.idx !== null && (<circle cx={getX(floatPoint.idx)} cy={getY(floatPoint.price)} r={4} fill="#38bdf8" opacity="0.6" />)}
                  </g>
                );
             })()}
