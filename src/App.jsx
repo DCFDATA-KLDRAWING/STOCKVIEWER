@@ -3628,6 +3628,7 @@ const App = () => {
     let macroFloatPoint = null;
 
     // ✨ 紀錄粗細同轉的輔助引擎
+    // 輔助引擎：當細折線產生轉折時，檢查粗折是否也跟著轉折
     const processMacroTurn = (curr, confirmIdx) => {
         if (macroTrend === 0) {
             if (macroPivots.length === 0) {
@@ -3645,16 +3646,18 @@ const App = () => {
         if (macroTrend === 1) {
             if (curr.type === 'High') {
                 if (curr.price > currentExtreme.price) currentExtreme = { ...curr };
-                if (lastFineHigh !== null && curr.price < lastFineHigh.price) {
+                if (lastFineHigh !== null && curr.price <= lastFineHigh.price) {
                     macroPivots.push({ ...currentExtreme });
                     macroTrend = -1;
-                    currentExtreme = { ...curr };
+                    // ✨ 核心修正：轉空頭時，極值追蹤點必須從前一個「細折低點」開始算！
+                    currentExtreme = lastFineLow !== null ? { ...lastFineLow } : { ...curr };
                     turned = true;
                 }
             } else if (curr.type === 'Low') {
                 if (lastFineLow !== null && curr.price < lastFineLow.price) {
                     macroPivots.push({ ...currentExtreme });
                     macroTrend = -1;
+                    // 這裡 curr 本身就是 Low，直接當作極值起點沒問題
                     currentExtreme = { ...curr };
                     turned = true;
                 }
@@ -3662,16 +3665,18 @@ const App = () => {
         } else if (macroTrend === -1) {
             if (curr.type === 'Low') {
                 if (curr.price < currentExtreme.price) currentExtreme = { ...curr };
-                if (lastFineLow !== null && curr.price > lastFineLow.price) {
+                if (lastFineLow !== null && curr.price >= lastFineLow.price) {
                     macroPivots.push({ ...currentExtreme });
                     macroTrend = 1;
-                    currentExtreme = { ...curr };
+                    // ✨ 核心修正：轉多頭時，極值追蹤點必須從前一個「細折高點」開始算！
+                    currentExtreme = lastFineHigh !== null ? { ...lastFineHigh } : { ...curr };
                     turned = true;
                 }
             } else if (curr.type === 'High') {
                 if (lastFineHigh !== null && curr.price > lastFineHigh.price) {
                     macroPivots.push({ ...currentExtreme });
                     macroTrend = 1;
+                    // 這裡 curr 本身就是 High，直接當作極值起點沒問題
                     currentExtreme = { ...curr };
                     turned = true;
                 }
@@ -3681,6 +3686,7 @@ const App = () => {
         if (curr.type === 'High') lastFineHigh = curr;
         else if (curr.type === 'Low') lastFineLow = curr;
 
+        // 紀錄同日共振關鍵 K 棒
         if (turned) {
             macroTurnSignals[confirmIdx] = macroTrend === 1 ? 'Up' : 'Down';
         }
