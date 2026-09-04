@@ -3608,15 +3608,7 @@ const App = () => {
             secVolIdx = data.length - lookbackData.length + idx;
         }
     });
-
-    // === ✨ 新增：ZigZag 細折線 (轉折指標) 核心運算 ===
-    let seekingHigh = true;
-    let lastHigh = null, lastHighIdx = null;
-    let lastLow = null, lastLowIdx = null;
-    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
-    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
-    const zigzagPivots = []; 
-    
+     
     // ✨ SAR 初始化變數
     let sarTrend = 1; // 1代表多頭, -1代表空頭
     let sarEP = data[0]?.high || 0; // 極點 (Extreme Point)
@@ -3669,38 +3661,113 @@ const App = () => {
         // ✨ 把算好的 SAR 存進當天的 K 棒資料中
         d.sar = calculatedSar;
         d.sarTrend = sarTrend;
-        // 從第 10 根開始算 (對應 PineScript 的 length)
+        
+        // === ✨ 新增：ZigZag 細折線與粗折線 (大小級別共振) 核心運算 ===
+    let seekingHigh = true;
+    let lastHigh = null, lastHighIdx = null;
+    let lastLow = null, lastLowIdx = null;
+    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
+    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
+    const zigzagPivots = []; 
+
+    // 🌟 粗折線 (Macro ZigZag) 狀態變數
+    let macroTrend = 0; 
+    let macroPivots = []; 
+    let currentExtreme = null; 
+    let lastFineHigh = null; 
+    let lastFineLow = null;  
+    
+    // ✨ 紀錄「粗細同轉」的關鍵 K 棒位置 (格式: { 索引: 'Up' | 'Down' })
+    const macroTurnSignals = {}; 
+
+    // 輔助引擎：當細折線產生轉折時，立刻呼叫此引擎檢查粗折是否也跟著轉折
+    const processMacroTurn = (curr, confirmIdx) => {
+        if (macroTrend === 0) {
+            if (macroPivots.length === 0) {
+                macroPivots.push({ ...curr });
+            } else {
+                macroTrend = curr.type === 'High' ? 1 : -1;
+                currentExtreme = { ...curr };
+            }
+            if (curr.type === 'High') lastFineHigh = curr;
+            else lastFineLow = curr;
+            return;
+        }
+
+        let turned = false;
+        if (macroTrend === 1) {
+            if (curr.type === 'High') {
+                if (curr.price > currentExtreme.price) currentExtreme = { ...curr };
+                if (lastFineHigh !== null && curr.price < lastFineHigh.price) {
+                    macroPivots.push({ ...currentExtreme });
+                    macroTrend = -1;
+                    currentExtreme = { ...curr };
+                    turned = true;
+                }
+            } else if (curr.type === 'Low') {
+                if (lastFineLow !== null && curr.price < lastFineLow.price) {
+                    macroPivots.push({ ...currentExtreme });
+                    macroTrend = -1;
+                    currentExtreme = { ...curr };
+                    turned = true;
+                }
+            }
+        } else if (macroTrend === -1) {
+            if (curr.type === 'Low') {
+                if (curr.price < currentExtreme.price) currentExtreme = { ...curr };
+                if (lastFineLow !== null && curr.price > lastFineLow.price) {
+                    macroPivots.push({ ...currentExtreme });
+                    macroTrend = 1;
+                    currentExtreme = { ...curr };
+                    turned = true;
+                }
+            } else if (curr.type === 'High') {
+                if (lastFineHigh !== null && curr.price > lastFineHigh.price) {
+                    macroPivots.push({ ...currentExtreme });
+                    macroTrend = 1;
+                    currentExtreme = { ...curr };
+                    turned = true;
+                }
+            }
+        }
+
+        if (curr.type === 'High') lastFineHigh = curr;
+        else if (curr.type === 'Low') lastFineLow = curr;
+
+        // ✨ 如果粗折線真的轉向了，把這一天記錄為「關鍵 K」
+        if (turned) {
+            macroTurnSignals[confirmIdx] = macroTrend === 1 ? 'Up' : 'Down';
+        }
+    };
+
+    
+
+        // 從第 10 根開始算 ZigZag
         if (i > 10) { 
             if (seekingHigh) {
                 if (tempHigh === null || d.high > tempHigh) {
-                    tempHigh = d.high;
-                    tempHighLow = d.low;
-                    tempHighIdx = i;
+                    tempHigh = d.high; tempHighLow = d.low; tempHighIdx = i;
                 }
-                // 當收盤價跌破最高點當根的最低價時，確認轉折向下
                 if (tempHighLow !== null && d.close < tempHighLow) {
-                    zigzagPivots.push({ idx: tempHighIdx, price: tempHigh, type: 'High' });
-                    lastHigh = tempHigh;
-                    lastHighIdx = tempHighIdx;
-                    tempLow = d.low;
-                    tempLowHigh = d.high;
-                    tempLowIdx = i;
+                    const newPivot = { idx: tempHighIdx, price: tempHigh, type: 'High' };
+                    zigzagPivots.push(newPivot);
+                    processMacroTurn(newPivot, i); // 🌟 關鍵：當下觸發粗折檢查！
+                    
+                    lastHigh = tempHigh; lastHighIdx = tempHighIdx;
+                    tempLow = d.low; tempLowHigh = d.high; tempLowIdx = i;
                     seekingHigh = false;
                 }
             } else {
                 if (tempLow === null || d.low < tempLow) {
-                    tempLow = d.low;
-                    tempLowHigh = d.high;
-                    tempLowIdx = i;
+                    tempLow = d.low; tempLowHigh = d.high; tempLowIdx = i;
                 }
-                // 當收盤價突破最低點當根的最高價時，確認轉折向上
                 if (tempLowHigh !== null && d.close > tempLowHigh) {
-                    zigzagPivots.push({ idx: tempLowIdx, price: tempLow, type: 'Low' });
-                    lastLow = tempLow;
-                    lastLowIdx = tempLowIdx;
-                    tempHigh = d.high;
-                    tempHighLow = d.low;
-                    tempHighIdx = i;
+                    const newPivot = { idx: tempLowIdx, price: tempLow, type: 'Low' };
+                    zigzagPivots.push(newPivot);
+                    processMacroTurn(newPivot, i); // 🌟 關鍵：當下觸發粗折檢查！
+                    
+                    lastLow = tempLow; lastLowIdx = tempLowIdx;
+                    tempHigh = d.high; tempHighLow = d.low; tempHighIdx = i;
                     seekingHigh = true;
                 }
             }
@@ -3710,114 +3777,23 @@ const App = () => {
     // 處理尚未確認的最後一段「浮動線」
     let floatPoint = null;
     if (lastHigh !== null || lastLow !== null) {
-        if (seekingHigh) {
-            floatPoint = { idx: tempHighIdx, price: tempHigh, type: 'High', isFloat: true };
-        } else {
-            floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
-        }
-    }
-    // === 🌟 粗折線 (Macro ZigZag) 多空結構波段核心運算 ===
-    let macroTrend = 0; // 1代表多頭波段, -1代表空頭波段
-    let macroPivots = []; // 紀錄確認轉折的粗折點 [{idx, price, type}]
-    let currentExtreme = null; // 追蹤當前波段的極值點 (空頭最低點，多頭最高點)
-    let lastFineHigh = null; // 紀錄前一個細折高點
-    let lastFineLow = null;  // 紀錄前一個細折低點
-
-    if (zigzagPivots.length >= 2) {
-        for (let pIdx = 0; pIdx < zigzagPivots.length; pIdx++) {
-            const curr = zigzagPivots[pIdx];
-            
-            // 1. 初始化第一個波段起點
-            if (macroTrend === 0) {
-                if (pIdx === 0) {
-                    macroPivots.push({ idx: curr.idx, price: curr.price, type: curr.type });
-                } else if (pIdx === 1) {
-                    macroTrend = curr.type === 'High' ? 1 : -1;
-                    currentExtreme = { ...curr };
-                }
-                if (curr.type === 'High') lastFineHigh = curr;
-                else lastFineLow = curr;
-                continue;
-            }
-
-            // 2. 多頭波段 (1) 邏輯：尋找「轉折向下」的時機
-            if (macroTrend === 1) {
-                if (curr.type === 'High') {
-                    // 多頭持續中，如果創新高，就更新極值
-                    if (curr.price > currentExtreme.price) {
-                        currentExtreme = { ...curr };
-                    }
-                    
-                    // ✨ 轉下條件 2：頭頭低 (細折高點未過前一個細折高點)
-                    if (lastFineHigh !== null && curr.price < lastFineHigh.price) {
-                        macroPivots.push({ ...currentExtreme }); // 確立最高點為粗折轉折
-                        macroTrend = -1; // 翻轉為空頭
-                        currentExtreme = { ...curr }; // 提早從這個較低的高點開始找空頭極值
-                    }
-                } else if (curr.type === 'Low') {
-                    // ✨ 轉下條件 1：破前低 (跌破前一個細折低點)
-                    if (lastFineLow !== null && curr.price < lastFineLow.price) {
-                        macroPivots.push({ ...currentExtreme });
-                        macroTrend = -1; 
-                        currentExtreme = { ...curr };
-                    }
-                }
-            } 
-            // 3. 空頭波段 (-1) 邏輯：尋找「轉折向上」的時機
-            else if (macroTrend === -1) {
-                if (curr.type === 'Low') {
-                    // 空頭持續中，如果創新低，就更新極值
-                    if (curr.price < currentExtreme.price) {
-                        currentExtreme = { ...curr };
-                    }
-
-                    // ✨ 轉上條件 2：底底高 (細折低點未破前一個細折低點)
-                    if (lastFineLow !== null && curr.price > lastFineLow.price) {
-                        macroPivots.push({ ...currentExtreme }); // 確立最低點為粗折轉折
-                        macroTrend = 1; // 翻轉為多頭
-                        currentExtreme = { ...curr }; // 提早從這個較高的低點開始找多頭極值
-                    }
-                } else if (curr.type === 'High') {
-                    // ✨ 轉上條件 1：過前高 (突破前一個細折高點)
-                    if (lastFineHigh !== null && curr.price > lastFineHigh.price) {
-                        macroPivots.push({ ...currentExtreme });
-                        macroTrend = 1; 
-                        currentExtreme = { ...curr };
-                    }
-                }
-            }
-
-            // 迴圈最後，把當前的細折點記錄下來，供下一回合比對
-            if (curr.type === 'High') lastFineHigh = curr;
-            else if (curr.type === 'Low') lastFineLow = curr;
-        }
+        if (seekingHigh) floatPoint = { idx: tempHighIdx, price: tempHigh, type: 'High', isFloat: true };
+        else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
-    // 處理尚未確認的粗折虛線 (行進中的波段)
     let macroFloatPoint = null;
     
     // ✨ 虛線懸浮在波動區間的「正中間」
     if (data.length > 0) {
         const lastIdx = data.length - 1;
-        
-        // 找出最後一個細折轉折點的位置
         let lastPivotIdx = 0;
-        if (zigzagPivots.length > 0) {
-            lastPivotIdx = zigzagPivots[zigzagPivots.length - 1].idx;
-        }
+        if (zigzagPivots.length > 0) lastPivotIdx = zigzagPivots[zigzagPivots.length - 1].idx;
 
-        // 取出從最後一個轉折點到「今天」之間的所有 K 棒，這代表「正在進行中的短波段」
         const recentCandles = data.slice(lastPivotIdx);
-        
         if (recentCandles.length > 0) {
-            // 找出這段期間的最高點與最低點
             const recentHigh = Math.max(...recentCandles.map(c => c.high));
             const recentLow = Math.min(...recentCandles.map(c => c.low));
-            
-            // 計算正中間的價格
             const midPrice = recentLow + ((recentHigh - recentLow) / 2);
-            
-            // 將虛線末端對準最新的一天(lastIdx)，高度對準區間的中心點
             macroFloatPoint = { idx: lastIdx, price: midPrice, type: 'Float' };
         } else {
             macroFloatPoint = { idx: lastIdx, price: data[lastIdx].close, type: 'Float' };
