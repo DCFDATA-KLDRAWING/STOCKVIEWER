@@ -3677,10 +3677,10 @@ const App = () => {
     let lastFineHigh = null; 
     let lastFineLow = null;  
     
-    // ✨ 紀錄「粗細同轉」的關鍵 K 棒位置 (格式: { 索引: 'Up' | 'Down' })
+    // ✨ 紀錄「粗細同轉」的關鍵 K 棒位置
     const macroTurnSignals = {}; 
 
-    // 輔助引擎：當細折線產生轉折時，立刻呼叫此引擎檢查粗折是否也跟著轉折
+    // 輔助引擎：當細折線產生轉折時，檢查粗折是否也跟著轉折
     const processMacroTurn = (curr, confirmIdx) => {
         if (macroTrend === 0) {
             if (macroPivots.length === 0) {
@@ -3734,16 +3734,15 @@ const App = () => {
         if (curr.type === 'High') lastFineHigh = curr;
         else if (curr.type === 'Low') lastFineLow = curr;
 
-        // ✨ 如果粗折線真的轉向了，把這一天記錄為「關鍵 K」
         if (turned) {
             macroTurnSignals[confirmIdx] = macroTrend === 1 ? 'Up' : 'Down';
         }
     };
 
+    // 🌟 主迴圈：遍歷所有 K 棒來計算細折與粗折
     for (let i = 0; i < data.length; i++) {
         const d = data[i];
 
-        // 從第 10 根開始算 ZigZag
         if (i > 10) { 
             if (seekingHigh) {
                 if (tempHigh === null || d.high > tempHigh) {
@@ -3752,7 +3751,7 @@ const App = () => {
                 if (tempHighLow !== null && d.close < tempHighLow) {
                     const newPivot = { idx: tempHighIdx, price: tempHigh, type: 'High' };
                     zigzagPivots.push(newPivot);
-                    processMacroTurn(newPivot, i); // 🌟 關鍵：當下觸發粗折檢查！
+                    processMacroTurn(newPivot, i); 
                     
                     lastHigh = tempHigh; lastHighIdx = tempHighIdx;
                     tempLow = d.low; tempLowHigh = d.high; tempLowIdx = i;
@@ -3765,7 +3764,7 @@ const App = () => {
                 if (tempLowHigh !== null && d.close > tempLowHigh) {
                     const newPivot = { idx: tempLowIdx, price: tempLow, type: 'Low' };
                     zigzagPivots.push(newPivot);
-                    processMacroTurn(newPivot, i); // 🌟 關鍵：當下觸發粗折檢查！
+                    processMacroTurn(newPivot, i); 
                     
                     lastLow = tempLow; lastLowIdx = tempLowIdx;
                     tempHigh = d.high; tempHighLow = d.low; tempHighIdx = i;
