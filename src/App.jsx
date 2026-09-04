@@ -3544,7 +3544,7 @@ const App = () => {
     const vma1 = calculateSMA(volumes, vmaParams?.vma1?.p || 5); const vma2 = calculateSMA(volumes, vmaParams?.vma2?.p || 13); const vma3 = calculateSMA(volumes, vmaParams?.vma3?.p || 34); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
 
-    // === ✨ 細折線與粗折線 (大小級別共振) 核心運算 ===
+    // 🌟 絕對安全的全域宣告區塊 (確保這些變數在整個函式都看的見)
     let seekingHigh = true;
     let lastHigh = null, lastHighIdx = null;
     let lastLow = null, lastLowIdx = null;
@@ -3552,12 +3552,14 @@ const App = () => {
     let tempLow = null, tempLowIdx = null, tempLowHigh = null;
     const zigzagPivots = []; 
 
-    // 🌟 粗折線狀態變數
     let macroTrend = 0; 
     let macroPivots = []; 
     let currentExtreme = null; 
     let lastFineHigh = null; 
-    let lastFineLow = null;
+    let lastFineLow = null;  
+    const macroTurnSignals = {}; 
+    let floatPoint = null;
+    let macroFloatPoint = null;
     
     // 🌟 修正版：嚴格捕捉 5MV 與 13MV 的「轉折點」（斜率由負轉正為上揚，由正轉負為下彎）
     const vma1Trend = [];
