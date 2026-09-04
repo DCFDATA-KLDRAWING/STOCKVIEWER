@@ -3810,15 +3810,11 @@ const App = () => {
     }
 
     // ✨ 讓虛線對齊最新的「收盤價」，而非浮動的最高/最低點
-    // 這樣藍色虛線就會平滑地穿梭在 K 棒的中間，不再亂跳！
-    if (isLastDay) {
-        // 如果還沒有未確認的極端點，或者極端點與最後一個確認點重複，就以目前收盤價為浮動起點
-        if (!macroFloatPoint || macroFloatPoint.idx === macroPivots[macroPivots.length - 1].idx) {
-            macroFloatPoint = { idx: i, price: current.close, type: 'Float' };
-        } else {
-            // 已經有行進中的波段，確保它連到最新的收盤價
-            macroFloatPoint = { idx: i, price: current.close, type: 'Float' };
-        }
+    // 直接向 data 陣列取得最後一筆的 index 與收盤價
+    if (data.length > 0) {
+        const lastIdx = data.length - 1;
+        const lastClose = data[lastIdx].close;
+        macroFloatPoint = { idx: lastIdx, price: lastClose, type: 'Float' };
     }
 
     const bbPeriod = 20; const bbStdDev = 2; const bbMa = calculateSMA(closes, bbPeriod);
