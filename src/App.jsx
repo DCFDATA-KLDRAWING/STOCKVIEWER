@@ -3544,23 +3544,7 @@ const App = () => {
     const vma1 = calculateSMA(volumes, vmaParams?.vma1?.p || 5); const vma2 = calculateSMA(volumes, vmaParams?.vma2?.p || 13); const vma3 = calculateSMA(volumes, vmaParams?.vma3?.p || 34); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
 
-    // 🌟 絕對安全的全域宣告區塊 (確保這些變數在整個函式都看的見)
-    let seekingHigh = true;
-    let lastHigh = null, lastHighIdx = null;
-    let lastLow = null, lastLowIdx = null;
-    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
-    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
-    const zigzagPivots = []; 
-
-    let macroTrend = 0; 
-    let macroPivots = []; 
-    let currentExtreme = null; 
-    let lastFineHigh = null; 
-    let lastFineLow = null;  
-    const macroTurnSignals = {}; 
-    let floatPoint = null;
-    let macroFloatPoint = null;
-    
+       
     // 🌟 修正版：嚴格捕捉 5MV 與 13MV 的「轉折點」（斜率由負轉正為上揚，由正轉負為下彎）
     const vma1Trend = [];
     const vma2Trend = [];
@@ -3626,65 +3610,24 @@ const App = () => {
         }
     });
      
-    // ✨ SAR 初始化變數
-    let sarTrend = 1; // 1代表多頭, -1代表空頭
-    let sarEP = data[0]?.high || 0; // 極點 (Extreme Point)
-    let sarAF = sarParams?.start || 0.02; // 加速因子 (AF)
-    let currentSar = data[0]?.low || 0;
+    // === 🌟 絕對安全的全域宣告區塊 ===
+    let seekingHigh = true;
+    let lastHigh = null, lastHighIdx = null;
+    let lastLow = null, lastLowIdx = null;
+    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
+    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
+    const zigzagPivots = []; 
 
-
-    for (let i = 0; i < data.length; i++) {
-        const d = data[i];
-        // ✨ SAR 拋物線核心演算法
-        let calculatedSar = currentSar; 
-        if (i > 0) {
-            let prev = data[i - 1];
-            // 1. 根據昨天的趨勢，更新極點(EP)與加速因子(AF)
-            if (sarTrend === 1) {
-                if (prev.high > sarEP) {
-                    sarEP = prev.high;
-                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
-                }
-            } else {
-                if (prev.low < sarEP) {
-                    sarEP = prev.low;
-                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
-                }
-            }
-            // 2. 算出今天的 SAR 暫定值
-            currentSar = currentSar + sarAF * (sarEP - currentSar);
-
-            // 3. 邊界限制 (多頭 SAR 不能高於近兩日低點；空頭 SAR 不能低於近兩日高點)
-            if (sarTrend === 1) {
-                currentSar = Math.min(currentSar, prev.low, i > 1 ? data[i - 2].low : prev.low);
-            } else {
-                currentSar = Math.max(currentSar, prev.high, i > 1 ? data[i - 2].high : prev.high);
-            }
-
-            // 4. 判斷今天是否發生「反轉」
-            if (sarTrend === 1 && d.low < currentSar) {
-                sarTrend = -1; // 翻空
-                currentSar = sarEP;
-                sarEP = d.low;
-                sarAF = sarParams?.start || 0.02;
-            } else if (sarTrend === -1 && d.high > currentSar) {
-                sarTrend = 1; // 翻多
-                currentSar = sarEP;
-                sarEP = d.high;
-                sarAF = sarParams?.start || 0.02;
-            }
-            calculatedSar = currentSar;
-        }
-        // ✨ 把算好的 SAR 存進當天的 K 棒資料中
-        d.sar = calculatedSar;
-        d.sarTrend = sarTrend;
-        
-          
-    
-    // ✨ 紀錄「粗細同轉」的關鍵 K 棒位置字典
+    let macroTrend = 0; 
+    let macroPivots = []; 
+    let currentExtreme = null; 
+    let lastFineHigh = null; 
+    let lastFineLow = null;  
     const macroTurnSignals = {}; 
+    let floatPoint = null;
+    let macroFloatPoint = null;
 
-    // 輔助引擎：當細折線產生轉折時，檢查粗折是否也跟著轉折
+    // ✨ 紀錄粗細同轉的輔助引擎
     const processMacroTurn = (curr, confirmIdx) => {
         if (macroTrend === 0) {
             if (macroPivots.length === 0) {
@@ -3743,10 +3686,47 @@ const App = () => {
         }
     };
 
-    // 🌟 主迴圈：遍歷所有 K 棒來計算細折與粗折
+    // ✨ SAR 初始化變數
+    let sarTrend = 1; 
+    let sarEP = data[0]?.high || 0; 
+    let sarAF = sarParams?.start || 0.02; 
+    let currentSar = data[0]?.low || 0;
+
+    // 🌟 唯一的主迴圈：同時處理 SAR、細折線與粗折線共振
     for (let i = 0; i < data.length; i++) {
         const d = data[i];
 
+        // 1. SAR 核心演算法
+        let calculatedSar = currentSar; 
+        if (i > 0) {
+            let prev = data[i - 1];
+            if (sarTrend === 1) {
+                if (prev.high > sarEP) {
+                    sarEP = prev.high;
+                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
+                }
+            } else {
+                if (prev.low < sarEP) {
+                    sarEP = prev.low;
+                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
+                }
+            }
+            currentSar = currentSar + sarAF * (sarEP - currentSar);
+
+            if (sarTrend === 1) currentSar = Math.min(currentSar, prev.low, i > 1 ? data[i - 2].low : prev.low);
+            else currentSar = Math.max(currentSar, prev.high, i > 1 ? data[i - 2].high : prev.high);
+
+            if (sarTrend === 1 && d.low < currentSar) {
+                sarTrend = -1; currentSar = sarEP; sarEP = d.low; sarAF = sarParams?.start || 0.02;
+            } else if (sarTrend === -1 && d.high > currentSar) {
+                sarTrend = 1; currentSar = sarEP; sarEP = d.high; sarAF = sarParams?.start || 0.02;
+            }
+            calculatedSar = currentSar;
+        }
+        d.sar = calculatedSar;
+        d.sarTrend = sarTrend;
+
+        // 2. ZigZag 細折與粗折共振計算
         if (i > 10) { 
             if (seekingHigh) {
                 if (tempHigh === null || d.high > tempHigh) {
@@ -3778,15 +3758,12 @@ const App = () => {
         }
     }
 
-    // 處理尚未確認的最後一段細折浮動線
-    let floatPoint = null;
+    // 3. 處理浮動線與中段虛線
     if (lastHigh !== null || lastLow !== null) {
         if (seekingHigh) floatPoint = { idx: tempHighIdx, price: tempHigh, type: 'High', isFloat: true };
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
-    // ✨ 虛線懸浮在波動區間的「正中間」
-    let macroFloatPoint = null;
     if (data.length > 0) {
         const lastIdx = data.length - 1;
         let lastPivotIdx = 0;
