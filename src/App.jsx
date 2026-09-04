@@ -3723,14 +3723,6 @@ const App = () => {
     let lastFineHigh = null; // 紀錄前一個細折高點
     let lastFineLow = null;  // 紀錄前一個細折低點
 
-    // 輔助函式：取得上一個確立的粗折高點或低點
-    const getLastMacroPrice = (type) => {
-        for (let i = macroPivots.length - 1; i >= 0; i--) {
-            if (macroPivots[i].type === type) return macroPivots[i].price;
-        }
-        return type === 'High' ? Infinity : -Infinity;
-    };
-
     if (zigzagPivots.length >= 2) {
         for (let pIdx = 0; pIdx < zigzagPivots.length; pIdx++) {
             const curr = zigzagPivots[pIdx];
@@ -3748,69 +3740,63 @@ const App = () => {
                 continue;
             }
 
-            // 2. 空頭波段 (-1) 邏輯
-            if (macroTrend === -1) {
-                if (curr.type === 'Low') {
-                    // 追蹤更低的低點
-                    if (!currentExtreme || curr.price < currentExtreme.price) {
+            // 2. 多頭波段 (1) 邏輯：尋找「轉折向下」的時機
+            if (macroTrend === 1) {
+                if (curr.type === 'High') {
+                    // 多頭持續中，如果創新高，就更新極值
+                    if (curr.price > currentExtreme.price) {
                         currentExtreme = { ...curr };
                     }
                     
-                    // ✨ 條件 B：底底高 (未過前高，但細折線低點已經高於前一個細折低點)
-                    if (lastFineLow && curr.price > lastFineLow.price) {
-                        macroPivots.push({ ...currentExtreme }); // 確立空頭最低點為粗折轉折
-                        macroTrend = 1; // 翻轉為多頭
-                        currentExtreme = lastFineHigh ? { ...lastFineHigh } : { ...curr };
+                    // ✨ 轉下條件 2：頭頭低 (細折高點未過前一個細折高點)
+                    if (lastFineHigh !== null && curr.price < lastFineHigh.price) {
+                        macroPivots.push({ ...currentExtreme }); // 確立最高點為粗折轉折
+                        macroTrend = -1; // 翻轉為空頭
+                        currentExtreme = { ...curr }; // 提早從這個較低的高點開始找空頭極值
                     }
-                } else if (curr.type === 'High') {
-                    // ✨ 條件 A：過前高 (突破前一個粗折高點)
-                    const lastMacroHigh = getLastMacroPrice('High');
-                    if (curr.price > lastMacroHigh) {
-                        macroPivots.push({ ...currentExtreme }); // 確立空頭最低點為粗折轉折
-                        macroTrend = 1; // 翻轉為多頭
+                } else if (curr.type === 'Low') {
+                    // ✨ 轉下條件 1：破前低 (跌破前一個細折低點)
+                    if (lastFineLow !== null && curr.price < lastFineLow.price) {
+                        macroPivots.push({ ...currentExtreme });
+                        macroTrend = -1; 
                         currentExtreme = { ...curr };
                     }
                 }
             } 
-            // 3. 多頭波段 (1) 邏輯
-            else if (macroTrend === 1) {
-                if (curr.type === 'High') {
-                    // 追蹤更高的高點
-                    if (!currentExtreme || curr.price > currentExtreme.price) {
+            // 3. 空頭波段 (-1) 邏輯：尋找「轉折向上」的時機
+            else if (macroTrend === -1) {
+                if (curr.type === 'Low') {
+                    // 空頭持續中，如果創新低，就更新極值
+                    if (curr.price < currentExtreme.price) {
                         currentExtreme = { ...curr };
                     }
 
-                    // ✨ 條件 B：頭頭低 (未破前低，但細折線高點已經低於前一個細折高點)
-                    if (lastFineHigh && curr.price < lastFineHigh.price) {
-                        macroPivots.push({ ...currentExtreme }); // 確立多頭最高點為粗折轉折
-                        macroTrend = -1; // 翻轉為空頭
-                        currentExtreme = lastFineLow ? { ...lastFineLow } : { ...curr };
+                    // ✨ 轉上條件 2：底底高 (細折低點未破前一個細折低點)
+                    if (lastFineLow !== null && curr.price > lastFineLow.price) {
+                        macroPivots.push({ ...currentExtreme }); // 確立最低點為粗折轉折
+                        macroTrend = 1; // 翻轉為多頭
+                        currentExtreme = { ...curr }; // 提早從這個較高的低點開始找多頭極值
                     }
-                } else if (curr.type === 'Low') {
-                    // ✨ 條件 A：破前低 (跌破前一個粗折低點)
-                    const lastMacroLow = getLastMacroPrice('Low');
-                    if (curr.price < lastMacroLow) {
-                        macroPivots.push({ ...currentExtreme }); // 確立多頭最高點為粗折轉折
-                        macroTrend = -1; // 翻轉為空頭
+                } else if (curr.type === 'High') {
+                    // ✨ 轉上條件 1：過前高 (突破前一個細折高點)
+                    if (lastFineHigh !== null && curr.price > lastFineHigh.price) {
+                        macroPivots.push({ ...currentExtreme });
+                        macroTrend = 1; 
                         currentExtreme = { ...curr };
                     }
                 }
             }
 
-            // 紀錄上一筆細折點供下一次迴圈比對
+            // 迴圈最後，把當前的細折點記錄下來，供下一回合比對
             if (curr.type === 'High') lastFineHigh = curr;
-            else lastFineLow = curr;
+            else if (curr.type === 'Low') lastFineLow = curr;
         }
     }
 
     // 處理尚未確認的粗折虛線 (行進中的波段)
     let macroFloatPoint = null;
-    if (currentExtreme && macroPivots.length > 0 && macroPivots[macroPivots.length - 1].idx !== currentExtreme.idx) {
-        macroFloatPoint = { ...currentExtreme };
-    }
-
-    // ✨ 讓虛線對齊最新的「收盤價」，而非浮動的最高/最低點
-    // 直接向 data 陣列取得最後一筆的 index 與收盤價
+    
+    // ✨ 讓虛線對齊最新的「收盤價」，走在波動中間，不亂畫連線
     if (data.length > 0) {
         const lastIdx = data.length - 1;
         const lastClose = data[lastIdx].close;
