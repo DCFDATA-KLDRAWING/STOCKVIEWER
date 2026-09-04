@@ -3740,7 +3740,8 @@ const App = () => {
         }
     };
 
-    
+    for (let i = 0; i < data.length; i++) {
+        const d = data[i];
 
         // 從第 10 根開始算 ZigZag
         if (i > 10) { 
