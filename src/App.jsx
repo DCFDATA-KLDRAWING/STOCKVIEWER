@@ -5923,6 +5923,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
   // ✨ 6. 【電腦版專屬】滑鼠滾輪與觸控板控制引擎 (請貼在 handlePointerDown 上面)
   const handleWheel = (e) => {
+    // ✨ 加上這行：如果查價線開啟，禁止滾輪縮放
+    if (toggles.showCrosshair) return;
     // 只有在純看盤(游標)模式下，才允許滾輪控制
     if (activeTool !== 'cursor') return;
     
