@@ -3543,6 +3543,21 @@ const App = () => {
     const ma4 = calculateSMA(closes, maParams?.ma4?.p || 60); const ma5 = calculateSMA(closes, maParams?.ma5?.p || 120); const ma6 = calculateSMA(closes, maParams?.ma6?.p || 240); 
     const vma1 = calculateSMA(volumes, vmaParams?.vma1?.p || 5); const vma2 = calculateSMA(volumes, vmaParams?.vma2?.p || 13); const vma3 = calculateSMA(volumes, vmaParams?.vma3?.p || 34); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
+
+    // === ✨ 細折線與粗折線 (大小級別共振) 核心運算 ===
+    let seekingHigh = true;
+    let lastHigh = null, lastHighIdx = null;
+    let lastLow = null, lastLowIdx = null;
+    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
+    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
+    const zigzagPivots = []; 
+
+    // 🌟 粗折線狀態變數
+    let macroTrend = 0; 
+    let macroPivots = []; 
+    let currentExtreme = null; 
+    let lastFineHigh = null; 
+    let lastFineLow = null;
     
     // 🌟 修正版：嚴格捕捉 5MV 與 13MV 的「轉折點」（斜率由負轉正為上揚，由正轉負為下彎）
     const vma1Trend = [];
@@ -3662,20 +3677,7 @@ const App = () => {
         d.sar = calculatedSar;
         d.sarTrend = sarTrend;
         
-        // === ✨ 細折線與粗折線 (大小級別共振) 核心運算 ===
-    let seekingHigh = true;
-    let lastHigh = null, lastHighIdx = null;
-    let lastLow = null, lastLowIdx = null;
-    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
-    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
-    const zigzagPivots = []; 
-
-    // 🌟 粗折線狀態變數
-    let macroTrend = 0; 
-    let macroPivots = []; 
-    let currentExtreme = null; 
-    let lastFineHigh = null; 
-    let lastFineLow = null;  
+          
     
     // ✨ 紀錄「粗細同轉」的關鍵 K 棒位置字典
     const macroTurnSignals = {}; 
