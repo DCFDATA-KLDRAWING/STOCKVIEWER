@@ -3610,16 +3610,18 @@ const App = () => {
         }
     });
      
-    // === 🌟 絕對安全的全域宣告區塊 === (原本就有的，直接給定初始值就好，不要寫 let)
-    seekingHigh = true;
-    lastHigh = null; lastHighIdx = null;
-    lastLow = null; lastLowIdx = null;
-    tempHigh = null; tempHighIdx = null; tempHighLow = null;
-    tempLow = null; tempLowIdx = null; tempLowHigh = null;
-    zigzagPivots.length = 0; // 清空陣列
-    // macroTurnSignals, floatPoint, macroFloatPoint 這些在上面都已經宣告過了
+    // === 🌟 絕對安全的全域宣告區塊 (重新宣告，保證不報錯) ===
+    let seekingHigh = true;
+    let lastHigh = null, lastHighIdx = null;
+    let lastLow = null, lastLowIdx = null;
+    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
+    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
+    const zigzagPivots = []; 
+    const macroTurnSignals = {}; 
+    let floatPoint = null;
+    let macroFloatPoint = null;
 
-    // ✨ SAR 初始化變數 (這些如果上面也宣告過，記得把 let 拿掉。若沒宣告過，保留 let)
+    // ✨ SAR 初始化變數
     let sarTrend = 1; 
     let sarEP = data[0]?.high || 0; 
     let sarAF = sarParams?.start || 0.02; 
@@ -3669,9 +3671,8 @@ const App = () => {
     }
 
     // 🌟 2. 粗折線「後處理」演算法 (保證高低交替，絕不畫歪)
+    let macroPivots = [];
     let macroTrend = 0;
-    // 如果 macroPivots 上面已經宣告過 let，請把這裡的 let 刪除；如果沒有，就保留。這裡假設上方已經宣告過：
-    macroPivots = []; 
     
     if (zigzagPivots.length >= 3) {
         // 第一個與第二個細折點，當作粗折的起始基準
