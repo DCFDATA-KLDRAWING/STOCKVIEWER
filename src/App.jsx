@@ -3668,12 +3668,11 @@ const App = () => {
         }
     }
 
-    // 🌟 2. 粗折線「後處理」演算法 (極簡純粹版)
+    // 🌟 2. 粗折線「後處理」演算法 (精確捕捉內包轉折版)
     let macroPivots = [];
     let macroTrend = 0;
     
     if (zigzagPivots.length >= 3) {
-        // 初始化：先推入第一、第二個點作為起手式
         macroPivots.push({ ...zigzagPivots[0] });
         macroPivots.push({ ...zigzagPivots[1] });
         macroTrend = zigzagPivots[1].type === 'High' ? 1 : -1;
@@ -3692,17 +3691,21 @@ const App = () => {
                     
                     // 遇到頭頭低 -> 轉空
                     if (lastFineHigh && curr.price <= lastFineHigh.price) {
-                        macroPivots.push({ ...highest }); // 畫出山頂
-                        if (lastFineLow) macroPivots.push({ ...lastFineLow }); // 畫出轉折的谷底
+                        macroPivots.push({ ...highest }); // 1. 先畫出最高的山頂
+                        if (lastFineLow && lastFineLow.idx > highest.idx) {
+                             macroPivots.push({ ...lastFineLow }); // 2. 畫出山頂後跌下來的谷底
+                        }
+                        macroPivots.push({ ...curr }); // 3. ✨ 關鍵：把這個「不過高的小山丘」畫出來，作為空頭的起點！
+                        
                         macroTrend = -1;
-                        lowest = lastFineLow ? { ...lastFineLow } : null;
+                        lowest = curr; // 空頭從這個小山丘開始往下算
                         macroTurnSignals[curr.idx] = 'Down';
                     }
                 } else if (curr.type === 'Low') {
                     // 遇到破前低 -> 轉空
                     if (lastFineLow && curr.price < lastFineLow.price) {
                         macroPivots.push({ ...highest }); // 畫出山頂
-                        macroPivots.push({ ...curr }); // 畫出這個新破底的谷底
+                        macroPivots.push({ ...curr }); // 畫出這個新破底的谷底，作為空頭起點
                         macroTrend = -1;
                         lowest = curr;
                         macroTurnSignals[curr.idx] = 'Down';
@@ -3714,17 +3717,21 @@ const App = () => {
                     
                     // 遇到底底高 -> 轉多
                     if (lastFineLow && curr.price >= lastFineLow.price) {
-                        macroPivots.push({ ...lowest }); // 畫出谷底
-                        if (lastFineHigh) macroPivots.push({ ...lastFineHigh }); // 畫出轉折的山頂
+                        macroPivots.push({ ...lowest }); // 1. 先畫出最深的谷底
+                        if (lastFineHigh && lastFineHigh.idx > lowest.idx) {
+                             macroPivots.push({ ...lastFineHigh }); // 2. 畫出谷底後彈上來的山丘
+                        }
+                        macroPivots.push({ ...curr }); // 3. ✨ 關鍵：把這個「不破底的小坑洞」畫出來，作為多頭的起點！
+                        
                         macroTrend = 1;
-                        highest = lastFineHigh ? { ...lastFineHigh } : null;
+                        highest = curr; // 多頭從這個小坑洞開始往上算
                         macroTurnSignals[curr.idx] = 'Up';
                     }
                 } else if (curr.type === 'High') {
                     // 遇到過前高 -> 轉多
                     if (lastFineHigh && curr.price > lastFineHigh.price) {
-                        macroPivots.push({ ...lowest }); // 畫出谷底
-                        macroPivots.push({ ...curr }); // 畫出這個新突破的山頂
+                        macroPivots.push({ ...lowest }); // 畫出最深谷底
+                        macroPivots.push({ ...curr }); // 畫出新突破的山頂，作為多頭起點
                         macroTrend = 1;
                         highest = curr;
                         macroTurnSignals[curr.idx] = 'Up';
@@ -3732,7 +3739,6 @@ const App = () => {
                 }
             }
 
-            // 更新最後的高低點紀錄，供下一輪比對
             if (curr.type === 'High') lastFineHigh = curr;
             if (curr.type === 'Low') lastFineLow = curr;
         }
@@ -3744,10 +3750,11 @@ const App = () => {
                 cleanedPivots.push(p);
             } else {
                 const lastP = cleanedPivots[cleanedPivots.length - 1];
-                // 過濾掉連續相同型態的點 (如果時間相同也視為重複)
                 if (lastP.type !== p.type && lastP.idx !== p.idx) {
                     cleanedPivots.push(p); 
                 } else if (lastP.type === p.type) {
+                    // 如果連續兩個點型態相同 (例如連續兩個 High)
+                    // 保留較極端的那個 (High留高，Low留低)
                     if ((p.type === 'High' && p.price > lastP.price) || 
                         (p.type === 'Low' && p.price < lastP.price)) {
                         cleanedPivots[cleanedPivots.length - 1] = p;
