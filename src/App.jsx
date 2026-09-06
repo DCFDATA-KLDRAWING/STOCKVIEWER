@@ -3764,25 +3764,54 @@ const App = () => {
         }
     }
 
-    // 3. 處理浮動線與中段虛線
+    // 3. 處理尚未確認的最後一段細折浮動線
     if (lastHigh !== null || lastLow !== null) {
         if (seekingHigh) floatPoint = { idx: tempHighIdx, price: tempHigh, type: 'High', isFloat: true };
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
+    // ✨ 4. 關鍵升級：粗折線的即時虛線 (Macro Float Point) 聯動判斷
     if (data.length > 0) {
         const lastIdx = data.length - 1;
         let lastPivotIdx = 0;
         if (zigzagPivots.length > 0) lastPivotIdx = zigzagPivots[zigzagPivots.length - 1].idx;
 
+        // 預設的虛線位置 (波動區間的一半)
         const recentCandles = data.slice(lastPivotIdx);
+        let defaultMidPrice = data[lastIdx].close;
         if (recentCandles.length > 0) {
             const recentHigh = Math.max(...recentCandles.map(c => c.high));
             const recentLow = Math.min(...recentCandles.map(c => c.low));
-            const midPrice = recentLow + ((recentHigh - recentLow) / 2);
-            macroFloatPoint = { idx: lastIdx, price: midPrice, type: 'Float' };
-        } else {
-            macroFloatPoint = { idx: lastIdx, price: data[lastIdx].close, type: 'Float' };
+            defaultMidPrice = recentLow + ((recentHigh - recentLow) / 2);
+        }
+        
+        macroFloatPoint = { idx: lastIdx, price: defaultMidPrice, type: 'Float' };
+
+        // 🚀【即時聯動引擎】：檢查行進中的細折虛線 (floatPoint)，是否已經打破了粗折結構！
+        if (floatPoint && currentExtreme !== null) {
+            if (macroTrend === -1) {
+                // 目前是空頭，但細折虛線(正在找高點)已經「突破了前一個細折高點 (過前高)」！
+                if (floatPoint.type === 'High' && lastFineHigh !== null && floatPoint.price > lastFineHigh.price) {
+                    // 粗折立刻醒來！將虛線瞄準這個突破的高點！
+                    macroFloatPoint = { idx: floatPoint.idx, price: floatPoint.price, type: 'High', isFloat: true, isBreakout: true };
+                    
+                    // 即時補上向上的「黃藍共振箭頭」
+                    if (!macroTurnSignals[floatPoint.idx]) {
+                         macroTurnSignals[floatPoint.idx] = 'Up';
+                    }
+                }
+            } else if (macroTrend === 1) {
+                // 目前是多頭，但細折虛線(正在找低點)已經「跌破了前一個細折低點 (破前低)」！
+                if (floatPoint.type === 'Low' && lastFineLow !== null && floatPoint.price < lastFineLow.price) {
+                    // 粗折立刻醒來！將虛線瞄準這個跌破的低點！
+                    macroFloatPoint = { idx: floatPoint.idx, price: floatPoint.price, type: 'Low', isFloat: true, isBreakdown: true };
+                    
+                    // 即時補上向下的「黃藍共振箭頭」
+                    if (!macroTurnSignals[floatPoint.idx]) {
+                         macroTurnSignals[floatPoint.idx] = 'Down';
+                    }
+                }
+            }
         }
     }
 
