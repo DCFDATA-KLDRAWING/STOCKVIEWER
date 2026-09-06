@@ -3627,7 +3627,7 @@ const App = () => {
     let floatPoint = null;
     let macroFloatPoint = null;
 
-    // ✨ 紀錄粗細同轉的輔助引擎 (純淨狀態機版)
+    // ✨ 紀錄粗細同轉的輔助引擎 (終極防漏折版)
     const processMacroTurn = (curr, confirmIdx) => {
         if (macroTrend === 0) {
             if (macroPivots.length === 0) {
@@ -3645,53 +3645,55 @@ const App = () => {
         
         if (macroTrend === 1) { // 目前是多頭
             if (curr.type === 'High') {
-                // 創高，更新極值
                 if (curr.price > currentExtreme.price) currentExtreme = { ...curr };
                 
                 // 遇到頭頭低 (或雙頂不過高) -> 轉空頭
                 if (lastFineHigh !== null && curr.price <= lastFineHigh.price) {
-                    macroPivots.push({ ...currentExtreme }); // 1. 先把最高峰存起來
-                    macroTrend = -1; // 2. 趨勢轉空
+                    // 1. 先把最高峰存起來
+                    macroPivots.push({ ...currentExtreme }); 
                     
-                    // 3. ✨ 新的空頭極值起點：必須是夾在兩個頭中間的那個「谷底」！
-                    // 也就是前一個細折低點
-                    currentExtreme = lastFineLow !== null ? { ...lastFineLow } : { ...curr };
+                    // 2. ✨ 核心修復：立刻把夾在中間的「谷底」也推進去當作新空頭的起點！
+                    if (lastFineLow !== null && lastFineLow.idx !== currentExtreme.idx) {
+                        macroPivots.push({ ...lastFineLow });
+                    }
+                    
+                    macroTrend = -1; // 3. 趨勢轉空
+                    currentExtreme = { ...curr }; // 4. 現在這個較低的頭，就是空頭的最新極值
                     turned = true;
                 }
             } else if (curr.type === 'Low') {
                 // 跌破前低 -> 轉空頭
                 if (lastFineLow !== null && curr.price < lastFineLow.price) {
-                    macroPivots.push({ ...currentExtreme }); // 1. 先把最高峰存起來
-                    macroTrend = -1; // 2. 趨勢轉空
-                    
-                    // 3. ✨ 這裡跌破了，代表這個 curr 就是新的空頭極值起點
-                    currentExtreme = { ...curr };
+                    macroPivots.push({ ...currentExtreme }); // 把最高峰存起來
+                    macroTrend = -1; 
+                    currentExtreme = { ...curr }; // 這個破底點就是空頭的最新極值
                     turned = true;
                 }
             }
         } else if (macroTrend === -1) { // 目前是空頭
             if (curr.type === 'Low') {
-                // 創低，更新極值
                 if (curr.price < currentExtreme.price) currentExtreme = { ...curr };
                 
                 // 遇到底底高 (或雙底不破低) -> 轉多頭
                 if (lastFineLow !== null && curr.price >= lastFineLow.price) {
-                    macroPivots.push({ ...currentExtreme }); // 1. 先把最低谷存起來
-                    macroTrend = 1; // 2. 趨勢轉多
+                    // 1. 先把最低谷存起來
+                    macroPivots.push({ ...currentExtreme });
                     
-                    // 3. ✨ 新的多頭極值起點：必須是夾在兩個底中間的那個「山峰」！
-                    // 也就是前一個細折高點
-                    currentExtreme = lastFineHigh !== null ? { ...lastFineHigh } : { ...curr };
+                    // 2. ✨ 核心修復：立刻把夾在中間的「山峰」也推進去當作新多頭的起點！
+                    if (lastFineHigh !== null && lastFineHigh.idx !== currentExtreme.idx) {
+                        macroPivots.push({ ...lastFineHigh });
+                    }
+                    
+                    macroTrend = 1; // 3. 趨勢轉多
+                    currentExtreme = { ...curr }; // 4. 現在這個較高的底，就是多頭的最新極值
                     turned = true;
                 }
             } else if (curr.type === 'High') {
                 // 突破前高 -> 轉多頭
                 if (lastFineHigh !== null && curr.price > lastFineHigh.price) {
-                    macroPivots.push({ ...currentExtreme }); // 1. 先把最低谷存起來
-                    macroTrend = 1; // 2. 趨勢轉多
-                    
-                    // 3. ✨ 這裡突破了，代表這個 curr 就是新的多頭極值起點
-                    currentExtreme = { ...curr };
+                    macroPivots.push({ ...currentExtreme }); // 把最低谷存起來
+                    macroTrend = 1; 
+                    currentExtreme = { ...curr }; // 這個突破點就是多頭的最新極值
                     turned = true;
                 }
             }
@@ -3700,7 +3702,6 @@ const App = () => {
         if (curr.type === 'High') lastFineHigh = curr;
         else if (curr.type === 'Low') lastFineLow = curr;
 
-        // 紀錄同日共振關鍵 K 棒
         if (turned) {
             macroTurnSignals[confirmIdx] = macroTrend === 1 ? 'Up' : 'Down';
         }
