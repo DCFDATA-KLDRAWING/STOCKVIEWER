@@ -3616,96 +3616,16 @@ const App = () => {
     let lastLow = null, lastLowIdx = null;
     let tempHigh = null, tempHighIdx = null, tempHighLow = null;
     let tempLow = null, tempLowIdx = null, tempLowHigh = null;
+    // === 🌟 絕對安全的全域宣告區塊 ===
+    let seekingHigh = true;
+    let lastHigh = null, lastHighIdx = null;
+    let lastLow = null, lastLowIdx = null;
+    let tempHigh = null, tempHighIdx = null, tempHighLow = null;
+    let tempLow = null, tempLowIdx = null, tempLowHigh = null;
     const zigzagPivots = []; 
-
-    let macroTrend = 0; 
-    let macroPivots = []; 
-    let currentExtreme = null; 
-    let lastFineHigh = null; 
-    let lastFineLow = null;  
     const macroTurnSignals = {}; 
     let floatPoint = null;
     let macroFloatPoint = null;
-
-    // ✨ 紀錄粗細同轉的輔助引擎 (終極防漏折版)
-    const processMacroTurn = (curr, confirmIdx) => {
-        if (macroTrend === 0) {
-            if (macroPivots.length === 0) {
-                macroPivots.push({ ...curr });
-            } else {
-                macroTrend = curr.type === 'High' ? 1 : -1;
-                currentExtreme = { ...curr };
-            }
-            if (curr.type === 'High') lastFineHigh = curr;
-            else lastFineLow = curr;
-            return;
-        }
-
-        let turned = false;
-        
-        if (macroTrend === 1) { // 目前是多頭
-            if (curr.type === 'High') {
-                if (curr.price > currentExtreme.price) currentExtreme = { ...curr };
-                
-                // 遇到頭頭低 (或雙頂不過高) -> 轉空頭
-                if (lastFineHigh !== null && curr.price <= lastFineHigh.price) {
-                    // 1. 先把最高峰存起來
-                    macroPivots.push({ ...currentExtreme }); 
-                    
-                    // 2. ✨ 核心修復：立刻把夾在中間的「谷底」也推進去當作新空頭的起點！
-                    if (lastFineLow !== null && lastFineLow.idx !== currentExtreme.idx) {
-                        macroPivots.push({ ...lastFineLow });
-                    }
-                    
-                    macroTrend = -1; // 3. 趨勢轉空
-                    currentExtreme = { ...curr }; // 4. 現在這個較低的頭，就是空頭的最新極值
-                    turned = true;
-                }
-            } else if (curr.type === 'Low') {
-                // 跌破前低 -> 轉空頭
-                if (lastFineLow !== null && curr.price < lastFineLow.price) {
-                    macroPivots.push({ ...currentExtreme }); // 把最高峰存起來
-                    macroTrend = -1; 
-                    currentExtreme = { ...curr }; // 這個破底點就是空頭的最新極值
-                    turned = true;
-                }
-            }
-        } else if (macroTrend === -1) { // 目前是空頭
-            if (curr.type === 'Low') {
-                if (curr.price < currentExtreme.price) currentExtreme = { ...curr };
-                
-                // 遇到底底高 (或雙底不破低) -> 轉多頭
-                if (lastFineLow !== null && curr.price >= lastFineLow.price) {
-                    // 1. 先把最低谷存起來
-                    macroPivots.push({ ...currentExtreme });
-                    
-                    // 2. ✨ 核心修復：立刻把夾在中間的「山峰」也推進去當作新多頭的起點！
-                    if (lastFineHigh !== null && lastFineHigh.idx !== currentExtreme.idx) {
-                        macroPivots.push({ ...lastFineHigh });
-                    }
-                    
-                    macroTrend = 1; // 3. 趨勢轉多
-                    currentExtreme = { ...curr }; // 4. 現在這個較高的底，就是多頭的最新極值
-                    turned = true;
-                }
-            } else if (curr.type === 'High') {
-                // 突破前高 -> 轉多頭
-                if (lastFineHigh !== null && curr.price > lastFineHigh.price) {
-                    macroPivots.push({ ...currentExtreme }); // 把最低谷存起來
-                    macroTrend = 1; 
-                    currentExtreme = { ...curr }; // 這個突破點就是多頭的最新極值
-                    turned = true;
-                }
-            }
-        }
-
-        if (curr.type === 'High') lastFineHigh = curr;
-        else if (curr.type === 'Low') lastFineLow = curr;
-
-        if (turned) {
-            macroTurnSignals[confirmIdx] = macroTrend === 1 ? 'Up' : 'Down';
-        }
-    };
 
     // ✨ SAR 初始化變數
     let sarTrend = 1; 
@@ -3713,70 +3633,130 @@ const App = () => {
     let sarAF = sarParams?.start || 0.02; 
     let currentSar = data[0]?.low || 0;
 
-    // 🌟 唯一的主迴圈：同時處理 SAR、細折線與粗折線共振
+    // 🌟 1. 唯一主迴圈：只專心算「細折線」與 SAR
     for (let i = 0; i < data.length; i++) {
         const d = data[i];
 
-        // 1. SAR 核心演算法
+        // --- SAR 運算 ---
         let calculatedSar = currentSar; 
         if (i > 0) {
             let prev = data[i - 1];
             if (sarTrend === 1) {
-                if (prev.high > sarEP) {
-                    sarEP = prev.high;
-                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
-                }
+                if (prev.high > sarEP) { sarEP = prev.high; sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20); }
             } else {
-                if (prev.low < sarEP) {
-                    sarEP = prev.low;
-                    sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20);
-                }
+                if (prev.low < sarEP) { sarEP = prev.low; sarAF = Math.min(sarAF + (sarParams?.step || 0.02), sarParams?.max || 0.20); }
             }
             currentSar = currentSar + sarAF * (sarEP - currentSar);
-
             if (sarTrend === 1) currentSar = Math.min(currentSar, prev.low, i > 1 ? data[i - 2].low : prev.low);
             else currentSar = Math.max(currentSar, prev.high, i > 1 ? data[i - 2].high : prev.high);
-
-            if (sarTrend === 1 && d.low < currentSar) {
-                sarTrend = -1; currentSar = sarEP; sarEP = d.low; sarAF = sarParams?.start || 0.02;
-            } else if (sarTrend === -1 && d.high > currentSar) {
-                sarTrend = 1; currentSar = sarEP; sarEP = d.high; sarAF = sarParams?.start || 0.02;
-            }
+            if (sarTrend === 1 && d.low < currentSar) { sarTrend = -1; currentSar = sarEP; sarEP = d.low; sarAF = sarParams?.start || 0.02; }
+            else if (sarTrend === -1 && d.high > currentSar) { sarTrend = 1; currentSar = sarEP; sarEP = d.high; sarAF = sarParams?.start || 0.02; }
             calculatedSar = currentSar;
         }
         d.sar = calculatedSar;
         d.sarTrend = sarTrend;
 
-        // 2. ZigZag 細折與粗折共振計算
+        // --- 細折線運算 ---
         if (i > 10) { 
             if (seekingHigh) {
-                if (tempHigh === null || d.high > tempHigh) {
-                    tempHigh = d.high; tempHighLow = d.low; tempHighIdx = i;
-                }
+                if (tempHigh === null || d.high > tempHigh) { tempHigh = d.high; tempHighLow = d.low; tempHighIdx = i; }
                 if (tempHighLow !== null && d.close < tempHighLow) {
-                    const newPivot = { idx: tempHighIdx, price: tempHigh, type: 'High' };
-                    zigzagPivots.push(newPivot);
-                    processMacroTurn(newPivot, i); 
-                    
+                    zigzagPivots.push({ idx: tempHighIdx, price: tempHigh, type: 'High' });
                     lastHigh = tempHigh; lastHighIdx = tempHighIdx;
-                    tempLow = d.low; tempLowHigh = d.high; tempLowIdx = i;
-                    seekingHigh = false;
+                    tempLow = d.low; tempLowHigh = d.high; tempLowIdx = i; seekingHigh = false;
                 }
             } else {
-                if (tempLow === null || d.low < tempLow) {
-                    tempLow = d.low; tempLowHigh = d.high; tempLowIdx = i;
-                }
+                if (tempLow === null || d.low < tempLow) { tempLow = d.low; tempLowHigh = d.high; tempLowIdx = i; }
                 if (tempLowHigh !== null && d.close > tempLowHigh) {
-                    const newPivot = { idx: tempLowIdx, price: tempLow, type: 'Low' };
-                    zigzagPivots.push(newPivot);
-                    processMacroTurn(newPivot, i); 
-                    
+                    zigzagPivots.push({ idx: tempLowIdx, price: tempLow, type: 'Low' });
                     lastLow = tempLow; lastLowIdx = tempLowIdx;
-                    tempHigh = d.high; tempHighLow = d.low; tempHighIdx = i;
-                    seekingHigh = true;
+                    tempHigh = d.high; tempHighLow = d.low; tempHighIdx = i; seekingHigh = true;
                 }
             }
         }
+    }
+
+    // 🌟 2. 粗折線「後處理」演算法 (保證高低交替，絕不畫歪)
+    let macroPivots = [];
+    let macroTrend = 0;
+    
+    if (zigzagPivots.length >= 3) {
+        // 第一個與第二個細折點，當作粗折的起始基準
+        macroPivots.push({ ...zigzagPivots[0] });
+        macroPivots.push({ ...zigzagPivots[1] });
+        macroTrend = zigzagPivots[1].type === 'High' ? 1 : -1;
+        
+        let highestSinceTurn = macroTrend === 1 ? zigzagPivots[1] : null;
+        let lowestSinceTurn = macroTrend === -1 ? zigzagPivots[1] : null;
+
+        for (let j = 2; j < zigzagPivots.length; j++) {
+            const curr = zigzagPivots[j];
+            const prev = zigzagPivots[j - 1];
+
+            if (macroTrend === 1) { // 處於多頭
+                if (curr.type === 'High') {
+                    if (highestSinceTurn === null || curr.price > highestSinceTurn.price) highestSinceTurn = curr;
+                    
+                    // 頭頭低 (轉空頭)
+                    if (curr.price <= prev.price) {
+                        macroPivots.push({ ...highestSinceTurn }); // 推入山峰
+                        macroPivots.push({ ...prev });             // 推入中間的谷底
+                        macroTrend = -1;
+                        lowestSinceTurn = curr.type === 'Low' ? curr : null;
+                        macroTurnSignals[curr.idx] = 'Down';
+                    }
+                } else if (curr.type === 'Low') {
+                    // 破前低 (轉空頭)
+                    if (curr.price < prev.price) {
+                        macroPivots.push({ ...highestSinceTurn });
+                        macroTrend = -1;
+                        lowestSinceTurn = curr;
+                        macroTurnSignals[curr.idx] = 'Down';
+                    }
+                }
+            } else if (macroTrend === -1) { // 處於空頭
+                if (curr.type === 'Low') {
+                    if (lowestSinceTurn === null || curr.price < lowestSinceTurn.price) lowestSinceTurn = curr;
+                    
+                    // 底底高 (轉多頭)
+                    if (curr.price >= prev.price) {
+                        macroPivots.push({ ...lowestSinceTurn }); // 推入谷底
+                        macroPivots.push({ ...prev });             // 推入中間的山峰
+                        macroTrend = 1;
+                        highestSinceTurn = curr.type === 'High' ? curr : null;
+                        macroTurnSignals[curr.idx] = 'Up';
+                    }
+                } else if (curr.type === 'High') {
+                    // 過前高 (轉多頭)
+                    if (curr.price > prev.price) {
+                        macroPivots.push({ ...lowestSinceTurn });
+                        macroTrend = 1;
+                        highestSinceTurn = curr;
+                        macroTurnSignals[curr.idx] = 'Up';
+                    }
+                }
+            }
+        }
+        
+        // 💎 強制清理濾網：確保 High/Low 嚴格交替，殺死所有穿越線！
+        const cleanedPivots = [];
+        for (let p of macroPivots) {
+            if (cleanedPivots.length === 0) {
+                cleanedPivots.push(p);
+            } else {
+                const lastP = cleanedPivots[cleanedPivots.length - 1];
+                if (lastP.type !== p.type) {
+                    cleanedPivots.push(p); // 型態不同，正常推入
+                } else {
+                    // 型態相同，只保留最極端的那個 (High留最高，Low留最低)
+                    if ((p.type === 'High' && p.price > lastP.price) || 
+                        (p.type === 'Low' && p.price < lastP.price)) {
+                        cleanedPivots[cleanedPivots.length - 1] = p;
+                    }
+                }
+            }
+        }
+        macroPivots = cleanedPivots; // 套用乾淨的陣列
     }
 
     // 3. 處理尚未確認的最後一段細折浮動線
