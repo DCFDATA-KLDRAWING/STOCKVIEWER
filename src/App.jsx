@@ -3765,14 +3765,15 @@ const App = () => {
     }
 
     // 3. 處理尚未確認的最後一段細折浮動線
-    let floatPoint = null;
+    // (注意：這裡的 floatPoint 和 macroFloatPoint 在上方已經宣告過了，所以不需要寫 let)
+    floatPoint = null;
     if (lastHigh !== null || lastLow !== null) {
         if (seekingHigh) floatPoint = { idx: tempHighIdx, price: tempHigh, type: 'High', isFloat: true };
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
     // ✨ 4. 霸氣聯動版：粗折線的即時虛線 (Macro Float Point) 聯動判斷
-    let macroFloatPoint = null;
+    macroFloatPoint = null;
     if (data.length > 0) {
         const lastIdx = data.length - 1;
         let lastPivotIdx = 0;
