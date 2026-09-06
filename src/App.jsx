@@ -3668,72 +3668,88 @@ const App = () => {
         }
     }
 
-    // 🌟 2. 粗折線「後處理」演算法 (保證高低交替，絕不畫歪)
+    // 🌟 2. 粗折線「後處理」演算法 (極簡純粹版)
     let macroPivots = [];
     let macroTrend = 0;
     
     if (zigzagPivots.length >= 3) {
+        // 初始化：先推入第一、第二個點作為起手式
         macroPivots.push({ ...zigzagPivots[0] });
         macroPivots.push({ ...zigzagPivots[1] });
         macroTrend = zigzagPivots[1].type === 'High' ? 1 : -1;
         
-        let highestSinceTurn = macroTrend === 1 ? zigzagPivots[1] : null;
-        let lowestSinceTurn = macroTrend === -1 ? zigzagPivots[1] : null;
+        let highest = macroTrend === 1 ? zigzagPivots[1] : null;
+        let lowest = macroTrend === -1 ? zigzagPivots[1] : null;
+        let lastFineHigh = zigzagPivots[1].type === 'High' ? zigzagPivots[1] : (zigzagPivots[0].type === 'High' ? zigzagPivots[0] : null);
+        let lastFineLow = zigzagPivots[1].type === 'Low' ? zigzagPivots[1] : (zigzagPivots[0].type === 'Low' ? zigzagPivots[0] : null);
 
         for (let j = 2; j < zigzagPivots.length; j++) {
             const curr = zigzagPivots[j];
-            const prev = zigzagPivots[j - 1];
 
-            if (macroTrend === 1) { 
+            if (macroTrend === 1) { // 📈 目前是多頭
                 if (curr.type === 'High') {
-                    if (highestSinceTurn === null || curr.price > highestSinceTurn.price) highestSinceTurn = curr;
-                    if (curr.price <= prev.price) {
-                        macroPivots.push({ ...highestSinceTurn });
-                        macroPivots.push({ ...prev });
+                    if (highest === null || curr.price > highest.price) highest = curr;
+                    
+                    // 遇到頭頭低 -> 轉空
+                    if (lastFineHigh && curr.price <= lastFineHigh.price) {
+                        macroPivots.push({ ...highest }); // 畫出山頂
+                        if (lastFineLow) macroPivots.push({ ...lastFineLow }); // 畫出轉折的谷底
                         macroTrend = -1;
-                        lowestSinceTurn = curr.type === 'Low' ? curr : null;
+                        lowest = lastFineLow ? { ...lastFineLow } : null;
                         macroTurnSignals[curr.idx] = 'Down';
                     }
                 } else if (curr.type === 'Low') {
-                    if (curr.price < prev.price) {
-                        macroPivots.push({ ...highestSinceTurn });
+                    // 遇到破前低 -> 轉空
+                    if (lastFineLow && curr.price < lastFineLow.price) {
+                        macroPivots.push({ ...highest }); // 畫出山頂
+                        macroPivots.push({ ...curr }); // 畫出這個新破底的谷底
                         macroTrend = -1;
-                        lowestSinceTurn = curr;
+                        lowest = curr;
                         macroTurnSignals[curr.idx] = 'Down';
                     }
                 }
-            } else if (macroTrend === -1) {
+            } else if (macroTrend === -1) { // 📉 目前是空頭
                 if (curr.type === 'Low') {
-                    if (lowestSinceTurn === null || curr.price < lowestSinceTurn.price) lowestSinceTurn = curr;
-                    if (curr.price >= prev.price) {
-                        macroPivots.push({ ...lowestSinceTurn });
-                        macroPivots.push({ ...prev });
+                    if (lowest === null || curr.price < lowest.price) lowest = curr;
+                    
+                    // 遇到底底高 -> 轉多
+                    if (lastFineLow && curr.price >= lastFineLow.price) {
+                        macroPivots.push({ ...lowest }); // 畫出谷底
+                        if (lastFineHigh) macroPivots.push({ ...lastFineHigh }); // 畫出轉折的山頂
                         macroTrend = 1;
-                        highestSinceTurn = curr.type === 'High' ? curr : null;
+                        highest = lastFineHigh ? { ...lastFineHigh } : null;
                         macroTurnSignals[curr.idx] = 'Up';
                     }
                 } else if (curr.type === 'High') {
-                    if (curr.price > prev.price) {
-                        macroPivots.push({ ...lowestSinceTurn });
+                    // 遇到過前高 -> 轉多
+                    if (lastFineHigh && curr.price > lastFineHigh.price) {
+                        macroPivots.push({ ...lowest }); // 畫出谷底
+                        macroPivots.push({ ...curr }); // 畫出這個新突破的山頂
                         macroTrend = 1;
-                        highestSinceTurn = curr;
+                        highest = curr;
                         macroTurnSignals[curr.idx] = 'Up';
                     }
                 }
             }
+
+            // 更新最後的高低點紀錄，供下一輪比對
+            if (curr.type === 'High') lastFineHigh = curr;
+            if (curr.type === 'Low') lastFineLow = curr;
         }
         
-        // 強制清理濾網
+        // 💎 強制清理濾網 (防穿越線)
         const cleanedPivots = [];
         for (let p of macroPivots) {
             if (cleanedPivots.length === 0) {
                 cleanedPivots.push(p);
             } else {
                 const lastP = cleanedPivots[cleanedPivots.length - 1];
-                if (lastP.type !== p.type) {
-                    cleanedPivots.push(p);
-                } else {
-                    if ((p.type === 'High' && p.price > lastP.price) || (p.type === 'Low' && p.price < lastP.price)) {
+                // 過濾掉連續相同型態的點 (如果時間相同也視為重複)
+                if (lastP.type !== p.type && lastP.idx !== p.idx) {
+                    cleanedPivots.push(p); 
+                } else if (lastP.type === p.type) {
+                    if ((p.type === 'High' && p.price > lastP.price) || 
+                        (p.type === 'Low' && p.price < lastP.price)) {
                         cleanedPivots[cleanedPivots.length - 1] = p;
                     }
                 }
