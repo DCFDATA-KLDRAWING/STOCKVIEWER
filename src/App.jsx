@@ -4711,7 +4711,7 @@ const handleOpenSectorMomentum = async () => {
                     {/* 樣式選擇下拉選單 */}
                     <select 
                       className="bg-slate-900 border border-slate-600 text-slate-300 text-[10px] rounded px-1 py-0.5 ml-1 outline-none"
-                      value={`${toggles.maxVolLineStyle?.type || 'solid'}-${toggles.maxVolLineStyle?.width || 1.5}`}
+                      value={`${toggles.maxVolLineStyle?.type || 'dashed'}-${toggles.maxVolLineStyle?.width || 1}`}
                       onChange={(e) => {
                         const [type, width] = e.target.value.split('-');
                         setToggles(p => ({ ...p, maxVolLineStyle: { type, width: Number(width) } }));
