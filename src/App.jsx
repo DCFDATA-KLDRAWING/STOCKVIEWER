@@ -6829,7 +6829,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                const lastDay = data[data.length - 1]; if (!lastDay || lastDay.maxVolPrice === undefined || lastDay.maxVolPrice === null) return null;
                const maxP = lastDay.maxVolPrice, secP = lastDay.secondVolPrice;
                const maxStartX = getX(lastDay.topVolIdx || 0); const secStartX = getX(lastDay.secondVolIdx || 0);
-               const lineStyle = toggles.maxVolLineStyle || { width: 1.5, type: 'solid' };
+               const lineStyle = toggles.maxVolLineStyle || { width: 1, type: 'dashed' };
 
                return (
                  <g pointerEvents="none">
