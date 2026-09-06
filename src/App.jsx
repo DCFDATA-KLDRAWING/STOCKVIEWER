@@ -3628,7 +3628,6 @@ const App = () => {
     let macroFloatPoint = null;
 
     // ✨ 紀錄粗細同轉的輔助引擎
-    // 輔助引擎：當細折線產生轉折時，檢查粗折是否也跟著轉折
     const processMacroTurn = (curr, confirmIdx) => {
         if (macroTrend === 0) {
             if (macroPivots.length === 0) {
@@ -3646,38 +3645,57 @@ const App = () => {
         if (macroTrend === 1) {
             if (curr.type === 'High') {
                 if (curr.price > currentExtreme.price) currentExtreme = { ...curr };
+                // 遇到頭頭低 (或雙頂) -> 轉空頭
                 if (lastFineHigh !== null && curr.price <= lastFineHigh.price) {
-                    macroPivots.push({ ...currentExtreme });
+                    macroPivots.push({ ...currentExtreme }); // 推入多頭的最高峰
                     macroTrend = -1;
-                    // ✨ 核心修正：轉空頭時，極值追蹤點必須從前一個「細折低點」開始算！
-                    currentExtreme = lastFineLow !== null ? { ...lastFineLow } : { ...curr };
+                    
+                    // ✨ 核心修正：找出空頭的起點，並「強制推入陣列」以畫出下彎的折線
+                    const newStart = lastFineLow !== null ? { ...lastFineLow } : { ...curr };
+                    // 為了避免和剛推入的高峰是同一個點，檢查一下時間(idx)
+                    if (newStart.idx !== currentExtreme.idx) {
+                        macroPivots.push(newStart);
+                    }
+                    currentExtreme = newStart;
                     turned = true;
                 }
             } else if (curr.type === 'Low') {
+                // 遇到破前低 -> 轉空頭
                 if (lastFineLow !== null && curr.price < lastFineLow.price) {
-                    macroPivots.push({ ...currentExtreme });
+                    macroPivots.push({ ...currentExtreme }); // 推入多頭的最高峰
                     macroTrend = -1;
-                    // 這裡 curr 本身就是 Low，直接當作極值起點沒問題
-                    currentExtreme = { ...curr };
+                    
+                    const newStart = { ...curr };
+                    if (newStart.idx !== currentExtreme.idx) macroPivots.push(newStart);
+                    currentExtreme = newStart;
                     turned = true;
                 }
             }
         } else if (macroTrend === -1) {
             if (curr.type === 'Low') {
                 if (curr.price < currentExtreme.price) currentExtreme = { ...curr };
+                // 遇到底底高 (或雙底) -> 轉多頭
                 if (lastFineLow !== null && curr.price >= lastFineLow.price) {
-                    macroPivots.push({ ...currentExtreme });
+                    macroPivots.push({ ...currentExtreme }); // 推入空頭的最低谷
                     macroTrend = 1;
-                    // ✨ 核心修正：轉多頭時，極值追蹤點必須從前一個「細折高點」開始算！
-                    currentExtreme = lastFineHigh !== null ? { ...lastFineHigh } : { ...curr };
+                    
+                    // ✨ 核心修正：找出多頭的起點，並「強制推入陣列」以畫出上揚的折線
+                    const newStart = lastFineHigh !== null ? { ...lastFineHigh } : { ...curr };
+                    if (newStart.idx !== currentExtreme.idx) {
+                        macroPivots.push(newStart);
+                    }
+                    currentExtreme = newStart;
                     turned = true;
                 }
             } else if (curr.type === 'High') {
+                // 遇到過前高 -> 轉多頭
                 if (lastFineHigh !== null && curr.price > lastFineHigh.price) {
-                    macroPivots.push({ ...currentExtreme });
+                    macroPivots.push({ ...currentExtreme }); // 推入空頭的最低谷
                     macroTrend = 1;
-                    // 這裡 curr 本身就是 High，直接當作極值起點沒問題
-                    currentExtreme = { ...curr };
+                    
+                    const newStart = { ...curr };
+                    if (newStart.idx !== currentExtreme.idx) macroPivots.push(newStart);
+                    currentExtreme = newStart;
                     turned = true;
                 }
             }
