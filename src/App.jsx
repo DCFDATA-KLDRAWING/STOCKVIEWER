@@ -2244,8 +2244,8 @@ const App = () => {
   const [displayCount, setDisplayCount] = useState(60);
   const [timeframe, setTimeframe] = useState('D');
     
-  // ✨ 新增副圖指標狀態 (預設關閉 None)
-  const [indicatorType, setIndicatorType] = useState('EdwinMomentum');
+  // ✨ 新增// ✨ 替換為多選狀態 (預設開啟 資金動能 與 MACD)
+  const [activeIndicators, setActiveIndicators] = useState(['EdwinMomentum', 'MACD']);
   
   // 1. 副圖指標參數記憶
   const [indicatorParams, setIndicatorParams] = useState(() => {
@@ -4711,7 +4711,7 @@ const handleOpenSectorMomentum = async () => {
                     {/* 樣式選擇下拉選單 */}
                     <select 
                       className="bg-slate-900 border border-slate-600 text-slate-300 text-[10px] rounded px-1 py-0.5 ml-1 outline-none"
-                      value={`${toggles.maxVolLineStyle?.type || 'solid'}-${toggles.maxVolLineStyle?.width || 1.5}`}
+                      value={`${toggles.maxVolLineStyle?.type || 'dashed'}-${toggles.maxVolLineStyle?.width || 1}`}
                       onChange={(e) => {
                         const [type, width] = e.target.value.split('-');
                         setToggles(p => ({ ...p, maxVolLineStyle: { type, width: Number(width) } }));
@@ -4767,26 +4767,38 @@ const handleOpenSectorMomentum = async () => {
             </div>
 
             <div className="flex items-start gap-3 mt-4 pt-4 border-t border-slate-700/50">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 mt-2">副圖指標：</span>
-              <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 mt-2">啟用的副圖：</span>
+              <div className="flex flex-col gap-2 w-full">
                 <div className="flex flex-wrap gap-2">
-                  {['None', 'MACD', 'KD', 'RSI', 'OBV', 'TOWER', 'EdwinMomentum', '外資', '投信', '自營', '投+外', '資券'].map(type => (
-                    <button key={type} onClick={() => setIndicatorType(type)} className={`px-3 py-1.5 text-xs rounded font-bold ${indicatorType === type ? 'bg-cyan-700 text-white border border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                      {type === 'None' ? '關閉' : (type === 'TOWER' ? '寶塔線' : (type === 'EdwinMomentum' ? '🌊 資金動能' : type))}
-                    </button>
+                  {['MACD', 'KD', 'RSI', 'OBV', 'TOWER', 'EdwinMomentum', '外資', '投信', '自營', '投+外', '資券'].map(type => (
+                    <label key={type} className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 text-xs rounded font-bold transition-all border ${activeIndicators.includes(type) ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>
+                      <input 
+                        type="checkbox" 
+                        className="hidden"
+                        checked={activeIndicators.includes(type)} 
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setActiveIndicators(prev => [...prev, type]);
+                          } else {
+                            setActiveIndicators(prev => prev.filter(t => t !== type));
+                          }
+                        }} 
+                      />
+                      <span>{type === 'TOWER' ? '寶塔線' : (type === 'EdwinMomentum' ? '🌊 資金動能' : type)}</span>
+                    </label>
                   ))}
                 </div>
                 {/* ✨ 資金動能的參數設定框 */}
-                {indicatorType === 'EdwinMomentum' && (
+                {activeIndicators.includes('EdwinMomentum') && (
                   <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
-                    <span className="text-[10px] text-slate-400 font-bold">計算週期 (Length)</span>
+                    <span className="text-[10px] text-slate-400 font-bold">動能週期 (Length)</span>
                     <input type="number" value={indicatorParams.edwinMomentum?.length || 20} onChange={e => setIndicatorParams({...indicatorParams, edwinMomentum: {...indicatorParams.edwinMomentum, length: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
                 {/* 動態參數調整輸入框 */}
-                {indicatorType === 'MACD' && (
+                {activeIndicators.includes('MACD') && (
                   <div className="flex flex-wrap items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
-                    <span className="text-[10px] text-slate-400 font-bold">快線</span>
+                    <span className="text-[10px] text-slate-400 font-bold">MACD 快線</span>
                     <input type="number" value={indicatorParams.macd.fast} onChange={e => setIndicatorParams({...indicatorParams, macd: {...indicatorParams.macd, fast: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                     <span className="text-[10px] text-slate-400 font-bold ml-2">慢線</span>
                     <input type="number" value={indicatorParams.macd.slow} onChange={e => setIndicatorParams({...indicatorParams, macd: {...indicatorParams.macd, slow: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
@@ -4794,9 +4806,9 @@ const handleOpenSectorMomentum = async () => {
                     <input type="number" value={indicatorParams.macd.signal} onChange={e => setIndicatorParams({...indicatorParams, macd: {...indicatorParams.macd, signal: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
-                {indicatorType === 'KD' && (
+                {activeIndicators.includes('KD') && (
                   <div className="flex flex-wrap items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
-                    <span className="text-[10px] text-slate-400 font-bold">RSV 週期</span>
+                    <span className="text-[10px] text-slate-400 font-bold">KD RSV 週期</span>
                     <input type="number" value={indicatorParams.kd.rsv} onChange={e => setIndicatorParams({...indicatorParams, kd: {...indicatorParams.kd, rsv: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                     <span className="text-[10px] text-slate-400 font-bold ml-2">K 平滑</span>
                     <input type="number" value={indicatorParams.kd.k} onChange={e => setIndicatorParams({...indicatorParams, kd: {...indicatorParams.kd, k: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
@@ -4804,7 +4816,7 @@ const handleOpenSectorMomentum = async () => {
                     <input type="number" value={indicatorParams.kd.d} onChange={e => setIndicatorParams({...indicatorParams, kd: {...indicatorParams.kd, d: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
-                {indicatorType === 'RSI' && (
+                {activeIndicators.includes('RSI') && (
                   <div className="flex flex-wrap items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
                     <span className="text-[10px] text-slate-400 font-bold">短週期 (RSI 1)</span>
                     <input type="number" value={indicatorParams.rsi.p1} onChange={e => setIndicatorParams({...indicatorParams, rsi: {...indicatorParams.rsi, p1: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
@@ -4812,13 +4824,13 @@ const handleOpenSectorMomentum = async () => {
                     <input type="number" value={indicatorParams.rsi.p2} onChange={e => setIndicatorParams({...indicatorParams, rsi: {...indicatorParams.rsi, p2: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
-                {indicatorType === 'OBV' && (
+                {activeIndicators.includes('OBV') && (
                   <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
                     <span className="text-[10px] text-slate-400 font-bold">OBV MA週期</span>
                     <input type="number" value={indicatorParams.obv?.ma || 20} onChange={e => setIndicatorParams({...indicatorParams, obv: {...indicatorParams.obv, ma: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
                   </div>
                 )}
-                {indicatorType === 'TOWER' && (
+                {activeIndicators.includes('TOWER') && (
                   <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700 w-fit">
                     <span className="text-[10px] text-slate-400 font-bold">寶塔線參數 (N日)</span>
                     <input type="number" value={indicatorParams.tower?.p || 3} onChange={e => setIndicatorParams({...indicatorParams, tower: {...indicatorParams.tower, p: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-slate-700 rounded text-cyan-300 text-xs text-center outline-none focus:border-cyan-500" />
@@ -4848,6 +4860,7 @@ const handleOpenSectorMomentum = async () => {
                 realSymbol={currentRealSymbol} // ✨ 修正：傳入分離出來的真實股號，防止存檔存到空字串
                 displayCount={displayCount}
                 indicatorType={indicatorType}
+                activeIndicators={activeIndicators} // 👈 傳入陣列
                 indicatorParams={indicatorParams}
                 setDisplayCount={setDisplayCount}
                 totalDataLength={klineData.length}
@@ -5551,7 +5564,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (🚀 PRO 級虛擬視窗引擎升級版) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -5785,21 +5798,27 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const width = chartWidth; 
   const paddingLeft = 10;   
   const yAxisWidth = 50;    
-  // ✨ 修正1：因為 Y 軸已經被獨立到外面，這裡不需要再扣除 50px，只要留 5px 給邊緣呼吸即可！
   const paddingRight = 5; 
   const indPaddingLeft = 15;
   
   const volHeight = isFullscreen ? 50 : 80;
-  const indicatorHeight = indicatorType !== 'None' ? (isFullscreen ? 70 : 140) : 0;
+  
+  // ✨ 每一個副圖的高度
+  const singleIndicatorHeight = isFullscreen ? 70 : 120;
+  const activeSubCharts = activeIndicators;
+  // ✨ 動態計算副圖總高度
+  const totalIndicatorsHeight = activeSubCharts.length * singleIndicatorHeight;
+  
   const chartPaddingTop = isFullscreen ? 25 : 80;
   const bottomLegendHeight = 40; 
   
   let mainHeight = 400; 
-  let totalSVGHeight = mainHeight + volHeight + indicatorHeight + 80; 
+  let totalSVGHeight = mainHeight + volHeight + totalIndicatorsHeight + 80; 
   
   if (isFullscreen) {
     totalSVGHeight = Math.max(chartHeight, 350); 
-    mainHeight = totalSVGHeight - volHeight - indicatorHeight - bottomLegendHeight;
+    // 全螢幕時，主圖高度 = 總高 - 量高 - 所有副圖高 - 底部圖例
+    mainHeight = totalSVGHeight - volHeight - totalIndicatorsHeight - bottomLegendHeight;
   }
 
   let defaultMax = -Infinity; let defaultMin = Infinity;
@@ -6829,7 +6848,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                const lastDay = data[data.length - 1]; if (!lastDay || lastDay.maxVolPrice === undefined || lastDay.maxVolPrice === null) return null;
                const maxP = lastDay.maxVolPrice, secP = lastDay.secondVolPrice;
                const maxStartX = getX(lastDay.topVolIdx || 0); const secStartX = getX(lastDay.secondVolIdx || 0);
-               const lineStyle = toggles.maxVolLineStyle || { width: 1.5, type: 'solid' };
+               const lineStyle = toggles.maxVolLineStyle || { width: 1, type: 'dashed' };
 
                return (
                  <g pointerEvents="none">
@@ -6955,185 +6974,205 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             })}
           </g>
 
-          <g transform={`translate(0, ${mainHeight + volHeight})`} clipPath="url(#chartClip)">
-            {indicatorType !== 'None' && (<line x1={0} y1={0} x2={width} y2={0} stroke="#1e293b" strokeWidth="1" />)}
-            
-            {indicatorType === 'OBV' && (() => {
-                let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
-                const range = (maxO - minO) || 1; const getObvY = (val) => indicatorHeight - ((val - minO) / range) * (indicatorHeight - 20) - 10;
-                return (<g>
-                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
-                    <path d={data.map((d, i) => d.obvMa != null ? `${i===0||data[i-1]?.obvMa== null?'M':'L'} ${getX(i)} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-                    <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
-                    <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
-                </g>);
-            })()}
+          {/* ✨ 動態渲染所有啟用的副圖 (包含 TOWER) */}
+          {activeSubCharts.map((chartType, index) => {
+             // 💡 關鍵：每個副圖的起始 Y 座標 = 主圖 + 成交量 + (前面有幾個副圖 * 單一副圖的高度)
+             const startY = mainHeight + volHeight + (index * singleIndicatorHeight);
+             
+             return (
+               <g key={chartType} transform={`translate(0, ${startY})`} clipPath="url(#chartClip)">
+                  {/* 副圖之間的頂部水平分隔線 */}
+                  <line x1={0} y1={0} x2={width} y2={0} stroke="#1e293b" strokeWidth="1.5" />
+                  
+                  {chartType === 'OBV' && (() => {
+                      let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
+                      const range = (maxO - minO) || 1; 
+                      const getObvY = (val) => singleIndicatorHeight - ((val - minO) / range) * (singleIndicatorHeight - 20) - 10;
+                      return (<g>
+                          <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                          <path d={data.map((d, i) => d.obvMa != null ? `${i===0||data[i-1]?.obvMa== null?'M':'L'} ${getX(i)} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                          <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
+                          <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
+                      </g>);
+                  })()}
 
-            {indicatorType === 'TOWER' && (() => {
-                let maxT = -Infinity, minT = Infinity; data.forEach(d => { if (d.tower?.top > maxT) maxT = d.tower.top; if (d.tower?.bottom < minT) minT = d.tower.bottom; });
-                const range = (maxT - minT) || 1; const getTY = (val) => indicatorHeight - ((val - minT) / range) * (indicatorHeight - 20) - 10;
-                return (<g>
-                    {data.map((d, i) => { if(!d.tower) return null; return <rect key={`tw-${i}`} x={getX(i) - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, Math.abs(getTY(d.tower.bottom) - getTY(d.tower.top)))} fill={d.tower.color} opacity="0.85" />; })}
-                    <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 (獨立副圖)</text>
-                </g>);
-            })()}
-            
-            {indicatorType === 'EdwinMomentum' && (() => {
-                let maxM = -Infinity, minM = Infinity;
-                data.forEach(d => {
-                    if (d.edwinMomentum != null && d.edwinMomentum > maxM) maxM = d.edwinMomentum;
-                    if (d.edwinMomentum != null && d.edwinMomentum < minM) minM = d.edwinMomentum;
-                });
-                const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
-                const getMomY = (val) => indicatorHeight / 2 - (val / absLimit) * (indicatorHeight / 2 - 15);
-                
-                const zeroY = getMomY(0);
-                const alertY = getMomY(7.5);
-                const alertLowY = getMomY(-4); // ✨ 新增：計算 -4 的垂直座標
+                  {chartType === 'EdwinMomentum' && (() => {
+                      let maxM = -Infinity, minM = Infinity;
+                      data.forEach(d => {
+                          if (d.edwinMomentum != null && d.edwinMomentum > maxM) maxM = d.edwinMomentum;
+                          if (d.edwinMomentum != null && d.edwinMomentum < minM) minM = d.edwinMomentum;
+                      });
+                      const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
+                      const getMomY = (val) => singleIndicatorHeight / 2 - (val / absLimit) * (singleIndicatorHeight / 2 - 15);
+                      
+                      const zeroY = getMomY(0);
+                      const alertY = getMomY(7.5);
+                      const alertLowY = getMomY(-4);
 
-                return (
-                    <g>
-                        <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
-                        <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
-                        {/* ✨ 新增：畫出 -4 的綠色虛線與標籤 */}
-                        <line x1={0} y1={alertLowY} x2={width} y2={alertLowY} stroke="#22c55e" strokeDasharray="2,2" opacity="0.8" />
-                        
-                        <path d={data.map((d, i) => d.edwinMomentum != null ? `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getMomY(d.edwinMomentum)}` : '').join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
-                        
-                        {data.map((d, i) => {
-                            if (i === 0 || d.edwinMomentum == null) return null;
-                            
-                            const tradingValue = (d.volume * 1000) * d.close;
-                            const isStrong = d.edwinMomentum >= 7.5 && tradingValue >= 500000000;
-                            // 2. ✨ 新增的綠色弱勢條件：動能 <= -4 且 成交值 >= 5億
-                            const isWeak = d.edwinMomentum <= -4 && tradingValue >= 500000000;
-                            
-                            if (isStrong || isWeak) {
-                                const prevD = data[i-1];
-                                if (prevD.edwinMomentum == null) return null;
-                                const x1 = getX(i - 1);
-                                const y1 = getMomY(prevD.edwinMomentum);
-                                const x2 = getX(i);
-                                const y2 = getMomY(d.edwinMomentum);
-                                
-                                const lineColor = isStrong ? '#ef4444' : '#22c55e'; // 紅色或綠色
-                                
-                                return (
-                                    <g key={`mom-signal-${i}`}>
-                                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={lineColor} strokeWidth="3" />
-                                        <circle cx={x2} cy={y2} r="3.5" fill={lineColor} />
-                                    </g>
-                                );
-                            }
-                            return null;
-                        })}
-                        
-                        <text x={width - paddingRight - 80} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 </text>
-                        <text x={width - paddingRight - 80} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強)</text>
-                        {/* ✨ 新增：右側 -4 的文字標籤 */}
-                        <text x={width - paddingRight - 80} y={alertLowY - 4} fill="#22c55e" fontSize="10" fontWeight="bold">-4 (弱)</text>
-                        <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
-                    </g>
-                );
-            })()}
+                      return (
+                          <g>
+                              <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
+                              <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
+                              <line x1={0} y1={alertLowY} x2={width} y2={alertLowY} stroke="#22c55e" strokeDasharray="2,2" opacity="0.8" />
+                              <path d={data.map((d, i) => d.edwinMomentum != null ? `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getMomY(d.edwinMomentum)}` : '').join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                              
+                              {data.map((d, i) => {
+                                  if (i === 0 || d.edwinMomentum == null) return null;
+                                  
+                                  const tradingValue = (d.volume * 1000) * d.close;
+                                  const isStrong = d.edwinMomentum >= 7.5 && tradingValue >= 500000000;
+                                  const isWeak = d.edwinMomentum <= -4 && tradingValue >= 500000000;
+                                  
+                                  if (isStrong || isWeak) {
+                                      const prevD = data[i-1];
+                                      if (prevD.edwinMomentum == null) return null;
+                                      const x1 = getX(i - 1);
+                                      const y1 = getMomY(prevD.edwinMomentum);
+                                      const x2 = getX(i);
+                                      const y2 = getMomY(d.edwinMomentum);
+                                      const lineColor = isStrong ? '#ef4444' : '#22c55e';
+                                      
+                                      return (
+                                          <g key={`mom-signal-${i}`}>
+                                              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={lineColor} strokeWidth="3" />
+                                              <circle cx={x2} cy={y2} r="3.5" fill={lineColor} />
+                                          </g>
+                                      );
+                                  }
+                                  return null;
+                              })}
+                              
+                              <text x={width - paddingRight - 80} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 </text>
+                              <text x={width - paddingRight - 80} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強)</text>
+                              <text x={width - paddingRight - 80} y={alertLowY - 4} fill="#22c55e" fontSize="10" fontWeight="bold">-4 (弱)</text>
+                              <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
+                          </g>
+                      );
+                  })()}
 
-            {['外資', '投信', '自營', '投+外'].includes(indicatorType) && (() => {
-                let maxV = -Infinity, minV = Infinity;
-                data.forEach(d => {
-                    let val = 0;
-                    if (indicatorType === '外資') val = d.foreign || 0;
-                    else if (indicatorType === '投信') val = d.trust || 0;
-                    else if (indicatorType === '自營') val = d.dealer || 0;
-                    else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+                  {['外資', '投信', '自營', '投+外'].includes(chartType) && (() => {
+                      let maxV = -Infinity, minV = Infinity;
+                      data.forEach(d => {
+                          let val = 0;
+                          if (chartType === '外資') val = d.foreign || 0;
+                          else if (chartType === '投信') val = d.trust || 0;
+                          else if (chartType === '自營') val = d.dealer || 0;
+                          else if (chartType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
 
-                    if (val > maxV) maxV = val;
-                    if (val < minV) minV = val;
-                });
-                const absMax = Math.max(Math.abs(maxV), Math.abs(minV)) || 1;
-                const getInstY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft);
-                const zeroY = getInstY(0);
+                          if (val > maxV) maxV = val;
+                          if (val < minV) minV = val;
+                      });
+                      const absMax = Math.max(Math.abs(maxV), Math.abs(minV)) || 1;
+                      const getInstY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - indPaddingLeft);
+                      const zeroY = getInstY(0);
 
-                return (
-                    <g>
-                        <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
-                        {data.map((d, i) => {
-                            let val = 0;
-                            if (indicatorType === '外資') val = d.foreign || 0;
-                            else if (indicatorType === '投信') val = d.trust || 0;
-                            else if (indicatorType === '自營') val = d.dealer || 0;
-                            else if (indicatorType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+                      return (
+                          <g>
+                              <line x1={0} y1={singleIndicatorHeight / 2} x2={width} y2={singleIndicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                              {data.map((d, i) => {
+                                  let val = 0;
+                                  if (chartType === '外資') val = d.foreign || 0;
+                                  else if (chartType === '投信') val = d.trust || 0;
+                                  else if (chartType === '自營') val = d.dealer || 0;
+                                  else if (chartType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
 
-                            const y = getInstY(val);
-                            const color = val >= 0 ? '#ef4444' : '#22c55e';
-                            return <rect key={`inst-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
-                        })}
-                        <text x={paddingLeft} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
-                            {indicatorType === '外資' ? '外資買賣超(張)' : indicatorType === '投信' ? '投信買賣超(張)' : indicatorType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
-                        </text>
-                    </g>
-                );
-            })()}
+                                  const y = getInstY(val);
+                                  const color = val >= 0 ? '#ef4444' : '#22c55e';
+                                  return <rect key={`inst-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
+                              })}
+                              <text x={paddingLeft} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
+                                  {chartType === '外資' ? '外資買賣超(張)' : chartType === '投信' ? '投信買賣超(張)' : chartType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
+                              </text>
+                          </g>
+                      );
+                  })()}
 
-            {indicatorType === '資券' && (() => {
-                let maxM = -Infinity, minM = Infinity; 
-                data.forEach(d => { 
-                    if (d.marginDiff != null && d.marginDiff > maxM) maxM = d.marginDiff; if (d.marginDiff != null && d.marginDiff < minM) minM = d.marginDiff; 
-                    if (d.shortDiff != null && d.shortDiff > maxM) maxM = d.shortDiff; if (d.shortDiff != null && d.shortDiff < minM) minM = d.shortDiff; 
-                });
-                const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
-                const getMarginY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - indPaddingLeft);
-                return (<g>
-                    <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
-                    {data.map((d, i) => {
-                        const y = getMarginY(d.marginDiff || 0); const zeroY = getMarginY(0);
-                        return <rect key={`margin-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={(d.marginDiff || 0) >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
-                    })}
-                    <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getMarginY(d.shortDiff || 0)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
-                    <text x={paddingLeft} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
-                    <text x={paddingLeft + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
-                </g>);
-            })()}
-            
-            {indicatorType === 'MACD' && (() => {
-                    let maxM = -Infinity, minM = Infinity; 
-                    data.forEach(d => { 
-                        if(d.macd) {
-                           if (d.macd.dif != null && d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif != null && d.macd.dif < minM) minM = d.macd.dif; 
-                           if (d.macd.macd != null && d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd != null && d.macd.macd < minM) minM = d.macd.macd; 
-                           if (d.macd.osc != null && d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc != null && d.macd.osc < minM) minM = d.macd.osc; 
-                        }
-                    });
-                    const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; const getMyY = (val) => indicatorHeight / 2 - (val / absMax) * (indicatorHeight / 2 - 10);
-                    return (<g>
-                            <line x1={0} y1={indicatorHeight / 2} x2={width} y2={indicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
-                            {data.map((d, i) => { 
-                                if(!d.macd || d.macd.osc == null) return null;
-                                const y = getMyY(d.macd.osc); const zeroY = getMyY(0); 
-                                return <rect key={`osc-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; 
-                            })}
-                            <path d={data.map((d, i) => (d.macd && d.macd.dif != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.dif)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => (d.macd && d.macd.macd != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.macd)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
-                        </g>);
-            })()}
-            
-            {indicatorType === 'KD' && (() => {
-                    const getKdY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
-                    return (<g>
-                            <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => (d.kd && d.kd.k != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.k)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => (d.kd && d.kd.d != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.d)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                        </g>);
-            })()}
-            
-            {indicatorType === 'RSI' && (() => {
-                    const getRsiY = (val) => indicatorHeight - ((val) / 100) * (indicatorHeight - 20) - 10;
-                    return (<g>
-                            <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
-                            <path d={data.map((d, i) => (d.rsi && d.rsi.rsi1 != null) ? `${i===0||data[i-1]?.rsi?.rsi1==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
-                            <path d={data.map((d, i) => (d.rsi && d.rsi.rsi2 != null) ? `${i===0||data[i-1]?.rsi?.rsi2==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
-                        </g>);
-            })()}
-          </g>
+                  {chartType === '資券' && (() => {
+                      let maxM = -Infinity, minM = Infinity; 
+                      data.forEach(d => { 
+                          if (d.marginDiff != null && d.marginDiff > maxM) maxM = d.marginDiff; if (d.marginDiff != null && d.marginDiff < minM) minM = d.marginDiff; 
+                          if (d.shortDiff != null && d.shortDiff > maxM) maxM = d.shortDiff; if (d.shortDiff != null && d.shortDiff < minM) minM = d.shortDiff; 
+                      });
+                      const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
+                      const getMarginY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - indPaddingLeft);
+                      return (<g>
+                          <line x1={0} y1={singleIndicatorHeight / 2} x2={width} y2={singleIndicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                          {data.map((d, i) => {
+                              const y = getMarginY(d.marginDiff || 0); const zeroY = getMarginY(0);
+                              return <rect key={`margin-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={(d.marginDiff || 0) >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
+                          })}
+                          <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getMarginY(d.shortDiff || 0)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
+                          <text x={paddingLeft} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
+                          <text x={paddingLeft + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
+                      </g>);
+                  })()}
+                  
+                  {chartType === 'MACD' && (() => {
+                          let maxM = -Infinity, minM = Infinity; 
+                          data.forEach(d => { 
+                              if(d.macd) {
+                                 if (d.macd.dif != null && d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif != null && d.macd.dif < minM) minM = d.macd.dif; 
+                                 if (d.macd.macd != null && d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd != null && d.macd.macd < minM) minM = d.macd.macd; 
+                                 if (d.macd.osc != null && d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc != null && d.macd.osc < minM) minM = d.macd.osc; 
+                              }
+                          });
+                          const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
+                          const getMyY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - 10);
+                          return (<g>
+                                  <line x1={0} y1={singleIndicatorHeight / 2} x2={width} y2={singleIndicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                                  {data.map((d, i) => { 
+                                      if(!d.macd || d.macd.osc == null) return null;
+                                      const y = getMyY(d.macd.osc); const zeroY = getMyY(0); 
+                                      return <rect key={`osc-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; 
+                                  })}
+                                  <path d={data.map((d, i) => (d.macd && d.macd.dif != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.dif)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  <path d={data.map((d, i) => (d.macd && d.macd.macd != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.macd)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                                  <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MACD ({indicatorParams.macd.fast}, {indicatorParams.macd.slow}, {indicatorParams.macd.signal})</text>
+                              </g>);
+                  })()}
+                  
+                  {chartType === 'KD' && (() => {
+                          const getKdY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
+                          return (<g>
+                                  <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <path d={data.map((d, i) => (d.kd && d.kd.k != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.k)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                                  <path d={data.map((d, i) => (d.kd && d.kd.d != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.d)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  <text x={paddingLeft} y={15} fill="#f59e0b" fontSize="10" fontWeight="bold">KD ({indicatorParams.kd.rsv}, {indicatorParams.kd.k}, {indicatorParams.kd.d})</text>
+                              </g>);
+                  })()}
+                  
+                  {chartType === 'RSI' && (() => {
+                          const getRsiY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
+                          return (<g>
+                                  <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <path d={data.map((d, i) => (d.rsi && d.rsi.rsi1 != null) ? `${i===0||data[i-1]?.rsi?.rsi1==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
+                                  <path d={data.map((d, i) => (d.rsi && d.rsi.rsi2 != null) ? `${i===0||data[i-1]?.rsi?.rsi2==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  <text x={paddingLeft} y={15} fill="#ec4899" fontSize="10" fontWeight="bold">RSI ({indicatorParams.rsi.p1}, {indicatorParams.rsi.p2})</text>
+                              </g>);
+                  })()}
+
+                  {/* ✨ 新增：獨立出來的寶塔線副圖 */}
+                  {chartType === 'TOWER' && (() => {
+                      let maxT = -Infinity, minT = Infinity; 
+                      data.forEach(d => { 
+                        if (d.tower?.top > maxT) maxT = d.tower.top; 
+                        if (d.tower?.bottom < minT) minT = d.tower.bottom; 
+                      });
+                      const range = (maxT - minT) || 1; 
+                      // ⚠️ 高度基準改為 singleIndicatorHeight
+                      const getTY = (val) => singleIndicatorHeight - ((val - minT) / range) * (singleIndicatorHeight - 20) - 10;
+                      return (<g>
+                          {data.map((d, i) => { 
+                            if(!d.tower) return null; 
+                            return <rect key={`tw-${i}`} x={getX(i) - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, Math.abs(getTY(d.tower.bottom) - getTY(d.tower.top)))} fill={d.tower.color} opacity="0.85" />; 
+                          })}
+                          <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 ({indicatorParams.tower?.p || 3}日)</text>
+                      </g>);
+                  })()}
+
+               </g>
+             );
+          })}
 
           <g clipPath="url(#chartClip)">
             {drawings.map(d => renderDrawingObject(d))}
