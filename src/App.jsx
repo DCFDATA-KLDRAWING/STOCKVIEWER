@@ -5563,7 +5563,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (🚀 PRO 級虛擬視窗引擎升級版) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, indicatorType, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -7202,7 +7202,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             tooltipLines.push({ color: changeColor, text: `漲跌： ${changeSign}${changeRatio.toFixed(2)}%` });
             tooltipLines.push({ color: '#e2e8f0', text: `量： ${hoverD?.volume} 張` });
             
-            if (indicatorType === 'EdwinMomentum' && hoverD?.edwinMomentum !== undefined) {
+            if (activeIndicators === 'EdwinMomentum' && hoverD?.edwinMomentum !== undefined) {
                 const momVal = hoverD.edwinMomentum;
                 const momColor = momVal >= 0 ? '#ef4444' : '#22c55e';
                 tooltipLines.push({ color: momColor, text: `動能： ${momVal.toFixed(2)}` });
@@ -7237,32 +7237,32 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     if (vmaParams?.vma3?.show !== false) tooltipLines.push({ color: vmaParams?.vma3?.c || '#10b981', text: `VMA${vmaParams?.vma3?.p || 34}： ${hoverD?.vma3?.toFixed(2) || '-'}` });
                 }
 
-                if (indicatorType === 'MACD') {
+                if (activeIndicators === 'MACD') {
                     tooltipLines.push({ color: "#38bdf8", text: `DIF： ${hoverD?.macd?.dif?.toFixed(2) || '-'}` });
                     tooltipLines.push({ color: "#f59e0b", text: `MACD： ${hoverD?.macd?.macd?.toFixed(2) || '-'}` });
                     tooltipLines.push({ color: hoverD?.macd?.osc >= 0 ? '#ef4444' : '#22c55e', text: `OSC： ${hoverD?.macd?.osc?.toFixed(2) || '-'}` });
-                } else if (indicatorType === 'KD') {
+                } else if (activeIndicators === 'KD') {
                     tooltipLines.push({ color: "#f59e0b", text: `K(${indicatorParams.kd.k})： ${hoverD?.kd?.k?.toFixed(2) || '-'}` });
                     tooltipLines.push({ color: "#38bdf8", text: `D(${indicatorParams.kd.d})： ${hoverD?.kd?.d?.toFixed(2) || '-'}` });
-                } else if (indicatorType === 'RSI') {
+                } else if (activeIndicators === 'RSI') {
                     tooltipLines.push({ color: "#ec4899", text: `RSI(${indicatorParams.rsi.p1})： ${hoverD?.rsi?.rsi1?.toFixed(2) || '-'}` });
                     tooltipLines.push({ color: "#38bdf8", text: `RSI(${indicatorParams.rsi.p2})： ${hoverD?.rsi?.rsi2?.toFixed(2) || '-'}` });
-                } else if (indicatorType === 'OBV') {
+                } else if (activeIndicators === 'OBV') {
                     tooltipLines.push({ color: "#eab308", text: `OBV： ${hoverD?.obv}` });
                     tooltipLines.push({ color: "#38bdf8", text: `MA： ${hoverD?.obvMa?.toFixed(0) || '-'}` });
-                } else if (indicatorType === 'TOWER') {
+                } else if (activeIndicators === 'TOWER') {
                     tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔頂： ${hoverD?.tower?.top?.toFixed(2)}` });
                     tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔底： ${hoverD?.tower?.bottom?.toFixed(2)}` });
-                } else if (['外資', '投信', '自營', '投+外'].includes(indicatorType)) {
-                    if (indicatorType === '外資') tooltipLines.push({ color: "#f472b6", text: `外資： ${hoverD?.foreign?.toFixed(0) || 0} 張` });
-                    if (indicatorType === '投信') tooltipLines.push({ color: "#34d399", text: `投信： ${hoverD?.trust?.toFixed(0) || 0} 張` });
-                    if (indicatorType === '自營') tooltipLines.push({ color: "#fbbf24", text: `自營： ${hoverD?.dealer?.toFixed(0) || 0} 張` });
-                    if (indicatorType === '投+外') {
+                } else if (['外資', '投信', '自營', '投+外'].includes(activeIndicators)) {
+                    if (activeIndicators === '外資') tooltipLines.push({ color: "#f472b6", text: `外資： ${hoverD?.foreign?.toFixed(0) || 0} 張` });
+                    if (activeIndicators === '投信') tooltipLines.push({ color: "#34d399", text: `投信： ${hoverD?.trust?.toFixed(0) || 0} 張` });
+                    if (activeIndicators === '自營') tooltipLines.push({ color: "#fbbf24", text: `自營： ${hoverD?.dealer?.toFixed(0) || 0} 張` });
+                    if (activeIndicators === '投+外') {
                         tooltipLines.push({ color: "#f472b6", text: `外資： ${hoverD?.foreign?.toFixed(0) || 0} 張` });
                         tooltipLines.push({ color: "#34d399", text: `投信： ${hoverD?.trust?.toFixed(0) || 0} 張` });
                         tooltipLines.push({ color: "#38bdf8", text: `合買： ${((hoverD?.foreign || 0) + (hoverD?.trust || 0)).toFixed(0)} 張` });
                     }
-                } else if (indicatorType === '資券') {
+                } else if (activeIndicators === '資券') {
                     tooltipLines.push({ color: "#ef4444", text: `融資增減： ${hoverD?.marginDiff?.toFixed(0) || 0} 張` });
                     tooltipLines.push({ color: "#3b82f6", text: `融券增減： ${hoverD?.shortDiff?.toFixed(0) || 0} 張` });
                 }
