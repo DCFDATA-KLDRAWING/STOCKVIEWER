@@ -7008,10 +7008,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                           <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
                           <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
                           
-                          {/* ✨ 新增：右側數值標籤 (最高壓在線上，中低飄在線上) */}
-                          <text x={width - 60} y={getObvY(maxO) + 10} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(maxO)}</text>
-                          <text x={width - 60} y={getObvY(midO) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(midO)}</text>
-                          <text x={width - 60} y={getObvY(minO) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(minO)}</text>
+                          
                       </g>);
                   })()}
 
@@ -7061,10 +7058,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                                   return null;
                               })}
                               
-                              <text x={width - paddingRight - 80} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0 </text>
-                              <text x={width - paddingRight - 80} y={alertY - 4} fill="#ef4444" fontSize="10" fontWeight="bold">7.5 (強)</text>
-                              <text x={width - paddingRight - 80} y={alertLowY - 4} fill="#22c55e" fontSize="10" fontWeight="bold">-4 (弱)</text>
-                              <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
+                             <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
                           </g>
                       );
                   })()}
@@ -7150,8 +7144,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                                   <path d={data.map((d, i) => (d.macd && d.macd.macd != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.macd)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                                   <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MACD ({indicatorParams.macd.fast}, {indicatorParams.macd.slow}, {indicatorParams.macd.signal})</text>
                                   
-                                  {/* ✨ 新增：MACD 右側 0 軸標籤 */}
-                                  <text x={width - 60} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0</text>
+                                  
                               </g>);
                   })()}
                   
@@ -7168,10 +7161,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                                   
                                   <text x={paddingLeft} y={15} fill="#f59e0b" fontSize="10" fontWeight="bold">KD ({indicatorParams.kd.rsv}, {indicatorParams.kd.k}, {indicatorParams.kd.d})</text>
                                   
-                                  {/* ✨ 新增：右側 80/50/20 的數值標籤 (避開右側固定的 Y 軸) */}
-                                  <text x={width - 60} y={getKdY(80) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">80</text>
-                                  <text x={width - 60} y={getKdY(50) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">50</text>
-                                  <text x={width - 60} y={getKdY(20) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">20</text>
+                                  
+                                  
                               </g>);
                   })()}
                   
@@ -7188,9 +7179,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                                   <text x={paddingLeft} y={15} fill="#ec4899" fontSize="10" fontWeight="bold">RSI ({indicatorParams.rsi.p1}, {indicatorParams.rsi.p2})</text>
 
                                   {/* ✨ 新增：RSI 右側 80/50/20 標籤 */}
-                                  <text x={width - 60} y={getRsiY(80) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">80</text>
-                                  <text x={width - 60} y={getRsiY(50) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">50</text>
-                                  <text x={width - 60} y={getRsiY(20) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">20</text>
+                                  
                               </g>);
                   })()}
 
@@ -7220,10 +7209,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                           
                           <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 ({indicatorParams.tower?.p || 3}日)</text>
                           
-                          {/* ✨ 新增：右側價格標籤 (四捨五入或保留小數) */}
-                          <text x={width - 60} y={getTY(maxT) + 10} fill="#94a3b8" fontSize="10" fontWeight="bold">{maxT > 1000 ? Math.round(maxT) : maxT.toFixed(1)}</text>
-                          <text x={width - 60} y={getTY(midT) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{midT > 1000 ? Math.round(midT) : midT.toFixed(1)}</text>
-                          <text x={width - 60} y={getTY(minT) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{minT > 1000 ? Math.round(minT) : minT.toFixed(1)}</text>
+                          
                       </g>);
                   })()}
 
@@ -7454,6 +7440,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                       const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
                       const getMomY = (val) => singleIndicatorHeight / 2 - (val / absLimit) * (singleIndicatorHeight / 2 - 15);
                       return (<>
+                        <text x="2" y={getMomY(動能)} fill="#eab308" fontSize="11" fontWeight="bold" dominantBaseline="middle">動能</text>
                         <text x="2" y={getMomY(7.5)} fill="#ef4444" fontSize="10" fontWeight="bold" dominantBaseline="middle">7.5</text>
                         <text x="2" y={getMomY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>
                         <text x="2" y={getMomY(-4)} fill="#22c55e" fontSize="10" fontWeight="bold" dominantBaseline="middle">-4</text>
