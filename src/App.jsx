@@ -7056,9 +7056,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                                       );
                                   }
                                   return null;
-                              })}
-                              
-                             <text x={width - paddingRight - 80} y={15} fill="#eab308" fontSize="11" fontWeight="bold">動能</text>
+                              })}                             
+                             <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">動能</text>
                           </g>
                       );
                   })()}
