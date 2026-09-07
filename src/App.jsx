@@ -5800,23 +5800,25 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const paddingRight = 5; 
   const indPaddingLeft = 15;
   
+  // ✨ 副圖的長寬與邊距設定
   const volHeight = isFullscreen ? 50 : 80;
   
-  // ✨ 每一個副圖的高度
+  // 每一個副圖的預設高度
   const singleIndicatorHeight = isFullscreen ? 70 : 120;
+  // 計算開啟了幾個副圖 (包含寶塔線 TOWER，因為它現在也是獨立副圖了)
   const activeSubCharts = activeIndicators;
-  // ✨ 動態計算副圖總高度
   const totalIndicatorsHeight = activeSubCharts.length * singleIndicatorHeight;
-  
+
   const chartPaddingTop = isFullscreen ? 25 : 80;
   const bottomLegendHeight = 40; 
   
   let mainHeight = 400; 
+  // 總高度 = 主圖 + 成交量 + (副圖數量 * 單一高度) + 底部留白
   let totalSVGHeight = mainHeight + volHeight + totalIndicatorsHeight + 80; 
   
   if (isFullscreen) {
     totalSVGHeight = Math.max(chartHeight, 350); 
-    // 全螢幕時，主圖高度 = 總高 - 量高 - 所有副圖高 - 底部圖例
+    // 全螢幕時，主圖自動收縮以騰出空間給多個副圖
     mainHeight = totalSVGHeight - volHeight - totalIndicatorsHeight - bottomLegendHeight;
   }
 
