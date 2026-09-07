@@ -6988,13 +6988,30 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                   
                   {chartType === 'OBV' && (() => {
                       let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
+                      if (maxO === -Infinity) { maxO = 100; minO = 0; } // 防呆
                       const range = (maxO - minO) || 1; 
                       const getObvY = (val) => singleIndicatorHeight - ((val - minO) / range) * (singleIndicatorHeight - 20) - 10;
+                      
+                      const midO = (maxO + minO) / 2;
+                      // 💡 格式化大數字 (例如把 15000 變成 1.5W)
+                      const fmt = (v) => Math.abs(v) >= 10000 ? (v/10000).toFixed(1) + 'W' : Math.round(v);
+
                       return (<g>
+                          {/* ✨ 新增：OBV 頂、中、底 三條輔助線 */}
+                          <line x1={0} y1={getObvY(maxO)} x2={width} y2={getObvY(maxO)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getObvY(midO)} x2={width} y2={getObvY(midO)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getObvY(minO)} x2={width} y2={getObvY(minO)} stroke="#1e293b" strokeDasharray="4,4" />
+
                           <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
                           <path d={data.map((d, i) => d.obvMa != null ? `${i===0||data[i-1]?.obvMa== null?'M':'L'} ${getX(i)} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                          
                           <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
                           <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
+                          
+                          {/* ✨ 新增：右側數值標籤 (最高壓在線上，中低飄在線上) */}
+                          <text x={width - 60} y={getObvY(maxO) + 10} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(maxO)}</text>
+                          <text x={width - 60} y={getObvY(midO) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(midO)}</text>
+                          <text x={width - 60} y={getObvY(minO) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(minO)}</text>
                       </g>);
                   })()}
 
@@ -7120,16 +7137,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                           });
                           const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
                           const getMyY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - 10);
+                          const zeroY = getMyY(0); 
+
                           return (<g>
-                                  <line x1={0} y1={singleIndicatorHeight / 2} x2={width} y2={singleIndicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#1e293b" strokeDasharray="4,4" />
                                   {data.map((d, i) => { 
                                       if(!d.macd || d.macd.osc == null) return null;
-                                      const y = getMyY(d.macd.osc); const zeroY = getMyY(0); 
+                                      const y = getMyY(d.macd.osc); 
                                       return <rect key={`osc-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; 
                                   })}
                                   <path d={data.map((d, i) => (d.macd && d.macd.dif != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.dif)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
                                   <path d={data.map((d, i) => (d.macd && d.macd.macd != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.macd)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                                   <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MACD ({indicatorParams.macd.fast}, {indicatorParams.macd.slow}, {indicatorParams.macd.signal})</text>
+                                  
+                                  {/* ✨ 新增：MACD 右側 0 軸標籤 */}
+                                  <text x={width - 60} y={zeroY - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">0</text>
                               </g>);
                   })()}
                   
@@ -7156,10 +7178,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                   {chartType === 'RSI' && (() => {
                           const getRsiY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
                           return (<g>
-                                  <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  
                                   <path d={data.map((d, i) => (d.rsi && d.rsi.rsi1 != null) ? `${i===0||data[i-1]?.rsi?.rsi1==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
                                   <path d={data.map((d, i) => (d.rsi && d.rsi.rsi2 != null) ? `${i===0||data[i-1]?.rsi?.rsi2==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  
                                   <text x={paddingLeft} y={15} fill="#ec4899" fontSize="10" fontWeight="bold">RSI ({indicatorParams.rsi.p1}, {indicatorParams.rsi.p2})</text>
+
+                                  {/* ✨ 新增：RSI 右側 80/50/20 標籤 */}
+                                  <text x={width - 60} y={getRsiY(80) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">80</text>
+                                  <text x={width - 60} y={getRsiY(50) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">50</text>
+                                  <text x={width - 60} y={getRsiY(20) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">20</text>
                               </g>);
                   })()}
 
@@ -7170,15 +7201,29 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                         if (d.tower?.top > maxT) maxT = d.tower.top; 
                         if (d.tower?.bottom < minT) minT = d.tower.bottom; 
                       });
+                      if (maxT === -Infinity) { maxT = 100; minT = 0; } // 防呆
                       const range = (maxT - minT) || 1; 
-                      // ⚠️ 高度基準改為 singleIndicatorHeight
                       const getTY = (val) => singleIndicatorHeight - ((val - minT) / range) * (singleIndicatorHeight - 20) - 10;
+                      
+                      const midT = (maxT + minT) / 2;
+
                       return (<g>
+                          {/* ✨ 新增：寶塔線 頂、中、底 三條輔助線 */}
+                          <line x1={0} y1={getTY(maxT)} x2={width} y2={getTY(maxT)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getTY(midT)} x2={width} y2={getTY(midT)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getTY(minT)} x2={width} y2={getTY(minT)} stroke="#1e293b" strokeDasharray="4,4" />
+
                           {data.map((d, i) => { 
                             if(!d.tower) return null; 
                             return <rect key={`tw-${i}`} x={getX(i) - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, Math.abs(getTY(d.tower.bottom) - getTY(d.tower.top)))} fill={d.tower.color} opacity="0.85" />; 
                           })}
+                          
                           <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 ({indicatorParams.tower?.p || 3}日)</text>
+                          
+                          {/* ✨ 新增：右側價格標籤 (四捨五入或保留小數) */}
+                          <text x={width - 60} y={getTY(maxT) + 10} fill="#94a3b8" fontSize="10" fontWeight="bold">{maxT > 1000 ? Math.round(maxT) : maxT.toFixed(1)}</text>
+                          <text x={width - 60} y={getTY(midT) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{midT > 1000 ? Math.round(midT) : midT.toFixed(1)}</text>
+                          <text x={width - 60} y={getTY(minT) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{minT > 1000 ? Math.round(minT) : minT.toFixed(1)}</text>
                       </g>);
                   })()}
 
