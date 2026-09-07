@@ -4859,7 +4859,6 @@ const handleOpenSectorMomentum = async () => {
                 defensivePrice={globalDefensivePrice}
                 realSymbol={currentRealSymbol} // ✨ 修正：傳入分離出來的真實股號，防止存檔存到空字串
                 displayCount={displayCount}
-                indicatorType={indicatorType}
                 activeIndicators={activeIndicators} // 👈 傳入陣列
                 indicatorParams={indicatorParams}
                 setDisplayCount={setDisplayCount}
