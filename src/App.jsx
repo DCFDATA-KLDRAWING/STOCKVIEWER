@@ -3770,24 +3770,28 @@ const App = () => {
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
-     // ✨ 4. 【終極視覺補丁】精準處理「頭頭低 / 底底高」的未完成波動
+     // ✨ 4. 【終極視覺補丁】涵蓋「頭頭低/底底高」與「過前高/破前低」的所有未完成波動
     if (data.length > 0) {
         const lastIdx = data.length - 1;
         
-        // 🌟 關鍵修正：我們不再無腦抓取所有細折點！
-        // 我們直接檢查 `processMacroTurn` 迴圈跑完後，停留在手上的 `currentExtreme` (極端值追蹤點)
-        // 如果這個極端值還沒被推入 macroPivots (代表它是一個尚未走完的頭頭低或底底高)
-        // 我們才把它當作「臨時補丁」接在最後面！
-        if (currentExtreme !== null) {
-            const lastMacro = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1] : null;
-            // 確保這個極端點不是已經存在於陣列中的最後一個點
-            if (!lastMacro || currentExtreme.idx !== lastMacro.idx) {
-                // 將它標記為 FloatPivot 借給粗折線畫圖
-                macroPivots = [...macroPivots, { ...currentExtreme, type: 'FloatPivot' }];
+        // 取得歷史大波段中，最後一個被確認的粗折點
+        const lastMacro = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1] : null;
+        
+        if (lastMacro) {
+            // 💡 關鍵：我們去細折線陣列(zigzagPivots)裡面撈！
+            // 找出所有發生在 lastMacro「之後」的細折點。
+            // 這些點包含了所有引擎還沒確認的：過高、破底、頭頭低、底底高等各種狀況。
+            const recentFinePivots = zigzagPivots.filter(p => p.idx > lastMacro.idx);
+            
+            if (recentFinePivots.length > 0) {
+                // 將這些借來的點全部標記為 'FloatPivot'
+                const patchedPivots = recentFinePivots.map(p => ({ ...p, type: 'FloatPivot' }));
+                // 把補丁直接接在歷史波段的尾巴上，交給 SVG 去畫出那些轉折！
+                macroPivots = [...macroPivots, ...patchedPivots];
             }
         }
         
-        // 處理最後一段虛線，連到最新的收盤價
+        // 處理最後一段連到最新收盤價的虛線 (對齊最新的轉折點)
         let latestPivotIdx = 0;
         if (macroPivots.length > 0) {
             latestPivotIdx = macroPivots[macroPivots.length - 1].idx;
