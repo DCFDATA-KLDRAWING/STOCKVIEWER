@@ -3770,19 +3770,31 @@ const App = () => {
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
-     // ✨ 4. 【終極視覺補丁】精準處理「頭頭低 / 底底高」的未完成波動
+     // ✨ 4. 【終極視覺補丁】只在「反轉預兆 (頭頭低/底底高)」出現時才畫出折角
     if (data.length > 0) {
         const lastIdx = data.length - 1;
+        const lastMacro = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1] : null;
         
-        // 🌟 關鍵修正：我們不再無腦抓取所有細折點！
-        // 我們直接檢查 `processMacroTurn` 迴圈跑完後，停留在手上的 `currentExtreme` (極端值追蹤點)
-        // 如果這個極端值還沒被推入 macroPivots (代表它是一個尚未走完的頭頭低或底底高)
-        // 我們才把它當作「臨時補丁」接在最後面！
-        if (currentExtreme !== null) {
-            const lastMacro = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1] : null;
-            // 確保這個極端點不是已經存在於陣列中的最後一個點
-            if (!lastMacro || currentExtreme.idx !== lastMacro.idx) {
-                // 將它標記為 FloatPivot 借給粗折線畫圖
+        // 只有當引擎手上捏著一個極值，而且這個極值跟最後一個確認點不同的時候
+        if (currentExtreme !== null && (!lastMacro || currentExtreme.idx !== lastMacro.idx)) {
+            
+            // 💡 智慧判斷：這個極值真的是個反轉預兆嗎？
+            // 在多頭中，如果這個極值(高點) 沒有 突破前一個大山頂，那它就是個「頭頭低」！
+            // 在空頭中，如果這個極值(低點) 沒有 跌破前一個深谷底，那它就是個「底底高」！
+            let isReversalWarning = false;
+            if (macroTrend === 1 && currentExtreme.type === 'High') {
+                if (lastMacro && lastMacro.type === 'High' && currentExtreme.price < lastMacro.price) {
+                    isReversalWarning = true;
+                }
+            } else if (macroTrend === -1 && currentExtreme.type === 'Low') {
+                if (lastMacro && lastMacro.type === 'Low' && currentExtreme.price > lastMacro.price) {
+                    isReversalWarning = true;
+                }
+            }
+
+            // 只有在真的是反轉預兆（頭頭低 / 底底高）時，我們才把它加進去畫折角！
+            // 如果是像大盤那樣一路過高，isReversalWarning 會是 false，就不會加點，維持漂亮的直線！
+            if (isReversalWarning) {
                 macroPivots = [...macroPivots, { ...currentExtreme, type: 'FloatPivot' }];
             }
         }
