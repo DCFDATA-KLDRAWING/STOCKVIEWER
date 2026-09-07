@@ -7136,10 +7136,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                   {chartType === 'KD' && (() => {
                           const getKdY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
                           return (<g>
-                                  <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" /><line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  {/* ✨ 補上 50 的中軸線 */}
+                                  <line x1={0} y1={getKdY(50)} x2={width} y2={getKdY(50)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  
                                   <path d={data.map((d, i) => (d.kd && d.kd.k != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.k)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
                                   <path d={data.map((d, i) => (d.kd && d.kd.d != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.d)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  
                                   <text x={paddingLeft} y={15} fill="#f59e0b" fontSize="10" fontWeight="bold">KD ({indicatorParams.kd.rsv}, {indicatorParams.kd.k}, {indicatorParams.kd.d})</text>
+                                  
+                                  {/* ✨ 新增：右側 80/50/20 的數值標籤 (避開右側固定的 Y 軸) */}
+                                  <text x={width - 60} y={getKdY(80) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">80</text>
+                                  <text x={width - 60} y={getKdY(50) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">50</text>
+                                  <text x={width - 60} y={getKdY(20) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">20</text>
                               </g>);
                   })()}
                   
