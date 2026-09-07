@@ -3770,19 +3770,96 @@ const App = () => {
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
+    // ✨ 4. 【終極動態鎖定補丁】全段掃描：精準判斷 4 大轉折並自動轉實體線
     if (data.length > 0) {
         const lastIdx = data.length - 1;
-        let lastPivotIdx = 0;
-        if (zigzagPivots.length > 0) lastPivotIdx = zigzagPivots[zigzagPivots.length - 1].idx;
+        const lastMacro = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1] : null;
+        macroFloatPoint = null;
 
-        const recentCandles = data.slice(lastPivotIdx);
-        if (recentCandles.length > 0) {
-            const recentHigh = Math.max(...recentCandles.map(c => c.high));
-            const recentLow = Math.min(...recentCandles.map(c => c.low));
-            const midPrice = recentLow + ((recentHigh - recentLow) / 2);
-            macroFloatPoint = { idx: lastIdx, price: midPrice, type: 'Float' };
+        if (lastMacro) {
+            const recentFinePivots = zigzagPivots.filter(p => p.idx > lastMacro.idx);
+
+            if (recentFinePivots.length > 0) {
+                let confirmedTail = []; // 準備變成實體線的陣列
+                let currentTailTrend = macroTrend;
+                let currentExtreme = lastMacro;
+                let tBase = lastMacro.price; // 防守線
+
+                // 🌟 關鍵：完整掃描尾端所有細折，不再中途 break！
+                for (let i = 0; i < recentFinePivots.length; i++) {
+                    const p = recentFinePivots[i];
+
+                    if (currentTailTrend === 1) { // 📈
+                        if (p.type === 'High') {
+                            if (p.price >= currentExtreme.price) {
+                                // 🚀 創局部新高 (順勢推進)
+                                currentExtreme = p;
+                            } else {
+                                // ⚠️ 頭頭低 (轉弱) -> 確立前面的高點為實體轉折！
+                                if (currentExtreme.idx !== lastMacro.idx) confirmedTail.push(currentExtreme);
+                                currentTailTrend = -1;
+                                currentExtreme = p; // 拐點向下
+                            }
+                        } else if (p.type === 'Low') {
+                            if (p.price < tBase) {
+                                // ⚠️ 破前波低 (轉空) -> 確立前面的高點為實體轉折！
+                                if (currentExtreme.idx !== lastMacro.idx) confirmedTail.push(currentExtreme);
+                                currentTailTrend = -1;
+                                currentExtreme = p;
+                            } else {
+                                tBase = p.price; // 墊高防守線
+                            }
+                        }
+                    } else if (currentTailTrend === -1) { // 📉
+                        if (p.type === 'Low') {
+                            if (p.price <= currentExtreme.price) {
+                                // 🚀 創局部新低 (順勢推進)
+                                currentExtreme = p;
+                            } else {
+                                // ⚠️ 底底高 (打底) -> 確立前面的低點為實體轉折！
+                                if (currentExtreme.idx !== lastMacro.idx) confirmedTail.push(currentExtreme);
+                                currentTailTrend = 1;
+                                currentExtreme = p; // 拐點向上
+                            }
+                        } else if (p.type === 'High') {
+                            if (p.price > tBase) {
+                                // ⚠️ 過前波高 (匯鑽科情境：轉多) -> 確立前面的低點為實體轉折！
+                                if (currentExtreme.idx !== lastMacro.idx) confirmedTail.push(currentExtreme);
+                                currentTailTrend = 1;
+                                currentExtreme = p;
+                            } else {
+                                tBase = p.price; // 壓低防守線
+                            }
+                        }
+                    }
+                }
+
+                // 💡 魔法時刻：將掃描過程中確認的洗盤轉折，正式寫入 macroPivots (變成實體線)
+                if (confirmedTail.length > 0) {
+                    macroPivots = [...macroPivots, ...confirmedTail];
+                }
+
+                // 剩下的最後一個極端值 (例如匯鑽科的 70 元新高)，交給 FloatPoint 去畫「虛線」
+                if (currentExtreme.idx !== lastMacro.idx && !confirmedTail.find(x => x.idx === currentExtreme.idx)) {
+                    macroFloatPoint = { idx: currentExtreme.idx, price: currentExtreme.price, type: 'Float' };
+                }
+            }
+        }
+        
+        // 如果最新的收盤價比極端值還猛，讓虛線直接對齊最新收盤價
+        const lastClose = data[lastIdx].close;
+        if (macroFloatPoint) {
+            // 簡單判斷最後一段的方向
+            const lastP = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1].price : 0;
+            const isPointingUp = macroFloatPoint.price > lastP;
+            
+            if (isPointingUp && lastClose > macroFloatPoint.price) {
+                macroFloatPoint = { idx: lastIdx, price: lastClose, type: 'Float' };
+            } else if (!isPointingUp && lastClose < macroFloatPoint.price) {
+                macroFloatPoint = { idx: lastIdx, price: lastClose, type: 'Float' };
+            }
         } else {
-            macroFloatPoint = { idx: lastIdx, price: data[lastIdx].close, type: 'Float' };
+            macroFloatPoint = { idx: lastIdx, price: lastClose, type: 'Float' };
         }
     }
 
