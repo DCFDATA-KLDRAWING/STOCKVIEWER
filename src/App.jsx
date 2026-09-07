@@ -3770,40 +3770,100 @@ const App = () => {
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
-     // ✨ 4. 【終極視覺補丁】涵蓋「頭頭低/底底高」與「過前高/破前低」的所有未完成波動
+     // ✨ 4. 【終極視覺補丁】精準判斷「頭頭低/底底高」與「破前波低/過前波高」
     if (data.length > 0) {
         const lastIdx = data.length - 1;
-        
-        // 取得歷史大波段中，最後一個被確認的粗折點
         const lastMacro = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1] : null;
-        
+        let isPatched = false;
+
         if (lastMacro) {
-            // 💡 關鍵：我們去細折線陣列(zigzagPivots)裡面撈！
-            // 找出所有發生在 lastMacro「之後」的細折點。
-            // 這些點包含了所有引擎還沒確認的：過高、破底、頭頭低、底底高等各種狀況。
+            // 取出最後一個確立的粗折點之後的所有細折點
             const recentFinePivots = zigzagPivots.filter(p => p.idx > lastMacro.idx);
-            
+
             if (recentFinePivots.length > 0) {
-                // 將這些借來的點全部標記為 'FloatPivot'
-                const patchedPivots = recentFinePivots.map(p => ({ ...p, type: 'FloatPivot' }));
-                // 把補丁直接接在歷史波段的尾巴上，交給 SVG 去畫出那些轉折！
-                macroPivots = [...macroPivots, ...patchedPivots];
+                let shouldPatch = false;
+                let patchStartIndex = -1;
+
+                if (macroTrend === 1) { // 📈 目前在多頭波段 (尋找高點中)
+                    let highestHigh = -Infinity;
+                    let highestHighIdx = -1;
+                    let lastLow = lastMacro.price; // 防守線初始為起漲點
+
+                    for (let i = 0; i < recentFinePivots.length; i++) {
+                        const p = recentFinePivots[i];
+                        if (p.type === 'High') {
+                            if (p.price >= highestHigh) {
+                                highestHigh = p.price;
+                                highestHighIdx = i; // 記住這波的最高點位置
+                            } else {
+                                // ⚠️ 觸發：頭頭低 (沒創出新高)
+                                shouldPatch = true;
+                                patchStartIndex = highestHighIdx; // 從這波的最高點開始折下來
+                                break;
+                            }
+                        } else if (p.type === 'Low') {
+                            if (p.price < lastLow) {
+                                // ⚠️ 觸發：破前波低 (跌破了前一個細折低點)
+                                shouldPatch = true;
+                                patchStartIndex = highestHighIdx !== -1 ? highestHighIdx : 0; 
+                                break;
+                            }
+                            lastLow = p.price; // 更新防守線為最新的低點
+                        }
+                    }
+                } else if (macroTrend === -1) { // 📉 目前在空頭波段 (尋找低點中)
+                    let lowestLow = Infinity;
+                    let lowestLowIdx = -1;
+                    let lastHigh = lastMacro.price; // 防守線初始為起跌點
+
+                    for (let i = 0; i < recentFinePivots.length; i++) {
+                        const p = recentFinePivots[i];
+                        if (p.type === 'Low') {
+                            if (p.price <= lowestLow) {
+                                lowestLow = p.price;
+                                lowestLowIdx = i; // 記住這波的最低點位置
+                            } else {
+                                // ⚠️ 觸發：底底高 (沒創出新低)
+                                shouldPatch = true;
+                                patchStartIndex = lowestLowIdx; // 從這波的最低點開始折上去
+                                break;
+                            }
+                        } else if (p.type === 'High') {
+                            if (p.price > lastHigh) {
+                                // ⚠️ 觸發：過前波高 (突破了前一個細折高點)
+                                shouldPatch = true;
+                                patchStartIndex = lowestLowIdx !== -1 ? lowestLowIdx : 0;
+                                break;
+                            }
+                            lastHigh = p.price; // 更新防守線為最新的高點
+                        }
+                    }
+                }
+
+                // 如果發現了轉弱/轉強訊號，就把高低點與之後的尾巴補上去！
+                if (shouldPatch && patchStartIndex !== -1) {
+                    const pointsToPatch = recentFinePivots.slice(patchStartIndex);
+                    const patchedPivots = pointsToPatch.map(p => ({ ...p, type: 'FloatPivot' }));
+                    macroPivots = [...macroPivots, ...patchedPivots];
+                    isPatched = true; // 標記為已有折角
+                }
             }
         }
         
-        // 處理最後一段連到最新收盤價的虛線 (對齊最新的轉折點)
-        let latestPivotIdx = 0;
-        if (macroPivots.length > 0) {
-            latestPivotIdx = macroPivots[macroPivots.length - 1].idx;
-        }
-        
-        const recentCandles = data.slice(latestPivotIdx);
-        if (recentCandles.length > 0) {
-            const recentHigh = Math.max(...recentCandles.map(c => c.high));
-            const recentLow = Math.min(...recentCandles.map(c => c.low));
-            const midPrice = recentLow + ((recentHigh - recentLow) / 2);
-            macroFloatPoint = { idx: lastIdx, price: midPrice, type: 'Float' };
+        // 決定最後的行進虛線要連到哪裡
+        if (!isPatched && currentExtreme) {
+            // 如果趨勢完美(底底高頭頭高)，沒有打補丁，虛線直接連向目前的極端值(最高/最低點)
+            macroFloatPoint = { idx: currentExtreme.idx, price: currentExtreme.price, type: 'Float' };
+            
+            // 如果最新一根 K 棒比極端值還猛，就直接連向最新價格
+            const lastClose = data[lastIdx].close;
+            if (macroTrend === 1 && lastClose > currentExtreme.price) {
+                macroFloatPoint = { idx: lastIdx, price: lastClose, type: 'Float' };
+            } else if (macroTrend === -1 && lastClose < currentExtreme.price) {
+                macroFloatPoint = { idx: lastIdx, price: lastClose, type: 'Float' };
+            }
         } else {
+            // 如果已經打了補丁，虛線就對齊最後一根收盤價，表達尾端還在跳動
             macroFloatPoint = { idx: lastIdx, price: data[lastIdx].close, type: 'Float' };
         }
     }
