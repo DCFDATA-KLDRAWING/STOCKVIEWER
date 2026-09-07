@@ -3843,13 +3843,24 @@ const App = () => {
                 // 如果發現了轉弱/轉強訊號，就把高低點與之後的尾巴補上去！
                 if (shouldPatch && patchStartIndex !== -1) {
                     const pointsToPatch = recentFinePivots.slice(patchStartIndex);
-                    const patchedPivots = pointsToPatch.map(p => ({ ...p, type: 'FloatPivot' }));
+                    
+                    // 🌟 關鍵微調：不全都是虛線！
+                    // 當我們補上多個點時，代表中間已經發生了確實的「轉折」(例如頭頭低之後又過前高)
+                    // 所以除了陣列裡的【最後一個點】(代表還在行進中) 標為 FloatPivot 之外，
+                    // 前面的點我們都保留它原本的 type (High/Low)，讓 SVG 把這一段畫成實體藍線！
+                    const patchedPivots = pointsToPatch.map((p, index) => {
+                        if (index === pointsToPatch.length - 1) {
+                            return { ...p, type: 'FloatPivot' }; // 最後一個點維持虛線
+                        } else {
+                            return { ...p }; // 前面的點「轉正」成為實體轉折
+                        }
+                    });
+                    
                     macroPivots = [...macroPivots, ...patchedPivots];
                     isPatched = true; // 標記為已有折角
                 }
             }
         }
-        
         // 決定最後的行進虛線要連到哪裡
         if (!isPatched && currentExtreme) {
             // 如果趨勢完美(底底高頭頭高)，沒有打補丁，虛線直接連向目前的極端值(最高/最低點)
