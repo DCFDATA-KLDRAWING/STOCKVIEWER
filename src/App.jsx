@@ -7439,8 +7439,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                       data.forEach(d => { if (d.edwinMomentum != null && d.edwinMomentum > maxM) maxM = d.edwinMomentum; if (d.edwinMomentum != null && d.edwinMomentum < minM) minM = d.edwinMomentum; });
                       const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
                       const getMomY = (val) => singleIndicatorHeight / 2 - (val / absLimit) * (singleIndicatorHeight / 2 - 15);
-                      return (<>
-                        <text x="2" y={getMomY(動能)} fill="#eab308" fontSize="11" fontWeight="bold" dominantBaseline="middle">動能</text>
+                      return (<>                        
                         <text x="2" y={getMomY(7.5)} fill="#ef4444" fontSize="10" fontWeight="bold" dominantBaseline="middle">7.5</text>
                         <text x="2" y={getMomY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>
                         <text x="2" y={getMomY(-4)} fill="#22c55e" fontSize="10" fontWeight="bold" dominantBaseline="middle">-4</text>
