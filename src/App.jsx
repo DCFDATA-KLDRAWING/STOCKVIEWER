@@ -3770,18 +3770,42 @@ const App = () => {
         else floatPoint = { idx: tempLowIdx, price: tempLow, type: 'Low', isFloat: true };
     }
 
+     // ✨ 4. 【終極視覺補丁】處理粗折線的尾端未確認波動
     if (data.length > 0) {
         const lastIdx = data.length - 1;
-        let lastPivotIdx = 0;
-        if (zigzagPivots.length > 0) lastPivotIdx = zigzagPivots[zigzagPivots.length - 1].idx;
-
-        const recentCandles = data.slice(lastPivotIdx);
-        if (recentCandles.length > 0) {
-            const recentHigh = Math.max(...recentCandles.map(c => c.high));
-            const recentLow = Math.min(...recentCandles.map(c => c.low));
-            const midPrice = recentLow + ((recentHigh - recentLow) / 2);
-            macroFloatPoint = { idx: lastIdx, price: midPrice, type: 'Float' };
+        
+        // 取得最後一個「已確認」的粗折點
+        const lastMacro = macroPivots.length > 0 ? macroPivots[macroPivots.length - 1] : null;
+        
+        if (lastMacro) {
+            // 找出在這個粗折點「之後」才發生的細折點
+            const recentFinePivots = zigzagPivots.filter(p => p.idx > lastMacro.idx);
+            
+            // 如果真的有尚未被結算進粗折的「小山丘/小坑洞」，我們就把這些點「暫時借來」
+            // 塞進 macroPivots 的尾巴，這樣畫線時就會出現下彎/上揚的細節！
+            if (recentFinePivots.length > 0) {
+                // 將這些借來的點標記為 'FloatPivot'，方便之後如果想改變畫法可以區分
+                const patchedPivots = recentFinePivots.map(p => ({...p, type: 'FloatPivot'}));
+                macroPivots = [...macroPivots, ...patchedPivots];
+            }
+            
+            // 處理虛線連到當下最新價格 (對齊最新的細折起點)
+            let latestPivotIdx = lastMacro.idx;
+            if (macroPivots.length > 0) {
+                latestPivotIdx = macroPivots[macroPivots.length - 1].idx;
+            }
+            
+            const recentCandles = data.slice(latestPivotIdx);
+            if (recentCandles.length > 0) {
+                const recentHigh = Math.max(...recentCandles.map(c => c.high));
+                const recentLow = Math.min(...recentCandles.map(c => c.low));
+                const midPrice = recentLow + ((recentHigh - recentLow) / 2);
+                macroFloatPoint = { idx: lastIdx, price: midPrice, type: 'Float' };
+            } else {
+                macroFloatPoint = { idx: lastIdx, price: data[lastIdx].close, type: 'Float' };
+            }
         } else {
+            // 如果連一個粗折都還沒形成 (例如資料太少)
             macroFloatPoint = { idx: lastIdx, price: data[lastIdx].close, type: 'Float' };
         }
     }
