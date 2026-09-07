@@ -5808,6 +5808,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   // 計算開啟了幾個副圖 (包含寶塔線 TOWER，因為它現在也是獨立副圖了)
   const activeSubCharts = activeIndicators;
   const totalIndicatorsHeight = activeSubCharts.length * singleIndicatorHeight;
+  const indicatorHeight = totalIndicatorsHeight;
 
   const chartPaddingTop = isFullscreen ? 25 : 80;
   const bottomLegendHeight = 40; 
