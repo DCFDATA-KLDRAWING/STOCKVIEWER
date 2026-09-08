@@ -2342,9 +2342,13 @@ const App = () => {
     showAutoWave: false,      // 🌟 新增：自動波段對照主開關
     autoWaveLongOnly: false,  // 🌟 新增：自動波段僅多方(>55MA)
     autoWaveShortOnly: false,  // 🌟 新增：自動波段僅空方(<55MA)
-    showDeductionNotice: false // 🌟 新增：扣抵智慧提醒開關
+    showDeductionNotice: false, // 🌟 新增：扣抵智慧提醒開關
+    showDisposition: false // ✨ 新增：處置股開關 (預設關閉)
     
   });
+  
+  // ✨ 新增：處置股資料快取 (避免重複呼叫 API)
+  const [dispositionData, setDispositionData] = useState({});
   // ✨ 新增：SAR 指標的專屬參數
   const [sarParams, setSarParams] = useState({ start: 0.02, step: 0.02, max: 0.20 });
   
@@ -2510,6 +2514,35 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('MY_STOCK_WATCHLIST', JSON.stringify(watchlist));
   }, [watchlist]);
+
+  // 👇 ==============================================================
+  // 👇 請把【✨ 新增：處置股 API 獨立撈取引擎】整段 useEffect 貼在這裡！ 👇
+  // 👇 ==============================================================
+  useEffect(() => {
+    if (!toggles.showDisposition || !realSymbol) return;
+    if (dispositionData[realSymbol]) return; // 已快取就不再抓，極度省 API 額度！
+
+    const fetchDisposition = async () => {
+        try {
+            // 自動往回推算抓取近 2 年的處置資料，確保圖表涵蓋
+            const startDate = new Date();
+            startDate.setFullYear(startDate.getFullYear() - 2);
+            const startDateStr = startDate.toISOString().split('T')[0];
+
+            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${realSymbol}&start_date=${startDateStr}`;
+            
+            const response = await fetch(apiUrl);
+            const json = await response.json();
+
+            if (json.msg === 'success' && json.data) {
+                setDispositionData(prev => ({ ...prev, [realSymbol]: json.data }));
+            }
+        } catch (error) {
+            console.error('抓取處置股資料失敗:', error);
+        }
+    };
+    fetchDisposition();
+  }, [toggles.showDisposition, realSymbol]);
 
   // ✨ 新增：彈窗的頁籤切換與排序狀態
   const [rankingTab, setRankingTab] = useState('ranking'); // 'ranking' (讀圖排行) 或 'watchlist' (自選)
@@ -4738,6 +4771,11 @@ const handleOpenSectorMomentum = async () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
+                  {/* ✨ 新增：處置股 打勾按鈕 */}
+                <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+                  <input type="checkbox" checked={toggles.showDisposition} onChange={() => handleToggle('showDisposition')} className="w-3.5 h-3.5 text-red-500 rounded bg-slate-900 border-slate-600" />
+                  <span className="text-xs text-red-400 font-bold">處置股</span>
+                </label>
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -6554,7 +6592,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const tfLabel = timeframe === 'W' ? '週K' : timeframe === 'M' ? '月K' : timeframe === 'D' ? '日K' : timeframe + '分K';
 
   return (
-    <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}>
+    <div ref={chartContainerRef} 
+      className={isFullscreen ? 
+        // 全螢幕模式：解放 h-[100vw]，改為 min-h-[100vw]，並加上 overflow-y-auto 允許上下滑動看副圖
+        "fixed top-0 left-0 w-[100vh] min-h-[100vw] overflow-y-auto origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" 
+        : 
+        // 正常模式
+        "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"
+      }
+    >
       <CustomModal modal={chartModal}/>
       {/* ✨ 8象限買賣供需圖 */}
       {pqModalOpen && (
@@ -6755,8 +6801,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         <button onClick={() => { setActiveTool('cursor'); setDraftPoints([]); }} className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-cyan-800/90 border border-cyan-400 text-cyan-100 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.6)] font-bold backdrop-blur-md hover:bg-cyan-700 transition-all flex items-center gap-2 pointer-events-auto">🖱️ 結束畫線 (返回游標)</button>
       )}
 
-      {/* ✨ 6. 【引擎輸出層】加入 touch-pan-y 確保可以上下滾動網頁，但攔截水平滑動 */}
-      <div className="flex-1 flex flex-row relative overflow-hidden w-full h-full min-h-0">
+      {/* ✨ 6. 【引擎輸出層】允許內容物撐開高度，並交由外層滾動 */}
+      <div 
+        className={`flex flex-row relative w-full ${isFullscreen ? 'overflow-y-visible' : 'flex-1 overflow-hidden min-h-0'}`}
+        style={isFullscreen ? { height: `${totalSVGHeight}px`, minHeight: `${totalSVGHeight}px` } : {}}
+      >
         
         {/* ✨ 專業版：浮動縮放按鈕 (帶有智慧透明度，平時半透明不遮擋指標) */}
         <div className="absolute bottom-[90px] right-[65px] flex flex-col gap-3 z-[110] pointer-events-auto opacity-30 hover:opacity-100 active:opacity-100 transition-opacity duration-300">
@@ -6921,6 +6970,58 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`mzz-pt-${i}`} cx={px} cy={getY(p.price)} r={4.5} fill="#38bdf8" shadow="0 0 10px #38bdf8" />; })}
                  </g>
                );
+            })()}
+
+            {/* 👇 ========================================== 👇 */}
+            {/* 👇 請把步驟 4 的程式碼貼在這裡！(緊接在 MacroZigZag 下方) 👇 */}
+            {/* ✨ 終極新增：處置股事件雷達 (紅色警戒區 + 起訖標籤) */}
+            {toggles.showDisposition && dispositionData[realSymbol] && (() => {
+                const records = dispositionData[realSymbol];
+                if (!records || records.length === 0) return null;
+                
+                return records.map((rec, recIdx) => {
+                    // 找出處置起點與終點的 K 棒位置
+                    const startIdx = data.findIndex(d => d.date >= rec.start_date);
+                    let endIdx = -1;
+                    for (let i = data.length - 1; i >= 0; i--) { if (data[i].date <= rec.end_date) { endIdx = i; break; } }
+                    if (startIdx === -1 || startIdx > endIdx) return null; // 若日期對不上則跳過
+                    
+                    const rectX = getX(startIdx) - candleWidth / 2;
+                    const rectWidth = (endIdx - startIdx) * spacing + candleWidth;
+                    const startX = getX(startIdx);
+                    const endX = getX(endIdx);
+                    const elements = [];
+
+                    // 1. 畫出處置期間的紅色淡淡背景 (只涵蓋主圖高度)
+                    if (rectX + rectWidth > 0 && rectX < width) {
+                        elements.push(<rect key={`disp-bg-${recIdx}`} x={rectX} y={0} width={rectWidth} height={mainHeight} fill="rgba(239, 68, 68, 0.12)" pointerEvents="none" />);
+                    }
+
+                    // 2. 畫「⚠️處置」起點標籤
+                    if (startX > -20 && startX < width + 20 && data[startIdx]) {
+                        const startY = getY(data[startIdx].high) - 25;
+                        elements.push(
+                            <g key={`disp-start-${recIdx}`} pointerEvents="none">
+                                <line x1={startX} y1={startY} x2={startX} y2={getY(data[startIdx].high) - 5} stroke="#fbbf24" strokeWidth="1" strokeDasharray="2,2"/>
+                                <rect x={startX - 22} y={startY - 12} width="44" height="14" fill="#fbbf24" rx="2" />
+                                <text x={startX} y={startY - 5} fill="#0f172a" fontSize="9" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">⚠️處置</text>
+                            </g>
+                        );
+                    }
+
+                    // 3. 畫「🔓出關」終點標籤
+                    if (endX > -20 && endX < width + 20 && data[endIdx]) {
+                        const endY = getY(data[endIdx].high) - 25;
+                        elements.push(
+                            <g key={`disp-end-${recIdx}`} pointerEvents="none">
+                                <line x1={endX} y1={endY} x2={endX} y2={getY(data[endIdx].high) - 5} stroke="#4ade80" strokeWidth="1" strokeDasharray="2,2"/>
+                                <rect x={endX - 22} y={endY - 12} width="44" height="14" fill="#4ade80" rx="2" />
+                                <text x={endX} y={endY - 5} fill="#0f172a" fontSize="9" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">🔓出關</text>
+                            </g>
+                        );
+                    }
+                    return <g key={`disp-group-${recIdx}`}>{elements}</g>;
+                });
             })()}
 
             {toggles.showMaxVolLines && data.length > 0 && (() => {
