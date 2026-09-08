@@ -2519,30 +2519,29 @@ const App = () => {
   // 👇 請把【✨ 新增：處置股 API 獨立撈取引擎】整段 useEffect 貼在這裡！ 👇
   // 👇 ==============================================================
   useEffect(() => {
-    if (!toggles.showDisposition || !realSymbol) return;
-    if (dispositionData[realSymbol]) return; // 已快取就不再抓，極度省 API 額度！
+    if (!toggles.showDisposition || !stockId) return;
+    if (dispositionData[stockId]) return; // 已快取就不再抓
 
     const fetchDisposition = async () => {
         try {
-            // 自動往回推算抓取近 2 年的處置資料，確保圖表涵蓋
             const startDate = new Date();
             startDate.setFullYear(startDate.getFullYear() - 2);
             const startDateStr = startDate.toISOString().split('T')[0];
 
-            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${realSymbol}&start_date=${startDateStr}`;
+            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${stockId}&start_date=${startDateStr}`;
             
             const response = await fetch(apiUrl);
             const json = await response.json();
 
             if (json.msg === 'success' && json.data) {
-                setDispositionData(prev => ({ ...prev, [realSymbol]: json.data }));
+                setDispositionData(prev => ({ ...prev, [stockId]: json.data }));
             }
         } catch (error) {
             console.error('抓取處置股資料失敗:', error);
         }
     };
     fetchDisposition();
-  }, [toggles.showDisposition, realSymbol]);
+  }, [toggles.showDisposition, stockId]);
 
   // ✨ 新增：彈窗的頁籤切換與排序狀態
   const [rankingTab, setRankingTab] = useState('ranking'); // 'ranking' (讀圖排行) 或 'watchlist' (自選)
@@ -6975,8 +6974,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             {/* 👇 ========================================== 👇 */}
             {/* 👇 請把步驟 4 的程式碼貼在這裡！(緊接在 MacroZigZag 下方) 👇 */}
             {/* ✨ 終極新增：處置股事件雷達 (紅色警戒區 + 起訖標籤) */}
-            {toggles.showDisposition && dispositionData[realSymbol] && (() => {
-                const records = dispositionData[realSymbol];
+            {toggles.showDisposition && dispositionData[stockId] && (() => {
+                const records = dispositionData[stockId];
                 if (!records || records.length === 0) return null;
                 
                 return records.map((rec, recIdx) => {
