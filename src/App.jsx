@@ -6554,15 +6554,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const tfLabel = timeframe === 'W' ? '週K' : timeframe === 'M' ? '月K' : timeframe === 'D' ? '日K' : timeframe + '分K';
 
   return (
-    <div ref={chartContainerRef} 
-      className={isFullscreen ? 
-        // 全螢幕模式：解放 h-[100vw]，改為 min-h-[100vw]，並加上 overflow-y-auto 允許上下滑動看副圖
-        "fixed top-0 left-0 w-[100vh] min-h-[100vw] overflow-y-auto origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" 
-        : 
-        // 正常模式
-        "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"
-      }
-    >
+    <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}>
       <CustomModal modal={chartModal}/>
       {/* ✨ 8象限買賣供需圖 */}
       {pqModalOpen && (
@@ -6763,11 +6755,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         <button onClick={() => { setActiveTool('cursor'); setDraftPoints([]); }} className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-cyan-800/90 border border-cyan-400 text-cyan-100 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.6)] font-bold backdrop-blur-md hover:bg-cyan-700 transition-all flex items-center gap-2 pointer-events-auto">🖱️ 結束畫線 (返回游標)</button>
       )}
 
-      {/* ✨ 6. 【引擎輸出層】允許內容物撐開高度，並交由外層滾動 */}
-      <div 
-        className={`flex flex-row relative w-full ${isFullscreen ? 'overflow-y-visible' : 'flex-1 overflow-hidden min-h-0'}`}
-        style={isFullscreen ? { height: `${totalSVGHeight}px`, minHeight: `${totalSVGHeight}px` } : {}}
-      >
+      {/* ✨ 6. 【引擎輸出層】加入 touch-pan-y 確保可以上下滾動網頁，但攔截水平滑動 */}
+      <div className="flex-1 flex flex-row relative overflow-hidden w-full h-full min-h-0">
         
         {/* ✨ 專業版：浮動縮放按鈕 (帶有智慧透明度，平時半透明不遮擋指標) */}
         <div className="absolute bottom-[90px] right-[65px] flex flex-col gap-3 z-[110] pointer-events-auto opacity-30 hover:opacity-100 active:opacity-100 transition-opacity duration-300">
