@@ -7490,89 +7490,80 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
               );
             })}
           </g>
-
-          {/* ✨ 動態渲染所有啟用副圖的 Y 軸刻度 (完美對齊與縮放版) */}
-          {(() => {
-              let currentYOffset = mainHeight + volHeight;
-              const yAxisElements = [];
-              // 🛡️ 防呆：只取最近 150 根 K 棒來算極值，避免歷史超級極端值把刻度壓扁！
-              const recentData = data.slice(-150); 
-
-              // 1. 如果有開獨立的「動能指標」，優先畫它的專屬刻度
-              if (toggles.showEdwinMomentum) {
-                  let maxM = -Infinity, minM = Infinity;
-                  recentData.forEach(d => { if (d.edwinMomentum != null && d.edwinMomentum > maxM) maxM = d.edwinMomentum; if (d.edwinMomentum != null && d.edwinMomentum < minM) minM = d.edwinMomentum; });
-                  const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
-                  const getMomY = (val) => singleIndicatorHeight / 2 - (val / absLimit) * (singleIndicatorHeight / 2 - 15);
-                  
-                  yAxisElements.push(
-                      <g key="sticky-y-edwin" transform={`translate(5, ${currentYOffset})`}>
-                        <text x="2" y={getMomY(7.5)} fill="#ef4444" fontSize="10" fontWeight="bold" dominantBaseline="middle">7.5</text>
-                        <text x="2" y={getMomY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>
-                        <text x="2" y={getMomY(-4)} fill="#22c55e" fontSize="10" fontWeight="bold" dominantBaseline="middle">-4</text>
-                      </g>
-                  );
-                  currentYOffset += singleIndicatorHeight; // 畫完後，往下推一個副圖的距離
-              }
-
-              // 2. 依序畫出其他動態副圖 (MACD, KD, RSI...) 的刻度
-              activeSubCharts.forEach((chartType) => {
-                  // 防呆：如果陣列裡有動能，且上面已經畫過了，就跳過，避免重複佔位
-                  if (chartType === 'EdwinMomentum' && toggles.showEdwinMomentum) return; 
-
-                  const gElements = [];
-                  if (chartType === 'OBV') {
-                      let maxO = -Infinity, minO = Infinity; recentData.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
+          {/* ✨ 動態渲染所有啟用副圖的 Y 軸刻度 */}
+          {activeSubCharts.map((chartType, index) => {
+             const startY = mainHeight + volHeight + (index * singleIndicatorHeight);
+             
+             return (
+               <g key={`sticky-y-${chartType}`} transform={`translate(5, ${startY})`}>
+                  {chartType === 'OBV' && (() => {
+                      let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
                       if (maxO === -Infinity) { maxO = 100; minO = 0; }
                       const range = (maxO - minO) || 1; 
                       const getObvY = (val) => singleIndicatorHeight - ((val - minO) / range) * (singleIndicatorHeight - 20) - 10;
                       const midO = (maxO + minO) / 2;
                       const fmt = (v) => Math.abs(v) >= 10000 ? (v/10000).toFixed(1) + 'W' : Math.round(v);
-                      gElements.push(<text key="obv-1" x="2" y={getObvY(maxO) + 6} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(maxO)}</text>);
-                      gElements.push(<text key="obv-2" x="2" y={getObvY(midO)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">{fmt(midO)}</text>);
-                      gElements.push(<text key="obv-3" x="2" y={getObvY(minO) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(minO)}</text>);
-                  } else if (chartType === 'MACD') {
+                      return (<>
+                        <text x="2" y={getObvY(maxO) + 6} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(maxO)}</text>
+                        <text x="2" y={getObvY(midO)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">{fmt(midO)}</text>
+                        <text x="2" y={getObvY(minO) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(minO)}</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'EdwinMomentum' && (() => {
+                      let maxM = -Infinity, minM = Infinity;
+                      data.forEach(d => { if (d.edwinMomentum != null && d.edwinMomentum > maxM) maxM = d.edwinMomentum; if (d.edwinMomentum != null && d.edwinMomentum < minM) minM = d.edwinMomentum; });
+                      const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
+                      const getMomY = (val) => singleIndicatorHeight / 2 - (val / absLimit) * (singleIndicatorHeight / 2 - 15);
+                      return (<>                        
+                        <text x="2" y={getMomY(7.5)} fill="#ef4444" fontSize="10" fontWeight="bold" dominantBaseline="middle">7.5</text>
+                        <text x="2" y={getMomY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>
+                        <text x="2" y={getMomY(-4)} fill="#22c55e" fontSize="10" fontWeight="bold" dominantBaseline="middle">-4</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'MACD' && (() => {
                       let maxM = -Infinity, minM = Infinity; 
-                      recentData.forEach(d => { if(d.macd) { if (d.macd.dif != null && d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif != null && d.macd.dif < minM) minM = d.macd.dif; if (d.macd.macd != null && d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd != null && d.macd.macd < minM) minM = d.macd.macd; if (d.macd.osc != null && d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc != null && d.macd.osc < minM) minM = d.macd.osc; } });
+                      data.forEach(d => { if(d.macd) { if (d.macd.dif != null && d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif != null && d.macd.dif < minM) minM = d.macd.dif; if (d.macd.macd != null && d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd != null && d.macd.macd < minM) minM = d.macd.macd; if (d.macd.osc != null && d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc != null && d.macd.osc < minM) minM = d.macd.osc; } });
                       const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
                       const getMyY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - 10);
-                      gElements.push(<text key="macd-0" x="2" y={getMyY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>);
-                  } else if (chartType === 'KD') {
+                      return (<text x="2" y={getMyY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>);
+                  })()}
+
+                  {chartType === 'KD' && (() => {
                       const getKdY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
-                      gElements.push(<text key="kd-80" x="2" y={getKdY(80)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">80</text>);
-                      gElements.push(<text key="kd-50" x="2" y={getKdY(50)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">50</text>);
-                      gElements.push(<text key="kd-20" x="2" y={getKdY(20)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">20</text>);
-                  } else if (chartType === 'RSI') {
+                      return (<>
+                        <text x="2" y={getKdY(80)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">80</text>
+                        <text x="2" y={getKdY(50)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">50</text>
+                        <text x="2" y={getKdY(20)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">20</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'RSI' && (() => {
                       const getRsiY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
-                      gElements.push(<text key="rsi-80" x="2" y={getRsiY(80)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">80</text>);
-                      gElements.push(<text key="rsi-50" x="2" y={getRsiY(50)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">50</text>);
-                      gElements.push(<text key="rsi-20" x="2" y={getRsiY(20)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">20</text>);
-                  } else if (chartType === 'TOWER') {
+                      return (<>
+                        <text x="2" y={getRsiY(80)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">80</text>
+                        <text x="2" y={getRsiY(50)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">50</text>
+                        <text x="2" y={getRsiY(20)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">20</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'TOWER' && (() => {
                       let maxT = -Infinity, minT = Infinity; 
-                      recentData.forEach(d => { if (d.tower?.top > maxT) maxT = d.tower.top; if (d.tower?.bottom < minT) minT = d.tower.bottom; });
+                      data.forEach(d => { if (d.tower?.top > maxT) maxT = d.tower.top; if (d.tower?.bottom < minT) minT = d.tower.bottom; });
                       if (maxT === -Infinity) { maxT = 100; minT = 0; }
                       const range = (maxT - minT) || 1; 
                       const getTY = (val) => singleIndicatorHeight - ((val - minT) / range) * (singleIndicatorHeight - 20) - 10;
                       const midT = (maxT + minT) / 2;
-                      gElements.push(<text key="tw-max" x="2" y={getTY(maxT) + 6} fill="#94a3b8" fontSize="10" fontWeight="bold">{maxT > 1000 ? Math.round(maxT) : maxT.toFixed(1)}</text>);
-                      gElements.push(<text key="tw-mid" x="2" y={getTY(midT)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">{midT > 1000 ? Math.round(midT) : midT.toFixed(1)}</text>);
-                      gElements.push(<text key="tw-min" x="2" y={getTY(minT) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{minT > 1000 ? Math.round(minT) : minT.toFixed(1)}</text>);
-                  }
-                  
-                  if (gElements.length > 0) {
-                      yAxisElements.push(
-                          <g key={`sticky-y-${chartType}`} transform={`translate(5, ${currentYOffset})`}>
-                              {gElements}
-                          </g>
-                      );
-                  }
-                  currentYOffset += singleIndicatorHeight; // 畫完後，繼續往下推
-              });
-
-              return yAxisElements;
-          })()}
-
-          {/* 查價線浮動價格標籤 */}
+                      return (<>
+                        <text x="2" y={getTY(maxT) + 6} fill="#94a3b8" fontSize="10" fontWeight="bold">{maxT > 1000 ? Math.round(maxT) : maxT.toFixed(1)}</text>
+                        <text x="2" y={getTY(midT)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">{midT > 1000 ? Math.round(midT) : midT.toFixed(1)}</text>
+                        <text x="2" y={getTY(minT) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{minT > 1000 ? Math.round(minT) : minT.toFixed(1)}</text>
+                      </>);
+                  })()}
+               </g>
+             );
+          })}
           {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
             <g>
               <rect x={0} y={crosshair.y - 12} width={yAxisWidth} height={24} fill="#ef4444" rx="2" />
