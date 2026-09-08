@@ -2519,8 +2519,13 @@ const App = () => {
   // 👇 請把【✨ 新增：處置股 API 獨立撈取引擎】整段 useEffect 貼在這裡！ 👇
   // 👇 ==============================================================
   useEffect(() => {
-    if (!toggles.showDisposition || !stockId) return;
-    if (dispositionData[stockId]) return; // 已快取就不再抓
+    // 🛡️ 防呆：如果 symbol 還沒準備好，就先不執行
+    if (!toggles.showDisposition || !symbol) return;
+    
+    // 如果 symbol 裡面有 .TW (例如 2330.TW)，我們把它清掉變成 2330 才能打 API
+    const cleanSymbol = symbol.replace('.TW', '').replace('.TWO', '');
+    
+    if (dispositionData[cleanSymbol]) return; // 已快取就不再抓
 
     const fetchDisposition = async () => {
         try {
@@ -2528,20 +2533,21 @@ const App = () => {
             startDate.setFullYear(startDate.getFullYear() - 2);
             const startDateStr = startDate.toISOString().split('T')[0];
 
-            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${stockId}&start_date=${startDateStr}`;
+            // 使用乾淨的股票代號打 API
+            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${cleanSymbol}&start_date=${startDateStr}`;
             
             const response = await fetch(apiUrl);
             const json = await response.json();
 
             if (json.msg === 'success' && json.data) {
-                setDispositionData(prev => ({ ...prev, [stockId]: json.data }));
+                setDispositionData(prev => ({ ...prev, [cleanSymbol]: json.data }));
             }
         } catch (error) {
             console.error('抓取處置股資料失敗:', error);
         }
     };
     fetchDisposition();
-  }, [toggles.showDisposition, stockId]);
+  }, [toggles.showDisposition, symbol]);
 
   // ✨ 新增：彈窗的頁籤切換與排序狀態
   const [rankingTab, setRankingTab] = useState('ranking'); // 'ranking' (讀圖排行) 或 'watchlist' (自選)
@@ -6974,16 +6980,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             {/* 👇 ========================================== 👇 */}
             {/* 👇 請把步驟 4 的程式碼貼在這裡！(緊接在 MacroZigZag 下方) 👇 */}
             {/* ✨ 終極新增：處置股事件雷達 (紅色警戒區 + 起訖標籤) */}
-            {toggles.showDisposition && dispositionData[stockId] && (() => {
-                const records = dispositionData[stockId];
+            {toggles.showDisposition && symbol && (() => {
+                const cleanSymbol = symbol.replace('.TW', '').replace('.TWO', '');
+                const records = dispositionData[cleanSymbol];
                 if (!records || records.length === 0) return null;
                 
                 return records.map((rec, recIdx) => {
-                    // 找出處置起點與終點的 K 棒位置
                     const startIdx = data.findIndex(d => d.date >= rec.start_date);
                     let endIdx = -1;
                     for (let i = data.length - 1; i >= 0; i--) { if (data[i].date <= rec.end_date) { endIdx = i; break; } }
-                    if (startIdx === -1 || startIdx > endIdx) return null; // 若日期對不上則跳過
+                    if (startIdx === -1 || startIdx > endIdx) return null; 
                     
                     const rectX = getX(startIdx) - candleWidth / 2;
                     const rectWidth = (endIdx - startIdx) * spacing + candleWidth;
@@ -6991,7 +6997,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     const endX = getX(endIdx);
                     const elements = [];
 
-                    // 1. 畫出處置期間的紅色淡淡背景 (只涵蓋主圖高度)
+                    // 1. 畫出處置期間的紅色淡淡背景
                     if (rectX + rectWidth > 0 && rectX < width) {
                         elements.push(<rect key={`disp-bg-${recIdx}`} x={rectX} y={0} width={rectWidth} height={mainHeight} fill="rgba(239, 68, 68, 0.12)" pointerEvents="none" />);
                     }
