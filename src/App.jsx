@@ -5662,38 +5662,74 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   
   const [dispositionData, setDispositionData] = useState({});
 
+  // ✨ 終極官方版：處置股 API (免 Key、無 CORS 限制、直接抓證交所/櫃買)
   useEffect(() => {
     if (!toggles.showDisposition || !realSymbol) return;
     
+    // 清除後綴，確保代號乾淨 (例如把 2330.TW 變成 2330)
     const cleanSymbol = realSymbol.replace('.TW', '').replace('.TWO', '');
-    if (dispositionData[cleanSymbol]) return; 
 
-    const fetchDisposition = async () => {
+    // 已經抓過官方名單就不要再浪費網路
+    if (dispositionData['OFFICIAL_LOADED']) return;
+
+    const fetchOfficialDisposition = async () => {
         try {
-            const startDate = new Date();
-            startDate.setFullYear(startDate.getFullYear() - 2);
-            const startDateStr = startDate.toISOString().split('T')[0];
+            // 🚀 同時發送請求給「證交所(上市)」與「櫃買中心(上櫃)」
+            const [twseRes, tpexRes] = await Promise.all([
+                fetch('https://openapi.twse.com.tw/v1/exchangeReport/TWT43U').catch(() => ({ ok: false, json: () => [] })),
+                fetch('https://www.tpex.org.tw/openapi/v1/tpex_disp').catch(() => ({ ok: false, json: () => [] }))
+            ]);
 
-            // 原始的 FinMind API 網址
-            const targetUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${cleanSymbol}&start_date=${startDateStr}`;
-            
-            // 🛡️ 加上免費的 CORS 代理伺服器，騙過瀏覽器的安全限制！
-            const apiUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-            
-            const response = await fetch(apiUrl);
-            const json = await response.json();
+            const twseData = twseRes.ok ? await twseRes.json() : [];
+            const tpexData = tpexRes.ok ? await tpexRes.json() : [];
 
-            if (json.msg === 'success' && json.data) {
-                console.log(`[處置股資料] ${cleanSymbol}:`, json.data);
-                setDispositionData(prev => ({ ...prev, [cleanSymbol]: json.data }));
-            } else {
-                console.log(`[處置股資料] ${cleanSymbol} 查詢失敗:`, json);
-            }
+            // 準備一個大字典來裝全市場的處置名單
+            const combinedData = { 'OFFICIAL_LOADED': true };
+
+            // 🛠️ 專門解析民國年的字串 (例如 "113/09/01迄113/09/14" -> 2024-09-01)
+            const parseDateString = (dateStr) => {
+                if (!dateStr) return null;
+                // 用正則表達式抓出連續的 民國年.月.日
+                const matches = dateStr.match(/(\d{3})[/.-](\d{2})[/.-](\d{2})/g);
+                if (matches && matches.length >= 2) {
+                    const parseSingle = (d) => {
+                        const parts = d.split(/[/.-]/);
+                        const year = parseInt(parts[0]) + 1911; // 加上 1911 變西元年
+                        return `${year}-${parts[1]}-${parts[2]}`;
+                    };
+                    return { start_date: parseSingle(matches[0]), end_date: parseSingle(matches[1]) };
+                }
+                return null;
+            };
+
+            // 整理上市資料
+            twseData.forEach(item => {
+                const dates = parseDateString(item.PunishDate);
+                if (dates && item.Code) {
+                    if (!combinedData[item.Code]) combinedData[item.Code] = [];
+                    combinedData[item.Code].push(dates);
+                }
+            });
+
+            // 整理上櫃資料
+            tpexData.forEach(item => {
+                const dates = parseDateString(item.DispositionPeriod);
+                if (dates && item.SecuritiesCompanyCode) {
+                    if (!combinedData[item.SecuritiesCompanyCode]) combinedData[item.SecuritiesCompanyCode] = [];
+                    combinedData[item.SecuritiesCompanyCode].push(dates);
+                }
+            });
+
+            // 把整理好的乾淨名單存進 State 裡面
+            console.log("✅ 成功取得官方處置名單", combinedData);
+            setDispositionData(combinedData);
+
         } catch (error) {
-            console.error('抓取處置股資料失敗 (請檢查代理伺服器狀態):', error);
+            console.error('抓取官方處置股資料失敗:', error);
         }
     };
-    fetchDisposition();
+    
+    fetchOfficialDisposition();
   }, [toggles.showDisposition, realSymbol]);
 
   // ✨ 1. 【虛擬視窗引擎核心】
