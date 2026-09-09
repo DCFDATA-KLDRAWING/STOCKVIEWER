@@ -5666,7 +5666,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
     if (!toggles.showDisposition || !realSymbol) return;
     
     const cleanSymbol = realSymbol.replace('.TW', '').replace('.TWO', '');
-    if (dispositionData[cleanSymbol]) return; // 已快取就不再抓
+    if (dispositionData[cleanSymbol]) return; 
 
     const fetchDisposition = async () => {
         try {
@@ -5674,20 +5674,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             startDate.setFullYear(startDate.getFullYear() - 2);
             const startDateStr = startDate.toISOString().split('T')[0];
 
-            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${cleanSymbol}&start_date=${startDateStr}`;
+            // 原始的 FinMind API 網址
+            const targetUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${cleanSymbol}&start_date=${startDateStr}`;
+            
+            // 🛡️ 加上免費的 CORS 代理伺服器，騙過瀏覽器的安全限制！
+            const apiUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
             
             const response = await fetch(apiUrl);
             const json = await response.json();
 
             if (json.msg === 'success' && json.data) {
-                // 🕵️‍♂️ 除錯神器：把 FinMind 傳回來的東西印在 F12 控制台！
                 console.log(`[處置股資料] ${cleanSymbol}:`, json.data);
                 setDispositionData(prev => ({ ...prev, [cleanSymbol]: json.data }));
             } else {
-                console.log(`[處置股資料] ${cleanSymbol} 查詢失敗或無資料:`, json);
+                console.log(`[處置股資料] ${cleanSymbol} 查詢失敗:`, json);
             }
         } catch (error) {
-            console.error('抓取處置股資料失敗:', error);
+            console.error('抓取處置股資料失敗 (請檢查代理伺服器狀態):', error);
         }
     };
     fetchDisposition();
