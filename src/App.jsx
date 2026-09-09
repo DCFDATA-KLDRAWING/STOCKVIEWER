@@ -2342,12 +2342,9 @@ const App = () => {
     showAutoWave: false,      // 🌟 新增：自動波段對照主開關
     autoWaveLongOnly: false,  // 🌟 新增：自動波段僅多方(>55MA)
     autoWaveShortOnly: false,  // 🌟 新增：自動波段僅空方(<55MA)
-    showDeductionNotice: false, // 🌟 新增：扣抵智慧提醒開關
-    showDisposition: false // ✨ 新增：處置股開關 (預設關閉)
+    showDeductionNotice: false // 🌟 新增：扣抵智慧提醒開關
     
   });
-  
-  
   // ✨ 新增：SAR 指標的專屬參數
   const [sarParams, setSarParams] = useState({ start: 0.02, step: 0.02, max: 0.20 });
   
@@ -2513,8 +2510,6 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('MY_STOCK_WATCHLIST', JSON.stringify(watchlist));
   }, [watchlist]);
-
-  
 
   // ✨ 新增：彈窗的頁籤切換與排序狀態
   const [rankingTab, setRankingTab] = useState('ranking'); // 'ranking' (讀圖排行) 或 'watchlist' (自選)
@@ -4743,11 +4738,6 @@ const handleOpenSectorMomentum = async () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
-                  {/* ✨ 新增：處置股 打勾按鈕 */}
-                <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
-                  <input type="checkbox" checked={toggles.showDisposition} onChange={() => handleToggle('showDisposition')} className="w-3.5 h-3.5 text-red-500 rounded bg-slate-900 border-slate-600" />
-                  <span className="text-xs text-red-400 font-bold">處置股</span>
-                </label>
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -5657,80 +5647,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
-  
-  // 👇 請將處置股 API 撈取引擎，【精準地】貼在這個位置！ 👇
-  
-  const [dispositionData, setDispositionData] = useState({});
-
-  // ✨ 終極官方版：處置股 API (免 Key、無 CORS 限制、直接抓證交所/櫃買)
-  useEffect(() => {
-    if (!toggles.showDisposition || !realSymbol) return;
-    
-    // 清除後綴，確保代號乾淨 (例如把 2330.TW 變成 2330)
-    const cleanSymbol = realSymbol.replace('.TW', '').replace('.TWO', '');
-
-    // 已經抓過官方名單就不要再浪費網路
-    if (dispositionData['OFFICIAL_LOADED']) return;
-
-    const fetchOfficialDisposition = async () => {
-        try {
-            // 🚀 加入 Proxy：騙過瀏覽器的跨網域限制，政府 API 不會擋 Proxy
-            const [twseRes, tpexRes] = await Promise.all([
-                fetch(`https://corsproxy.io/?${encodeURIComponent('https://openapi.twse.com.tw/v1/exchangeReport/TWT43U')}`).catch(() => ({ ok: false, json: () => [] })),
-                fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.tpex.org.tw/openapi/v1/tpex_disp')}`).catch(() => ({ ok: false, json: () => [] }))
-            ]);
-
-            const twseData = twseRes.ok ? await twseRes.json() : [];
-            const tpexData = tpexRes.ok ? await tpexRes.json() : [];
-
-            // 準備一個大字典來裝全市場的處置名單
-            const combinedData = { 'OFFICIAL_LOADED': true };
-
-            // 🛠️ 專門解析民國年的字串 (例如 "113/09/01迄113/09/14" -> 2024-09-01)
-            const parseDateString = (dateStr) => {
-                if (!dateStr) return null;
-                // 用正則表達式抓出連續的 民國年.月.日
-                const matches = dateStr.match(/(\d{3})[/.-](\d{2})[/.-](\d{2})/g);
-                if (matches && matches.length >= 2) {
-                    const parseSingle = (d) => {
-                        const parts = d.split(/[/.-]/);
-                        const year = parseInt(parts[0]) + 1911; // 加上 1911 變西元年
-                        return `${year}-${parts[1]}-${parts[2]}`;
-                    };
-                    return { start_date: parseSingle(matches[0]), end_date: parseSingle(matches[1]) };
-                }
-                return null;
-            };
-
-            // 整理上市資料
-            twseData.forEach(item => {
-                const dates = parseDateString(item.PunishDate);
-                if (dates && item.Code) {
-                    if (!combinedData[item.Code]) combinedData[item.Code] = [];
-                    combinedData[item.Code].push(dates);
-                }
-            });
-
-            // 整理上櫃資料
-            tpexData.forEach(item => {
-                const dates = parseDateString(item.DispositionPeriod);
-                if (dates && item.SecuritiesCompanyCode) {
-                    if (!combinedData[item.SecuritiesCompanyCode]) combinedData[item.SecuritiesCompanyCode] = [];
-                    combinedData[item.SecuritiesCompanyCode].push(dates);
-                }
-            });
-
-            // 把整理好的乾淨名單存進 State 裡面
-            console.log("✅ 成功取得官方處置名單", combinedData);
-            setDispositionData(combinedData);
-
-        } catch (error) {
-            console.error('抓取官方處置股資料失敗:', error);
-        }
-    };
-    
-    fetchOfficialDisposition();
-  }, [toggles.showDisposition, realSymbol]);
 
   // ✨ 1. 【虛擬視窗引擎核心】
   // rightOffset: 記錄畫面距離最新 K 棒往左平移了多少根 K 棒
@@ -6638,15 +6554,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const tfLabel = timeframe === 'W' ? '週K' : timeframe === 'M' ? '月K' : timeframe === 'D' ? '日K' : timeframe + '分K';
 
   return (
-    <div ref={chartContainerRef} 
-      className={isFullscreen ? 
-        // 全螢幕模式：解放 h-[100vw]，改為 min-h-[100vw]，並加上 overflow-y-auto 允許上下滑動看副圖
-        "fixed top-0 left-0 w-[100vh] min-h-[100vw] overflow-y-auto origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" 
-        : 
-        // 正常模式
-        "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"
-      }
-    >
+    <div ref={chartContainerRef} className={isFullscreen ? "fixed top-0 left-0 w-[100vh] h-[100vw] origin-top-left rotate-90 translate-x-[100vw] z-[10000] bg-[#020617] flex flex-col group" : "relative rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.1)] border border-cyan-900/50 bg-[#0f172a] h-full flex flex-col group"}>
       <CustomModal modal={chartModal}/>
       {/* ✨ 8象限買賣供需圖 */}
       {pqModalOpen && (
@@ -6847,11 +6755,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
         <button onClick={() => { setActiveTool('cursor'); setDraftPoints([]); }} className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-cyan-800/90 border border-cyan-400 text-cyan-100 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.6)] font-bold backdrop-blur-md hover:bg-cyan-700 transition-all flex items-center gap-2 pointer-events-auto">🖱️ 結束畫線 (返回游標)</button>
       )}
 
-      {/* ✨ 6. 【引擎輸出層】允許內容物撐開高度，並交由外層滾動 */}
-      <div 
-        className={`flex flex-row relative w-full ${isFullscreen ? 'overflow-y-visible' : 'flex-1 overflow-hidden min-h-0'}`}
-        style={isFullscreen ? { height: `${totalSVGHeight}px`, minHeight: `${totalSVGHeight}px` } : {}}
-      >
+      {/* ✨ 6. 【引擎輸出層】加入 touch-pan-y 確保可以上下滾動網頁，但攔截水平滑動 */}
+      <div className="flex-1 flex flex-row relative overflow-hidden w-full h-full min-h-0">
         
         {/* ✨ 專業版：浮動縮放按鈕 (帶有智慧透明度，平時半透明不遮擋指標) */}
         <div className="absolute bottom-[90px] right-[65px] flex flex-col gap-3 z-[110] pointer-events-auto opacity-30 hover:opacity-100 active:opacity-100 transition-opacity duration-300">
@@ -7016,60 +6921,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`mzz-pt-${i}`} cx={px} cy={getY(p.price)} r={4.5} fill="#38bdf8" shadow="0 0 10px #38bdf8" />; })}
                  </g>
                );
-            })()}
-
-            {/* 👇 ========================================== 👇 */}
-            {/* 👇 請把步驟 4 的程式碼貼在這裡！(緊接在 MacroZigZag 下方) 👇 */}
-            {/* ✨ 終極新增：處置股事件雷達 (紅色警戒區 + 起訖標籤) */}
-            {/* ✨ 終極新增：處置股事件雷達 (強化日期寬容度版) */}
-            {toggles.showDisposition && realSymbol && (() => {
-                const cleanSymbol = realSymbol.replace('.TW', '').replace('.TWO', '');
-                const records = dispositionData[cleanSymbol];
-                if (!records || records.length === 0) return null;
-                
-                return records.map((rec, recIdx) => {
-                    // 🛡️ 防呆：確保 start_date 和 end_date 存在，並只取前 10 碼 (YYYY-MM-DD)
-                    const sDate = rec.start_date ? rec.start_date.substring(0, 10) : '';
-                    const eDate = rec.end_date ? rec.end_date.substring(0, 10) : '';
-                    if (!sDate || !eDate) return null;
-
-                    const startIdx = data.findIndex(d => d.date >= sDate);
-                    let endIdx = -1;
-                    for (let i = data.length - 1; i >= 0; i--) { if (data[i].date <= eDate) { endIdx = i; break; } }
-                    
-                    if (startIdx === -1 || startIdx > endIdx) return null; 
-                    
-                    const rectX = getX(startIdx) - candleWidth / 2;
-                    const rectWidth = (endIdx - startIdx) * spacing + candleWidth;
-                    const startX = getX(startIdx);
-                    const endX = getX(endIdx);
-                    const elements = [];
-
-                    if (rectX + rectWidth > 0 && rectX < width) {
-                        elements.push(<rect key={`disp-bg-${recIdx}`} x={rectX} y={0} width={rectWidth} height={mainHeight} fill="rgba(239, 68, 68, 0.12)" pointerEvents="none" />);
-                    }
-                    if (startX > -20 && startX < width + 20 && data[startIdx]) {
-                        const startY = getY(data[startIdx].high) - 25;
-                        elements.push(
-                            <g key={`disp-start-${recIdx}`} pointerEvents="none">
-                                <line x1={startX} y1={startY} x2={startX} y2={getY(data[startIdx].high) - 5} stroke="#fbbf24" strokeWidth="1" strokeDasharray="2,2"/>
-                                <rect x={startX - 22} y={startY - 12} width="44" height="14" fill="#fbbf24" rx="2" />
-                                <text x={startX} y={startY - 5} fill="#0f172a" fontSize="9" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">⚠️處置</text>
-                            </g>
-                        );
-                    }
-                    if (endX > -20 && endX < width + 20 && data[endIdx]) {
-                        const endY = getY(data[endIdx].high) - 25;
-                        elements.push(
-                            <g key={`disp-end-${recIdx}`} pointerEvents="none">
-                                <line x1={endX} y1={endY} x2={endX} y2={getY(data[endIdx].high) - 5} stroke="#4ade80" strokeWidth="1" strokeDasharray="2,2"/>
-                                <rect x={endX - 22} y={endY - 12} width="44" height="14" fill="#4ade80" rx="2" />
-                                <text x={endX} y={endY - 5} fill="#0f172a" fontSize="9" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">🔓出關</text>
-                            </g>
-                        );
-                    }
-                    return <g key={`disp-group-${recIdx}`}>{elements}</g>;
-                });
             })()}
 
             {toggles.showMaxVolLines && data.length > 0 && (() => {
