@@ -6394,20 +6394,57 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              const rx = Math.min(pts[0].x, pts[1].x), ry = Math.min(pts[0].y, pts[1].y);
              const rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y);
              const raw1 = rawPts[0]; const raw2 = rawPts[1];
-             const priceDiff = raw2.price - raw1.price; const pct = (priceDiff / raw1.price) * 100;
-             const sign = priceDiff > 0 ? '+' : ''; const color = priceDiff >= 0 ? '#ef4444' : '#22c55e';
-             const textStr = `${sign}${priceDiff.toFixed(2)} (${sign}${pct.toFixed(2)}%)`;
              
-             let boxX = rx + rw / 2; if (boxX - 85 < paddingLeft) boxX = paddingLeft + 85; if (boxX + 85 > width - paddingRight) boxX = width - paddingRight - 85;
-             let boxY = ry - 12; if (boxY < paddingLeft + 12) boxY = paddingLeft + 12;
+             const highPrice = Math.max(raw1.price, raw2.price);
+             const lowPrice = Math.min(raw1.price, raw2.price);
+             const boxHeightPrice = highPrice - lowPrice;
+             const pct = (boxHeightPrice / lowPrice) * 100;
              
+             const targets = [
+               { label: 'T1.0', val: highPrice + boxHeightPrice * 1.0 },
+               { label: 'T1.386', val: highPrice + boxHeightPrice * 1.386 },
+               { label: 'T1.5', val: highPrice + boxHeightPrice * 1.5 },
+               { label: 'T1.618', val: highPrice + boxHeightPrice * 1.618 },
+               { label: 'T2.0', val: highPrice + boxHeightPrice * 2.0 },
+             ];
+
+             const badgeWidth = 140;
+             const badgeHeight = 95;
+             const boxCenterX = rx + rw / 2;
+             const boxCenterY = ry + rh / 2;
+             
+             // 🧠 Smart Left/Right & Up/Down placement to avoid covering K-lines or right margin controls
+             const isNearRightEdge = boxCenterX > width - paddingRight - 150;
+             const badgeX = isNearRightEdge ? rx - badgeWidth / 2 - 20 : width - paddingRight + 20;
+             let badgeY = boxCenterY;
+             if (badgeY - badgeHeight / 2 < paddingLeft + 10) badgeY = paddingLeft + 10 + badgeHeight / 2;
+             if (badgeY + badgeHeight / 2 > mainHeight - 10) badgeY = mainHeight - 10 - badgeHeight / 2;
+
+             const boxEdgeX = isNearRightEdge ? rx : rx + rw;
+
              return (
                <g>
-                 <rect x={rx} y={ry} width={rw} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill={color} fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
-                 <line x1={pts[0].x} y1={pts[0].y} x2={pts[1].x} y2={pts[1].y} stroke={drawObj.color} strokeWidth={1} strokeDasharray="4,4" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
-                 <g transform={`translate(${boxX}, ${boxY})`}>
-                    <rect x="-85" y="-12" width="170" height="24" fill="#0f172a" fillOpacity="0.3" rx="4" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.4" pointerEvents="none" />
-                    <text x="0" y="4" fill="#f8fafc" opacity="0.6" fontSize="12" fontWeight="bold" textAnchor="middle" pointerEvents="none">{textStr}</text>
+                 {/* Transparent box drawn directly over the chart area without blocking visibility */}
+                 <rect x={rx} y={ry} width={Math.max(rw, 30)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.12} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
+                 
+                 {/* Dashed line connecting box to the safe badge area */}
+                 <line x1={boxEdgeX} y1={boxCenterY} x2={badgeX + (isNearRightEdge ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
+
+                 {/* Compact info badge positioned safely */}
+                 <g transform={`translate(${badgeX}, ${badgeY})`}>
+                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
+                    
+                    <text x="0" y={-badgeHeight / 2 + 14} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                      箱高: {boxHeightPrice.toFixed(1)} (+{pct.toFixed(1)}%)
+                    </text>
+                    <line x1={-badgeWidth / 2 + 8} y1={-badgeHeight / 2 + 20} x2={badgeWidth / 2 - 8} y2={-badgeHeight / 2 + 20} stroke="#334155" strokeWidth="1" />
+                    
+                    {targets.map((t, idx) => (
+                      <text key={t.label} x="0" y={-badgeHeight / 2 + 33 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                        <tspan fill="#94a3b8">{t.label}: </tspan>
+                        <tspan fill="#f59e0b">{t.val.toFixed(1)}</tspan>
+                      </text>
+                    ))}
                  </g>
                </g>
              );
