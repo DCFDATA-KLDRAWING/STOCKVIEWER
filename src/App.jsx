@@ -6413,23 +6413,24 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              const boxCenterX = rx + rw / 2;
              const boxCenterY = ry + rh / 2;
              
-             // Safely anchor the info badge in the right margin area (away from candlesticks)
-             const badgeX = width - paddingRight + 20;
+             // 🧠 Smart Left/Right & Up/Down placement to avoid covering K-lines or right margin controls
+             const isNearRightEdge = boxCenterX > width - paddingRight - 150;
+             const badgeX = isNearRightEdge ? rx - badgeWidth / 2 - 20 : width - paddingRight + 20;
              let badgeY = boxCenterY;
              if (badgeY - badgeHeight / 2 < paddingLeft + 10) badgeY = paddingLeft + 10 + badgeHeight / 2;
              if (badgeY + badgeHeight / 2 > mainHeight - 10) badgeY = mainHeight - 10 - badgeHeight / 2;
 
-             const boxRightEdgeX = rx + rw;
+             const boxEdgeX = isNearRightEdge ? rx : rx + rw;
 
              return (
                <g>
                  {/* Transparent box drawn directly over the chart area without blocking visibility */}
                  <rect x={rx} y={ry} width={Math.max(rw, 30)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.12} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
-                 {/* Dashed line connecting box to the safe right-side badge area */}
-                 <line x1={boxRightEdgeX} y1={boxCenterY} x2={badgeX - badgeWidth / 2} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
+                 {/* Dashed line connecting box to the safe badge area */}
+                 <line x1={boxEdgeX} y1={boxCenterY} x2={badgeX + (isNearRightEdge ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
 
-                 {/* Compact info badge positioned safely in the right margin */}
+                 {/* Compact info badge positioned safely */}
                  <g transform={`translate(${badgeX}, ${badgeY})`}>
                     <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
                     
