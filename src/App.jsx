@@ -6436,33 +6436,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
          </g>
        );
     }
-    return null;
-  };
-
-  return (
-    <div className="p-4 bg-slate-950 text-white min-h-screen">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-xl font-bold">Advanced Stock Viewer with Compact Box Fibonacci Tool</h1>
-          <p className="text-sm text-slate-400">Measure tool auto-enables magnetic snapping and displays multi-line golden target prices neatly inside the badge.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setActiveTool(activeTool === 'measure' ? 'cursor' : 'measure')}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${activeTool === 'measure' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300'}`}
-          >
-            📦 測量箱子工具 {activeTool === 'measure' ? '(磁吸開)' : '(磁吸關)'}
-          </button>
-        </div>
-      </div>
-      <div className="border border-slate-800 rounded bg-slate-900 p-2">
-        <svg width={width} height={mainHeight + volHeight}>
-          {drawings.map(d => renderDrawingObject(d, false))}
-        </svg>
-      </div>
-    </div>
-  );
-}
     if (['pattern-w', 'pattern-multibottom', 'pattern-head-shoulders'].includes(drawObj.type)) {
        return ( <g key={idKey}><polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={drawObj.color} strokeWidth={drawObj.width} strokeLinecap="round" strokeLinejoin="round" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />{renderDots()}</g> );
     }
