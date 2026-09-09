@@ -2347,8 +2347,7 @@ const App = () => {
     
   });
   
-  // ✨ 新增：處置股資料快取 (避免重複呼叫 API)
-  const [dispositionData, setDispositionData] = useState({});
+  
   // ✨ 新增：SAR 指標的專屬參數
   const [sarParams, setSarParams] = useState({ start: 0.02, step: 0.02, max: 0.20 });
   
@@ -2515,39 +2514,7 @@ const App = () => {
     localStorage.setItem('MY_STOCK_WATCHLIST', JSON.stringify(watchlist));
   }, [watchlist]);
 
-  // 👇 ==============================================================
-  // 👇 請把【✨ 新增：處置股 API 獨立撈取引擎】整段 useEffect 貼在這裡！ 👇
-  // 👇 ==============================================================
-  useEffect(() => {
-    // 🛡️ 防呆：如果 symbol 還沒準備好，就先不執行
-    if (!toggles.showDisposition || !symbol) return;
-    
-    // 如果 symbol 裡面有 .TW (例如 2330.TW)，我們把它清掉變成 2330 才能打 API
-    const cleanSymbol = symbol.replace('.TW', '').replace('.TWO', '');
-    
-    if (dispositionData[cleanSymbol]) return; // 已快取就不再抓
-
-    const fetchDisposition = async () => {
-        try {
-            const startDate = new Date();
-            startDate.setFullYear(startDate.getFullYear() - 2);
-            const startDateStr = startDate.toISOString().split('T')[0];
-
-            // 使用乾淨的股票代號打 API
-            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${cleanSymbol}&start_date=${startDateStr}`;
-            
-            const response = await fetch(apiUrl);
-            const json = await response.json();
-
-            if (json.msg === 'success' && json.data) {
-                setDispositionData(prev => ({ ...prev, [cleanSymbol]: json.data }));
-            }
-        } catch (error) {
-            console.error('抓取處置股資料失敗:', error);
-        }
-    };
-    fetchDisposition();
-  }, [toggles.showDisposition, symbol]);
+  
 
   // ✨ 新增：彈窗的頁籤切換與排序狀態
   const [rankingTab, setRankingTab] = useState('ranking'); // 'ranking' (讀圖排行) 或 'watchlist' (自選)
@@ -5690,6 +5657,39 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
+  
+  // 👇 請將處置股 API 撈取引擎，【精準地】貼在這個位置！ 👇
+  
+  const [dispositionData, setDispositionData] = useState({});
+
+  useEffect(() => {
+    // 防呆：如果開關沒開，或者還沒有股票代號，就不抓取
+    if (!toggles.showDisposition || !realSymbol) return;
+    
+    // 如果已經有這檔股票的資料，就不重複抓取，極度省 API 額度！
+    if (dispositionData[realSymbol]) return; 
+
+    const fetchDisposition = async () => {
+        try {
+            // 自動往回推算抓取近 2 年的處置資料
+            const startDate = new Date();
+            startDate.setFullYear(startDate.getFullYear() - 2);
+            const startDateStr = startDate.toISOString().split('T')[0];
+
+            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${realSymbol}&start_date=${startDateStr}`;
+            
+            const response = await fetch(apiUrl);
+            const json = await response.json();
+
+            if (json.msg === 'success' && json.data) {
+                setDispositionData(prev => ({ ...prev, [realSymbol]: json.data }));
+            }
+        } catch (error) {
+            console.error('抓取處置股資料失敗:', error);
+        }
+    };
+    fetchDisposition();
+  }, [toggles.showDisposition, realSymbol]);
 
   // ✨ 1. 【虛擬視窗引擎核心】
   // rightOffset: 記錄畫面距離最新 K 棒往左平移了多少根 K 棒
@@ -6980,8 +6980,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             {/* 👇 ========================================== 👇 */}
             {/* 👇 請把步驟 4 的程式碼貼在這裡！(緊接在 MacroZigZag 下方) 👇 */}
             {/* ✨ 終極新增：處置股事件雷達 (紅色警戒區 + 起訖標籤) */}
-            {toggles.showDisposition && symbol && (() => {
-                const cleanSymbol = symbol.replace('.TW', '').replace('.TWO', '');
+            {toggles.showDisposition && realSymbol && (() => {
+                const cleanSymbol = realSymbol.replace('.TW', '').replace('.TWO', '');
                 const records = dispositionData[cleanSymbol];
                 if (!records || records.length === 0) return null;
                 
