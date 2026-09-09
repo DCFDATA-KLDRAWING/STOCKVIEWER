@@ -6413,8 +6413,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              const boxCenterX = rx + rw / 2;
              const boxCenterY = ry + rh / 2;
              
-             // Place badge in the right padding area (safe zone away from candlesticks)
-             const badgeX = width - paddingRight - badgeWidth / 2;
+             // Safely anchor the info badge in the right margin area (away from candlesticks)
+             const badgeX = width - paddingRight + 20;
              let badgeY = boxCenterY;
              if (badgeY - badgeHeight / 2 < paddingLeft + 10) badgeY = paddingLeft + 10 + badgeHeight / 2;
              if (badgeY + badgeHeight / 2 > mainHeight - 10) badgeY = mainHeight - 10 - badgeHeight / 2;
@@ -6423,12 +6423,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
              return (
                <g>
-                 <rect x={rx} y={ry} width={Math.max(rw, 30)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
+                 {/* Transparent box drawn directly over the chart area without blocking visibility */}
+                 <rect x={rx} y={ry} width={Math.max(rw, 30)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.12} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
-                 {/* Dashed line connecting box to the safe badge area */}
+                 {/* Dashed line connecting box to the safe right-side badge area */}
                  <line x1={boxRightEdgeX} y1={boxCenterY} x2={badgeX - badgeWidth / 2} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
 
-                 {/* Stacked compact info badge in safe margin */}
+                 {/* Compact info badge positioned safely in the right margin */}
                  <g transform={`translate(${badgeX}, ${badgeY})`}>
                     <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
                     
@@ -6438,7 +6439,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     <line x1={-badgeWidth / 2 + 8} y1={-badgeHeight / 2 + 20} x2={badgeWidth / 2 - 8} y2={-badgeHeight / 2 + 20} stroke="#334155" strokeWidth="1" />
                     
                     {targets.map((t, idx) => (
-                      <text key={t.label} x="0" y={-badgeHeight / 2 + 35 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                      <text key={t.label} x="0" y={-badgeHeight / 2 + 33 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
                         <tspan fill="#94a3b8">{t.label}: </tspan>
                         <tspan fill="#f59e0b">{t.val.toFixed(1)}</tspan>
                       </text>
