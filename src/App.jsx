@@ -6395,47 +6395,34 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              const rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y);
              const raw1 = rawPts[0]; const raw2 = rawPts[1];
              
-             // 箱體高低價與費波那契堆疊計算
              const highPrice = Math.max(raw1.price, raw2.price);
              const lowPrice = Math.min(raw1.price, raw2.price);
              const boxHeightPrice = highPrice - lowPrice;
              const pct = (boxHeightPrice / lowPrice) * 100;
-             const textStr = `箱高: ${boxHeightPrice.toFixed(2)} (+${pct.toFixed(2)}%)`;
              
-             let boxX = rx + rw / 2; if (boxX - 95 < paddingLeft) boxX = paddingLeft + 95; if (boxX + 95 > width - paddingRight) boxX = width - paddingRight - 95;
-             let boxY = ry - 14; if (boxY < paddingLeft + 14) boxY = paddingLeft + 14;
-
+             // 計算各堆疊目標價
              const targets = [
-               { ratio: '1.0', val: 1.0, color: '#3b82f6' },
-               { ratio: '1.386', val: 1.386, color: '#a855f7' },
-               { ratio: '1.5', val: 1.5, color: '#ec4899' },
-               { ratio: '1.618', val: 1.618, color: '#eab308' },
-               { ratio: '2.0', val: 2.0, color: '#ef4444' },
+               { label: 'T1.0', val: highPrice + boxHeightPrice * 1.0, color: '#3b82f6' },
+               { label: 'T1.386', val: highPrice + boxHeightPrice * 1.386, color: '#a855f7' },
+               { label: 'T1.5', val: highPrice + boxHeightPrice * 1.5, color: '#ec4899' },
+               { label: 'T1.618', val: highPrice + boxHeightPrice * 1.618, color: '#eab308' },
+               { label: 'T2.0', val: highPrice + boxHeightPrice * 2.0, color: '#ef4444' },
              ];
-             const rightEdgeX = Math.max(pts[0].x, pts[1].x);
+
+             let boxX = rx + rw / 2; if (boxX - 110 < paddingLeft) boxX = paddingLeft + 110; if (boxX + 110 > width - paddingRight) boxX = width - paddingRight - 110;
+             let boxY = ry - 14; if (boxY < paddingLeft + 14) boxY = paddingLeft + 14;
 
              return (
                <g>
                  <rect x={rx} y={ry} width={Math.max(rw, 40)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
+                 {/* 緊湊一體化標籤框：同時顯示箱高百分比與所有堆疊目標價 */}
                  <g transform={`translate(${boxX}, ${boxY})`}>
-                    <rect x="-95" y="-12" width="190" height="24" fill="#0f172a" fillOpacity="0.9" rx="4" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
-                    <text x="0" y="4" fill="#38bdf8" fontSize="11" fontWeight="bold" textAnchor="middle" pointerEvents="none">{textStr}</text>
+                    <rect x="-115" y="-14" width="230" height="28" fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
+                    <text x="0" y="2" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                      箱高:{boxHeightPrice.toFixed(1)}(+{pct.toFixed(1)}%) | {targets.map(t => `${t.label}:${t.val.toFixed(1)}`).join(' ')}
+                    </text>
                  </g>
-
-                 {targets.map((t) => {
-                   const targetPrice = highPrice + boxHeightPrice * t.val;
-                   const targetY = typeof getY === 'function' ? getY(targetPrice) : ry;
-                   if (targetY < paddingLeft || targetY > mainHeight) return null;
-
-                   return (
-                     <g key={t.ratio}>
-                       <line x1={rightEdgeX} y1={targetY} x2={rightEdgeX + 130} y2={targetY} stroke={t.color} strokeWidth="1.5" strokeDasharray="3 3" opacity={baseOpacity} />
-                       <rect x={rightEdgeX + 4} y={targetY - 10} width="122" height="20" rx="3" fill="#0f172a" stroke={t.color} strokeWidth="1" fillOpacity="0.9" />
-                       <text x={rightEdgeX + 10} y={targetY + 4} fill={t.color} fontSize="10" fontWeight="bold">T{t.ratio}: {targetPrice.toFixed(2)}</text>
-                     </g>
-                   );
-                 })}
                </g>
              );
            })()}
