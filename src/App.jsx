@@ -5663,26 +5663,28 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [dispositionData, setDispositionData] = useState({});
 
   useEffect(() => {
-    // 防呆：如果開關沒開，或者還沒有股票代號，就不抓取
     if (!toggles.showDisposition || !realSymbol) return;
     
-    // 如果已經有這檔股票的資料，就不重複抓取，極度省 API 額度！
-    if (dispositionData[realSymbol]) return; 
+    const cleanSymbol = realSymbol.replace('.TW', '').replace('.TWO', '');
+    if (dispositionData[cleanSymbol]) return; // 已快取就不再抓
 
     const fetchDisposition = async () => {
         try {
-            // 自動往回推算抓取近 2 年的處置資料
             const startDate = new Date();
             startDate.setFullYear(startDate.getFullYear() - 2);
             const startDateStr = startDate.toISOString().split('T')[0];
 
-            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${realSymbol}&start_date=${startDateStr}`;
+            const apiUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDispositionSecuritiesPeriod&data_id=${cleanSymbol}&start_date=${startDateStr}`;
             
             const response = await fetch(apiUrl);
             const json = await response.json();
 
             if (json.msg === 'success' && json.data) {
-                setDispositionData(prev => ({ ...prev, [realSymbol]: json.data }));
+                // 🕵️‍♂️ 除錯神器：把 FinMind 傳回來的東西印在 F12 控制台！
+                console.log(`[處置股資料] ${cleanSymbol}:`, json.data);
+                setDispositionData(prev => ({ ...prev, [cleanSymbol]: json.data }));
+            } else {
+                console.log(`[處置股資料] ${cleanSymbol} 查詢失敗或無資料:`, json);
             }
         } catch (error) {
             console.error('抓取處置股資料失敗:', error);
@@ -6980,15 +6982,22 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
             {/* 👇 ========================================== 👇 */}
             {/* 👇 請把步驟 4 的程式碼貼在這裡！(緊接在 MacroZigZag 下方) 👇 */}
             {/* ✨ 終極新增：處置股事件雷達 (紅色警戒區 + 起訖標籤) */}
+            {/* ✨ 終極新增：處置股事件雷達 (強化日期寬容度版) */}
             {toggles.showDisposition && realSymbol && (() => {
                 const cleanSymbol = realSymbol.replace('.TW', '').replace('.TWO', '');
                 const records = dispositionData[cleanSymbol];
                 if (!records || records.length === 0) return null;
                 
                 return records.map((rec, recIdx) => {
-                    const startIdx = data.findIndex(d => d.date >= rec.start_date);
+                    // 🛡️ 防呆：確保 start_date 和 end_date 存在，並只取前 10 碼 (YYYY-MM-DD)
+                    const sDate = rec.start_date ? rec.start_date.substring(0, 10) : '';
+                    const eDate = rec.end_date ? rec.end_date.substring(0, 10) : '';
+                    if (!sDate || !eDate) return null;
+
+                    const startIdx = data.findIndex(d => d.date >= sDate);
                     let endIdx = -1;
-                    for (let i = data.length - 1; i >= 0; i--) { if (data[i].date <= rec.end_date) { endIdx = i; break; } }
+                    for (let i = data.length - 1; i >= 0; i--) { if (data[i].date <= eDate) { endIdx = i; break; } }
+                    
                     if (startIdx === -1 || startIdx > endIdx) return null; 
                     
                     const rectX = getX(startIdx) - candleWidth / 2;
@@ -6997,12 +7006,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                     const endX = getX(endIdx);
                     const elements = [];
 
-                    // 1. 畫出處置期間的紅色淡淡背景
                     if (rectX + rectWidth > 0 && rectX < width) {
                         elements.push(<rect key={`disp-bg-${recIdx}`} x={rectX} y={0} width={rectWidth} height={mainHeight} fill="rgba(239, 68, 68, 0.12)" pointerEvents="none" />);
                     }
-
-                    // 2. 畫「⚠️處置」起點標籤
                     if (startX > -20 && startX < width + 20 && data[startIdx]) {
                         const startY = getY(data[startIdx].high) - 25;
                         elements.push(
@@ -7013,8 +7019,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                             </g>
                         );
                     }
-
-                    // 3. 畫「🔓出關」終點標籤
                     if (endX > -20 && endX < width + 20 && data[endIdx]) {
                         const endY = getY(data[endIdx].high) - 25;
                         elements.push(
