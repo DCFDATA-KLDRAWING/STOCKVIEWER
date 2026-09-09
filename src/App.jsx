@@ -6408,22 +6408,37 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                { label: 'T2.0', val: highPrice + boxHeightPrice * 2.0 },
              ];
 
-             let boxX = rx + rw / 2; if (boxX - 75 < paddingLeft) boxX = paddingLeft + 75; if (boxX + 75 > width - paddingRight) boxX = width - paddingRight - 75;
-             let boxY = ry - 55; if (boxY < paddingLeft + 14) boxY = paddingLeft + 14;
+             const badgeWidth = 140;
+             const badgeHeight = 95;
+             const boxCenterX = rx + rw / 2;
+             const boxCenterY = ry + rh / 2;
+             
+             // Place badge in the right padding area (safe zone away from candlesticks)
+             const badgeX = width - paddingRight - badgeWidth / 2;
+             let badgeY = boxCenterY;
+             if (badgeY - badgeHeight / 2 < paddingLeft + 10) badgeY = paddingLeft + 10 + badgeHeight / 2;
+             if (badgeY + badgeHeight / 2 > mainHeight - 10) badgeY = mainHeight - 10 - badgeHeight / 2;
+
+             const boxRightEdgeX = rx + rw;
 
              return (
                <g>
-                 <rect x={rx} y={ry} width={Math.max(rw, 40)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
+                 <rect x={rx} y={ry} width={Math.max(rw, 30)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
-                 {/* Compact multi-line golden target badge */}
-                 <g transform={`translate(${boxX}, ${boxY})`}>
-                    <rect x="-80" y="-8" width="160" height="96" fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
-                    <text x="0" y="8" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                 {/* Dashed line connecting box to the safe badge area */}
+                 <line x1={boxRightEdgeX} y1={boxCenterY} x2={badgeX - badgeWidth / 2} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
+
+                 {/* Stacked compact info badge in safe margin */}
+                 <g transform={`translate(${badgeX}, ${badgeY})`}>
+                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
+                    
+                    <text x="0" y={-badgeHeight / 2 + 14} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
                       箱高: {boxHeightPrice.toFixed(1)} (+{pct.toFixed(1)}%)
                     </text>
-                    <line x1="-72" y1="14" x2="72" y2="14" stroke="#334155" strokeWidth="1" />
+                    <line x1={-badgeWidth / 2 + 8} y1={-badgeHeight / 2 + 20} x2={badgeWidth / 2 - 8} y2={-badgeHeight / 2 + 20} stroke="#334155" strokeWidth="1" />
+                    
                     {targets.map((t, idx) => (
-                      <text key={t.label} x="0" y={28 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                      <text key={t.label} x="0" y={-badgeHeight / 2 + 35 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
                         <tspan fill="#94a3b8">{t.label}: </tspan>
                         <tspan fill="#f59e0b">{t.val.toFixed(1)}</tspan>
                       </text>
