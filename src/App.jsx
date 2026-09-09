@@ -5674,10 +5674,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
     const fetchOfficialDisposition = async () => {
         try {
-            // 🚀 同時發送請求給「證交所(上市)」與「櫃買中心(上櫃)」
+            // 🚀 加入 Proxy：騙過瀏覽器的跨網域限制，政府 API 不會擋 Proxy
             const [twseRes, tpexRes] = await Promise.all([
-                fetch('https://openapi.twse.com.tw/v1/exchangeReport/TWT43U').catch(() => ({ ok: false, json: () => [] })),
-                fetch('https://www.tpex.org.tw/openapi/v1/tpex_disp').catch(() => ({ ok: false, json: () => [] }))
+                fetch(`https://corsproxy.io/?${encodeURIComponent('https://openapi.twse.com.tw/v1/exchangeReport/TWT43U')}`).catch(() => ({ ok: false, json: () => [] })),
+                fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.tpex.org.tw/openapi/v1/tpex_disp')}`).catch(() => ({ ok: false, json: () => [] }))
             ]);
 
             const twseData = twseRes.ok ? await twseRes.json() : [];
