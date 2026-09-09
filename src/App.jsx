@@ -6400,28 +6400,34 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              const boxHeightPrice = highPrice - lowPrice;
              const pct = (boxHeightPrice / lowPrice) * 100;
              
-             // 計算各堆疊目標價
              const targets = [
-               { label: 'T1.0', val: highPrice + boxHeightPrice * 1.0, color: '#3b82f6' },
-               { label: 'T1.386', val: highPrice + boxHeightPrice * 1.386, color: '#a855f7' },
-               { label: 'T1.5', val: highPrice + boxHeightPrice * 1.5, color: '#ec4899' },
-               { label: 'T1.618', val: highPrice + boxHeightPrice * 1.618, color: '#eab308' },
-               { label: 'T2.0', val: highPrice + boxHeightPrice * 2.0, color: '#ef4444' },
+               { label: 'T1.0', val: highPrice + boxHeightPrice * 1.0 },
+               { label: 'T1.386', val: highPrice + boxHeightPrice * 1.386 },
+               { label: 'T1.5', val: highPrice + boxHeightPrice * 1.5 },
+               { label: 'T1.618', val: highPrice + boxHeightPrice * 1.618 },
+               { label: 'T2.0', val: highPrice + boxHeightPrice * 2.0 },
              ];
 
-             let boxX = rx + rw / 2; if (boxX - 110 < paddingLeft) boxX = paddingLeft + 110; if (boxX + 110 > width - paddingRight) boxX = width - paddingRight - 110;
-             let boxY = ry - 14; if (boxY < paddingLeft + 14) boxY = paddingLeft + 14;
+             let boxX = rx + rw / 2; if (boxX - 75 < paddingLeft) boxX = paddingLeft + 75; if (boxX + 75 > width - paddingRight) boxX = width - paddingRight - 75;
+             let boxY = ry - 55; if (boxY < paddingLeft + 14) boxY = paddingLeft + 14;
 
              return (
                <g>
                  <rect x={rx} y={ry} width={Math.max(rw, 40)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
-                 {/* 緊湊一體化標籤框：同時顯示箱高百分比與所有堆疊目標價 */}
+                 {/* 多行緊湊堆疊標籤框：黃金數字區分、層次分明 */}
                  <g transform={`translate(${boxX}, ${boxY})`}>
-                    <rect x="-115" y="-14" width="230" height="28" fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
-                    <text x="0" y="2" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
-                      箱高:{boxHeightPrice.toFixed(1)}(+{pct.toFixed(1)}%) | {targets.map(t => `${t.label}:${t.val.toFixed(1)}`).join(' ')}
+                    <rect x="-80" y="-8" width="160" height="96" fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
+                    <text x="0" y="8" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                      箱高: {boxHeightPrice.toFixed(1)} (+{pct.toFixed(1)}%)
                     </text>
+                    <line x1="-72" y1="14" x2="72" y2="14" stroke="#334155" strokeWidth="1" />
+                    {targets.map((t, idx) => (
+                      <text key={t.label} x="0" y={28 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
+                        <tspan fill="#94a3b8">{t.label}: </tspan>
+                        <tspan fill="#f59e0b">{t.val.toFixed(1)}</tspan>
+                      </text>
+                    ))}
                  </g>
                </g>
              );
@@ -6430,6 +6436,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
          </g>
        );
     }
+    return null;
+  };
     if (['pattern-w', 'pattern-multibottom', 'pattern-head-shoulders'].includes(drawObj.type)) {
        return ( <g key={idKey}><polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={drawObj.color} strokeWidth={drawObj.width} strokeLinecap="round" strokeLinejoin="round" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />{renderDots()}</g> );
     }
