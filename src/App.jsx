@@ -6394,21 +6394,48 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
              const rx = Math.min(pts[0].x, pts[1].x), ry = Math.min(pts[0].y, pts[1].y);
              const rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y);
              const raw1 = rawPts[0]; const raw2 = rawPts[1];
-             const priceDiff = raw2.price - raw1.price; const pct = (priceDiff / raw1.price) * 100;
-             const sign = priceDiff > 0 ? '+' : ''; const color = priceDiff >= 0 ? '#ef4444' : '#22c55e';
-             const textStr = `${sign}${priceDiff.toFixed(2)} (${sign}${pct.toFixed(2)}%)`;
              
-             let boxX = rx + rw / 2; if (boxX - 85 < paddingLeft) boxX = paddingLeft + 85; if (boxX + 85 > width - paddingRight) boxX = width - paddingRight - 85;
-             let boxY = ry - 12; if (boxY < paddingLeft + 12) boxY = paddingLeft + 12;
+             // 箱體高低價與費波那契堆疊計算
+             const highPrice = Math.max(raw1.price, raw2.price);
+             const lowPrice = Math.min(raw1.price, raw2.price);
+             const boxHeightPrice = highPrice - lowPrice;
+             const pct = (boxHeightPrice / lowPrice) * 100;
+             const textStr = `箱高: ${boxHeightPrice.toFixed(2)} (+${pct.toFixed(2)}%)`;
              
+             let boxX = rx + rw / 2; if (boxX - 95 < paddingLeft) boxX = paddingLeft + 95; if (boxX + 95 > width - paddingRight) boxX = width - paddingRight - 95;
+             let boxY = ry - 14; if (boxY < paddingLeft + 14) boxY = paddingLeft + 14;
+
+             const targets = [
+               { ratio: '1.0', val: 1.0, color: '#3b82f6' },
+               { ratio: '1.386', val: 1.386, color: '#a855f7' },
+               { ratio: '1.5', val: 1.5, color: '#ec4899' },
+               { ratio: '1.618', val: 1.618, color: '#eab308' },
+               { ratio: '2.0', val: 2.0, color: '#ef4444' },
+             ];
+             const rightEdgeX = Math.max(pts[0].x, pts[1].x);
+
              return (
                <g>
-                 <rect x={rx} y={ry} width={rw} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill={color} fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
-                 <line x1={pts[0].x} y1={pts[0].y} x2={pts[1].x} y2={pts[1].y} stroke={drawObj.color} strokeWidth={1} strokeDasharray="4,4" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />
+                 <rect x={rx} y={ry} width={Math.max(rw, 40)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
+                 
                  <g transform={`translate(${boxX}, ${boxY})`}>
-                    <rect x="-85" y="-12" width="170" height="24" fill="#0f172a" fillOpacity="0.3" rx="4" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.4" pointerEvents="none" />
-                    <text x="0" y="4" fill="#f8fafc" opacity="0.6" fontSize="12" fontWeight="bold" textAnchor="middle" pointerEvents="none">{textStr}</text>
+                    <rect x="-95" y="-12" width="190" height="24" fill="#0f172a" fillOpacity="0.9" rx="4" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
+                    <text x="0" y="4" fill="#38bdf8" fontSize="11" fontWeight="bold" textAnchor="middle" pointerEvents="none">{textStr}</text>
                  </g>
+
+                 {targets.map((t) => {
+                   const targetPrice = highPrice + boxHeightPrice * t.val;
+                   const targetY = typeof getY === 'function' ? getY(targetPrice) : ry;
+                   if (targetY < paddingLeft || targetY > mainHeight) return null;
+
+                   return (
+                     <g key={t.ratio}>
+                       <line x1={rightEdgeX} y1={targetY} x2={rightEdgeX + 130} y2={targetY} stroke={t.color} strokeWidth="1.5" strokeDasharray="3 3" opacity={baseOpacity} />
+                       <rect x={rightEdgeX + 4} y={targetY - 10} width="122" height="20" rx="3" fill="#0f172a" stroke={t.color} strokeWidth="1" fillOpacity="0.9" />
+                       <text x={rightEdgeX + 10} y={targetY + 4} fill={t.color} fontSize="10" fontWeight="bold">T{t.ratio}: {targetPrice.toFixed(2)}</text>
+                     </g>
+                   );
+                 })}
                </g>
              );
            })()}
