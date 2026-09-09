@@ -6415,7 +6415,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                <g>
                  <rect x={rx} y={ry} width={Math.max(rw, 40)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
-                 {/* 多行緊湊堆疊標籤框：黃金數字區分、層次分明 */}
+                 {/* Compact multi-line golden target badge */}
                  <g transform={`translate(${boxX}, ${boxY})`}>
                     <rect x="-80" y="-8" width="160" height="96" fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
                     <text x="0" y="8" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
