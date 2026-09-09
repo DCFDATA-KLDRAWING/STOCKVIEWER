@@ -6525,10 +6525,16 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                { label: 'T2.0', val: rawPts[2].price + diff * 2.0 },
              ];
 
+             // 🎯 計算 T2.0 目標價在畫布上的 Y 座標，讓垂直虛線直接延伸上去
+             const t2Price = rawPts[2].price + diff * 2.0;
+             let targetEndY = typeof getY === 'function' ? getY(t2Price) : C.y - 100;
+             if (targetEndY < paddingLeft) targetEndY = paddingLeft;
+             if (targetEndY > mainHeight) targetEndY = mainHeight;
+
              const badgeWidth = 130;
              const badgeHeight = 85;
              
-             // 🧠 智慧判斷資訊板要放在 C 點的左邊還是右邊，避免超出畫面
+             // 🧠 智慧判斷資訊板要放在 C 點的左邊還是右邊
              const isNearRightEdge = C.x > width - paddingRight - 150;
              const badgeX = isNearRightEdge ? C.x - badgeWidth / 2 - 20 : C.x + badgeWidth / 2 + 20;
              let badgeY = C.y - 40;
@@ -6537,8 +6543,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
 
              return (
                <g>
-                 {/* 簡短的 N 字型延伸示意小短線（不再拉到天邊） */}
-                 <line x1={C.x} y1={C.y} x2={C.x} y2={C.y - 25} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" />
+                 {/* 🚀 從 C 點往上延伸到 T2.0 目標價的垂直虛線 */}
+                 <line x1={C.x} y1={C.y} x2={C.x} y2={targetEndY} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" />
                  
                  {/* 連接 C 點與浮動目標面板的細虛線 */}
                  <line x1={C.x} y1={C.y} x2={badgeX + (isNearRightEdge ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="2,2" opacity="0.7" />
