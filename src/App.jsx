@@ -6518,22 +6518,47 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
           {B && C && <line x1={B.x} y1={B.y} x2={C.x} y2={C.y} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" />}
           {B && C && (() => {
              const diff = rawPts[1].price - rawPts[0].price; 
-             let maxY = getY(rawPts[2].price + diff * 2); if(maxY < paddingLeft) maxY = paddingLeft; if(maxY > mainHeight - paddingLeft) maxY = mainHeight - paddingLeft;
+             const targets = [
+               { label: 'T1.0', val: rawPts[2].price + diff * 1.0 },
+               { label: 'T1.5', val: rawPts[2].price + diff * 1.5 },
+               { label: 'T1.618', val: rawPts[2].price + diff * 1.618 },
+               { label: 'T2.0', val: rawPts[2].price + diff * 2.0 },
+             ];
+
+             const badgeWidth = 130;
+             const badgeHeight = 85;
+             
+             // 🧠 智慧判斷資訊板要放在 C 點的左邊還是右邊，避免超出畫面
+             const isNearRightEdge = C.x > width - paddingRight - 150;
+             const badgeX = isNearRightEdge ? C.x - badgeWidth / 2 - 20 : C.x + badgeWidth / 2 + 20;
+             let badgeY = C.y - 40;
+             if (badgeY - badgeHeight / 2 < paddingLeft + 10) badgeY = paddingLeft + 10 + badgeHeight / 2;
+             if (badgeY + badgeHeight / 2 > mainHeight - 10) badgeY = mainHeight - 10 - badgeHeight / 2;
+
              return (
                <g>
-                 <line x1={C.x} y1={C.y} x2={C.x} y2={maxY} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="6,4" />
-                 {[1, 1.5, 1.618, 2].map(k => {
-                    const tPrice = rawPts[2].price + diff * k; let ty = getY(tPrice); let isClamped = false;
-                    if (ty < paddingLeft + 15) { ty = paddingLeft + 15; isClamped = true; }
-                    if (ty > mainHeight - paddingLeft) { ty = mainHeight - paddingLeft - 5; isClamped = true; }
-                    return (
-                      <g key={k}>
-                        <line x1={C.x - 40} y1={ty} x2={C.x} y2={ty} stroke={drawObj.color} strokeWidth={drawObj.width} />
-                        <rect x={C.x - 145} y={ty - 13} width={100} height={26} fill={'#0f172a'} fillOpacity="0.9" rx="4" />
-                        <text x={C.x - 48} y={ty + 5} fill={drawObj.color} fontSize="13" fontWeight="bold" textAnchor="end">{isClamped ? `(超出) ` : ''}T{k}: {tPrice.toFixed(2)}</text>
-                      </g>
-                    );
-                 })}
+                 {/* 簡短的 N 字型延伸示意小短線（不再拉到天邊） */}
+                 <line x1={C.x} y1={C.y} x2={C.x} y2={C.y - 25} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" />
+                 
+                 {/* 連接 C 點與浮動目標面板的細虛線 */}
+                 <line x1={C.x} y1={C.y} x2={badgeX + (isNearRightEdge ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="2,2" opacity="0.7" />
+
+                 {/* 整合式精巧目標價資訊板 */}
+                 <g transform={`translate(${badgeX}, ${badgeY})`}>
+                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" />
+                    
+                    <text x="0" y={-badgeHeight / 2 + 14} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">
+                      N字目標價推演
+                    </text>
+                    <line x1={-badgeWidth / 2 + 8} y1={-badgeHeight / 2 + 19} x2={badgeWidth / 2 - 8} y2={-badgeHeight / 2 + 19} stroke="#334155" strokeWidth="1" />
+                    
+                    {targets.map((t, idx) => (
+                      <text key={t.label} x="0" y={-badgeHeight / 2 + 32 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle">
+                        <tspan fill="#94a3b8">{t.label}: </tspan>
+                        <tspan fill="#f59e0b">{t.val.toFixed(1)}</tspan>
+                      </text>
+                    ))}
+                 </g>
                </g>
              );
           })()}
