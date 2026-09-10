@@ -4952,6 +4952,8 @@ const handleOpenSectorMomentum = async () => {
                 savedLayouts={savedLayouts}        // ✨ 傳入畫板資料
                 setSavedLayouts={setSavedLayouts}  // ✨ 傳入更新畫板的方法
                 onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
+                showFvgIndicator={showFvgIndicator}
+                setShowFvgIndicator={setShowFvgIndicator}
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
                 rankingModalContent={
@@ -5656,8 +5658,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
-  // 🌟 在這裡加上 FVG 指標的開關狀態
-  const [showFvgIndicator, setShowFvgIndicator] = useState(true);
+  
 
   // ✨ 1. 【虛擬視窗引擎核心】
   // rightOffset: 記錄畫面距離最新 K 棒往左平移了多少根 K 棒
