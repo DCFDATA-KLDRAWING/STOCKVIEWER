@@ -6982,7 +6982,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             fill="#f59e0b" 
             fontSize="9" 
             fontWeight="bold" 
-            textAnchor="Left"
+            textAnchor="Right"
           >
             FVG: {fvgPrice.toFixed(1)}
           </text>
