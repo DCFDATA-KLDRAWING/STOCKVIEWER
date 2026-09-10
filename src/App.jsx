@@ -5659,8 +5659,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
-  // 🌟 核心修復：將 FVG 開關狀態正確宣告在 TrendChart 元件內
-  const [showFvgIndicator, setShowFvgIndicator] = useState(true);
+ 
   
 
   // ✨ 1. 【虛擬視窗引擎核心】
