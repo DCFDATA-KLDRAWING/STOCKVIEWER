@@ -6939,6 +6939,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       // 4. 依照您的要求計算中線價：(右側最低價 + 左側最高價) / 2
       const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
       
+      const xBoxStart = getX(i - 2);                 
+                         
+                          
+      const boxWidth = Math.max(30, xEnd - xBoxStart); 
+
+      const yHigh = getY(leftCandle.high);           
+      const yLow = getY(rightCandle.low);            
+      
       const yCoord = getY(fvgPrice);
       const xStart = getX(i - 1); // 釘在中間那根 K 棒的 X 座標
       const xEnd = xStart + 80;   // 向右延伸一小段距離供觀察
@@ -6957,18 +6965,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeWidth="1.5" 
             strokeDasharray="3,3" 
           />
-          {/* 價格標籤背景框 */}
           <rect 
-            x={xEnd - 45} 
-            y={yCoord - 18} 
-            width="75" 
-            height="16" 
-            fill="#0f172a" 
-            fillOpacity="0.9" 
-            rx="3" 
-            stroke="#f59e0b" 
-            strokeWidth="1" 
-          />
+  x={xBoxStart} 
+  y={yHigh} 
+  width={boxWidth} 
+  height={Math.max(4, yLow - yHigh)} 
+  fill="#f59e0b" 
+  fillOpacity="0.15" 
+  stroke="#f59e0b" 
+  strokeWidth="1.2" 
+  strokeDasharray="2,2" 
+  rx="2"
+/>
           {/* 計算出來的中間價格文字 */}
           <text 
             x={xEnd - 7} 
