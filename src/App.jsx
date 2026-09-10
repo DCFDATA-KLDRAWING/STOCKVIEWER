@@ -6965,10 +6965,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeDasharray="3,3" 
           />
           <rect 
-            x3={xBoxStart} 
-            y3={yHigh}
-            x4={xBoxEnd} 
-            y4={yLow} 
+            x={xBoxStart} 
+            y={yHigh}
+            x3={xBoxEnd} 
+            y3={yLow} 
             width={boxWidth} 
             height={Math.max(4, yLow - yHigh)} 
             fill="#f59e0b" 
