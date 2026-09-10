@@ -4738,15 +4738,18 @@ const handleOpenSectorMomentum = async () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
-  <input 
-    type="checkbox" 
-    checked={showFvgIndicator} 
-    onChange={() => setShowFvgIndicator(!showFvgIndicator)} 
-    className="w-3.5 h-3.5 text-amber-400 rounded bg-slate-900 border-slate-600" 
-  />
-  <span className="text-xs text-amber-400 font-bold">FVG中線</span>
-</label>
+                  {/* 📊 控制面板內的 FVG 按鈕 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700">
+          <input 
+            type="checkbox" 
+            checked={showFvgIndicator} 
+            onChange={() => setShowFvgIndicator(!showFvgIndicator)} 
+            className="w-3.5 h-3.5 text-amber-400 rounded bg-slate-900 border-slate-600" 
+          />
+          <span className="text-xs text-amber-400 font-bold">FVG中線</span>
+        </label>
+      </div>
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -5658,6 +5661,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
+  // 🌟 核心修復：將 FVG 開關狀態正確宣告在 TrendChart 元件內
+  const [showFvgIndicator, setShowFvgIndicator] = useState(true);
   
 
   // ✨ 1. 【虛擬視窗引擎核心】
