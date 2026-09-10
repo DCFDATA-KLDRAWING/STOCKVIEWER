@@ -6940,7 +6940,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
       
       // 🌟 變數宣告順序修正：先有 xStart 與 xEnd，才能算 boxWidth 與 y 座標
-      const xBoxStart = getX(i - 2);                 
+      const xBoxStart = getX(i - 2);
+      const xBoxEnd = getX(i);                 
       const xStart = getX(i - 1); 
       const xEnd = xStart + 80;   
       const boxWidth = Math.max(30, xEnd - xBoxStart); 
@@ -6964,8 +6965,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeDasharray="3,3" 
           />
           <rect 
-            x={xBoxStart} 
-            y={yHigh} 
+            x3={xBoxStart} 
+            y3={yHigh}
+            x2={xBoxEnd} 
+            y2={yLow} 
             width={boxWidth} 
             height={Math.max(4, yLow - yHigh)} 
             fill="#f59e0b" 
@@ -6975,18 +6978,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeDasharray="2,2" 
             rx="2"
           />
-          {/* 價格標籤背景框 */}
-          <rect 
-            x={xLineEnd - 45} 
-            y={yCoord - 18} 
-            width="75" 
-            height="16" 
-            fill="#0f172a" 
-            fillOpacity="0.9" 
-            rx="3" 
-            stroke="#f59e0b" 
-            strokeWidth="1" 
-          />
+          
           {/* 計算出來的中間價格文字 */}
           <text 
             x={xEnd - 7} 
