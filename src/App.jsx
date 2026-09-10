@@ -6964,8 +6964,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeDasharray="3,3" 
           />
           <rect 
-            x={yHigh} 
-            y={yLow} 
+            x={xBoxStart} 
+            y={yHigh} 
             width={boxWidth} 
             height={Math.max(4, yLow - yHigh)} 
             fill="#f59e0b" 
@@ -6974,6 +6974,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeWidth="1.2" 
             strokeDasharray="2,2" 
             rx="2"
+          />
+          {/* 價格標籤背景框 */}
+          <rect 
+            x={xLineEnd - 45} 
+            y={yCoord - 18} 
+            width="75" 
+            height="16" 
+            fill="#0f172a" 
+            fillOpacity="0.9" 
+            rx="3" 
+            stroke="#f59e0b" 
+            strokeWidth="1" 
           />
           {/* 計算出來的中間價格文字 */}
           <text 
