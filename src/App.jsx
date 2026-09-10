@@ -6965,7 +6965,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           />
           <rect 
             x={xBoxStart} 
-            y={yHigh} 
+            y={yLow} 
             width={boxWidth} 
             height={Math.max(4, yLow - yHigh)} 
             fill="#f59e0b" 
