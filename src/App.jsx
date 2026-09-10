@@ -6930,7 +6930,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const bodyRatio = midCandle.open === 0 ? 0 : ((midCandle.close - midCandle.open) / midCandle.open) * 100;
   
   if (bodyRatio >= 5) {
-    if (rightCandle.low > leftCandle.high) {
+    if (rightCandle.low > leftCandle.high & rightCandle.high > midCandle.high)  {
       
       const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
       
