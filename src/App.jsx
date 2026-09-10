@@ -6957,19 +6957,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeWidth="1.5" 
             strokeDasharray="3,3" 
           />
-          {/* 1. 畫出從左邊高點到右邊低點的實體區間方框 */}
-<rect 
-  x={xBoxStart}                    {/* 框的左側起始 X */}
-  y={yHigh}                        {/* 框的上緣 Y (左側高點) */}
-  width={boxWidth}                 {/* 框的總寬度 */}
-  height={boxHeight}               {/* 框的高度 (右側低點 Y - 左側高點 Y) */}
-  fill="#f59e0b"                   {/* 填滿金黃色 */}
-  fillOpacity="0.15"               {/* 半透明 15%，不遮擋底下的 K 棒 */}
-  stroke="#f59e0b"                 {/* 框線顏色 */}
-  strokeWidth="1.2"                {/* 框線粗細 */}
-  strokeDasharray="2,2"            {/* 框線改用細虛線 */}
-  rx="2"                           {/* 圓角 */}
-/>
+          <rect 
+            x={xEnd - 45} 
+            y={yMid - 18} 
+            width="75" 
+            height="16" 
+            fill="#0f172a" 
+            fillOpacity="0.95" 
+            rx="3" 
+            stroke="#fbbf24" 
+            strokeWidth="1.2" 
+          />
           {/* 價格標籤背景框 */}
           <rect 
             x={xEnd - 45} 
