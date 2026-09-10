@@ -6941,8 +6941,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       const boxWidth = Math.max(30, xBoxEnd - xBoxStart); 
 
       // 🌟 使用價格高低極值來正確對應 Y 軸高度
-      const highestPrice = Math.max(leftCandle.high, rightCandle.high);
-      const lowestPrice = Math.min(leftCandle.low, rightCandle.low);
+      const highestPrice = Math.max(leftCandle.low, rightCandle.high);
+      const lowestPrice = Math.min(leftCandle.high, rightCandle.low);
 
       const yHigh = getY(highestPrice);           
       const yLow = getY(lowestPrice);            
