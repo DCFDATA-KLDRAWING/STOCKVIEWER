@@ -6986,6 +6986,748 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   }
   return null;
 })}
+
+            {toggles.showBBandsCompress && (<g>
+                {(() => {
+                  const zones = []; let startIdx = -1; let count = 0;
+                  data.forEach((d, i) => {
+                    if (d.bbands?.up != null && d.bbands?.down != null && d.bbands?.mid != null) {
+                      const bandwidth = (d.bbands.up - d.bbands.down) / d.bbands.mid;
+                      if (bandwidth <= 0.15) { if (startIdx === -1) startIdx = i; count++; } else { if (count >= 10) zones.push({ start: startIdx, end: i - 1 }); startIdx = -1; count = 0; }
+                    } else { if (count >= 10) zones.push({ start: startIdx, end: i - 1 }); startIdx = -1; count = 0; }
+                  });
+                  if (count >= 10) zones.push({ start: startIdx, end: data.length - 1 });
+
+                  return zones.map((z, idx) => {
+                    const rectX = getX(z.start) - spacing / 2;
+                    const rectWidth = (z.end - z.start + 1) * spacing;
+                    if (rectX + rectWidth < 0 || rectX > width) return null;
+                    return <rect key={`compress-${idx}`} x={rectX} y={0} width={rectWidth} height={mainHeight} fill="rgba(234, 179, 8, 0.15)" pointerEvents="none" />;
+                  });
+                })()}
+              </g>
+            )}
+
+            {toggles.showAutoWave && data.length > 0 && (() => {
+               const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.zigzag || !lastDay.zigzag.pivots) return null;
+               const pivots = lastDay.zigzag.pivots; if (pivots.length < 2) return null;
+               const waves = [];
+               for (let i = 1; i < pivots.length; i++) {
+                   const p0 = pivots[i-1], p1 = pivots[i]; const idx0 = p0.idx, idx1 = p1.idx; if (idx0 > idx1) continue;
+                   const c0 = data[idx0], c1 = data[idx1]; if (!c0 || !c1) continue;
+                   const diff = c1.close - c0.close, absDiff = Math.abs(diff), bars = Math.max(1, idx1 - idx0);
+                   let totalVol = 0; for (let j = idx0; j <= idx1; j++) if (data[j]) totalVol += data[j].volume;
+                   const startVma5 = c0.vma1 !== null ? c0.vma1 : 0; const endVma5 = c1.vma1 !== null ? c1.vma1 : 0;
+                   const ma55 = c1.fixedMa60 ?? c1.ma4 ?? c1.close; const isLong = c1.close >= ma55; const isShort = c1.close < ma55;
+                   let showWaveInfo = true; if (toggles.autoWaveLongOnly && !isLong) showWaveInfo = false; if (toggles.autoWaveShortOnly && !isShort) showWaveInfo = false;
+                   waves.push({ p0, p1, diff, absDiff, bars, dir: diff >= 0 ? 'up' : 'down', isVmaUp: endVma5 >= startVma5, showWaveInfo });
+               }
+
+               return waves.map((w, i) => {
+                   if (!w.showWaveInfo) return null;
+                   const labels = []; const pct = (w.diff / w.p0.price) * 100;
+                   labels.push(`幅: ${w.diff>0?'+':''}${w.diff.toFixed(2)} (${pct>0?'+':''}${pct.toFixed(1)}%)`);
+                   if (i >= 1) { const prev = waves[i-1]; const isVolInc = w.isVmaUp; const isAmpInc = w.absDiff > prev.absDiff; let text = w.dir === 'up' ? (isVolInc ? "量增" : "量縮") + (isAmpInc ? "價漲角度陡" : "價彈角度緩") : (isVolInc ? "量增" : "量縮") + (isAmpInc ? "價跌角度陡" : "價跌角度緩"); labels.push(`[異位] ${text}`); }
+                   if (i >= 2) { const prevPrev = waves[i-2]; if (w.dir === prevPrev.dir) labels.push(`[同位] 幅度${w.absDiff > prevPrev.absDiff ? '強' : '弱'} / 量${w.isVmaUp ? '增' : '縮'}`); }
+
+                   const x0 = getX(w.p0.idx), y0 = getY(w.p0.price);
+                   const x1 = getX(w.p1.idx), y1 = getY(w.p1.price);
+                   if ((x0 < -100 && x1 < -100) || (x0 > width + 100 && x1 > width + 100)) return null;
+                   const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2;
+                   const boxHeight = labels.length * 16 + 8, boxWidth = 160, offsetY = w.dir === 'up' ? -boxHeight/2 - 50 : boxHeight/2 + 50;
+
+                   return (
+                     <g key={`autowave-info-${i}`} pointerEvents="none">
+                       <line x1={midX} y1={midY} x2={midX} y2={midY + offsetY} stroke="#38bdf8" strokeWidth="1" strokeDasharray="4,4" opacity="0.6" />
+                       <g transform={`translate(${midX}, ${midY + offsetY})`}>
+                         <rect x={-boxWidth/2} y={-boxHeight/2} width={boxWidth} height={boxHeight} fill="#0f172a" fillOpacity="0.85" rx="6" stroke="#38bdf8" strokeWidth="1" strokeOpacity="0.6" />
+                         {labels.map((lb, lIdx) => <text key={lIdx} x={0} y={-boxHeight/2 + 15 + lIdx * 16} fill={lIdx === 0 ? "#f8fafc" : (lIdx === 1 ? "#fbbf24" : "#a78bfa")} fontSize="11" fontWeight="bold" textAnchor="middle">{lb}</text>)}
+                       </g>
+                     </g>
+                   );
+               });
+            })()}
+
+            {toggles.showZigZag && data.length > 0 && (() => {
+               const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.zigzag) return null;
+               const { pivots, floatPoint } = lastDay.zigzag;
+               return (
+                 <g pointerEvents="none">
+                    {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#facc15" strokeWidth="1.5" fill="none" opacity="0.8" />)}
+                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#facc15" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />)}
+                    {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`zz-pt-${i}`} cx={px} cy={getY(p.price)} r={3.5} fill="#facc15" />; })}
+                    {floatPoint && floatPoint.idx !== null && (<circle cx={getX(floatPoint.idx)} cy={getY(floatPoint.price)} r={3} fill="#facc15" opacity="0.5" />)}
+                 </g>
+               );
+            })()}
+            {toggles.showMacroZigZag && data.length > 0 && (() => {
+               const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.macroZigZag) return null;
+               const { pivots, floatPoint } = lastDay.macroZigZag;
+               return (
+                 <g pointerEvents="none">
+                    {/* 🌟 已確立的波段 (實線) */}
+                    {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#38bdf8" strokeWidth="3" fill="none" opacity="0.9" />)}
+                    {/* 🌟 行進中的波段 (虛線，對準收盤價) */}
+                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6,6" opacity="0.5" />)}
+                    {/* 🌟 轉折點 (只畫確立的實體點) */}
+                    {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`mzz-pt-${i}`} cx={px} cy={getY(p.price)} r={4.5} fill="#38bdf8" shadow="0 0 10px #38bdf8" />; })}
+                 </g>
+               );
+            })()}
+
+            {toggles.showMaxVolLines && data.length > 0 && (() => {
+               const lastDay = data[data.length - 1]; if (!lastDay || lastDay.maxVolPrice === undefined || lastDay.maxVolPrice === null) return null;
+               const maxP = lastDay.maxVolPrice, secP = lastDay.secondVolPrice;
+               const maxStartX = getX(lastDay.topVolIdx || 0); const secStartX = getX(lastDay.secondVolIdx || 0);
+               const lineStyle = toggles.maxVolLineStyle || { width: 1, type: 'dashed' };
+
+               return (
+                 <g pointerEvents="none">
+                    {maxP !== null && typeof maxP === 'number' && !isNaN(maxP) && maxStartX < width + 100 && (
+                      <g>
+                        <line x1={maxStartX} y1={getY(maxP)} x2={width} y2={getY(maxP)} stroke="#f97316" strokeWidth={lineStyle.width} strokeDasharray={lineStyle.type === 'dashed' ? "4,4" : ""} opacity="0.8" />
+                        <text x={Math.max(10, maxStartX)} y={getY(maxP) - 5} fill="#f97316" fontSize="11" fontWeight="bold">最大量: {maxP.toFixed(2)}</text>
+                      </g>
+                    )}
+                    {secP !== null && typeof secP === 'number' && !isNaN(secP) && secStartX < width + 100 && (
+                      <g>
+                        <line x1={secStartX} y1={getY(secP)} x2={width} y2={getY(secP)} stroke="#f472b6" strokeWidth={lineStyle.width} strokeDasharray={lineStyle.type === 'dashed' ? "4,4" : ""} opacity="0.8" />
+                        <text x={Math.max(10, secStartX)} y={getY(secP) - 5} fill="#f472b6" fontSize="11" fontWeight="bold">次大量: {secP.toFixed(2)}</text>
+                      </g>
+                    )}
+                 </g>
+               );
+            })()}
+
+            {/* ✨ 6. 【精準渲染】只有螢幕內的 K 棒才需要畫出來 */}
+            {data.map((d, i) => {
+              const x = getX(i);
+              if (x < -100 || x > width + 100) return null; // 🚀 效能殺手鐧：太遠的不畫
+              
+              const color = d.close >= d.open ? '#ef4444' : '#22c55e';
+              const hideSignals = isFocusMode && focusModeDate && d.date < focusModeDate;
+              return (
+                <g key={`candle-${i}`}>
+                  <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
+                  <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
+                  
+                  {!hideSignals && toggles.showDeductionNotice && d.deductionNotice && (
+                    <g pointerEvents="none" opacity="0.6">
+                      <line x1={x} y1={getY(d.high) - 43} x2={x} y2={getY(d.high)} stroke="#fbbf24" strokeWidth="1" strokeDasharray="2,2" />
+                      <rect x={x - 65} y={getY(d.high) - 75} width="130" height="32" fill="#0f172a" fillOpacity="0.8" rx="4" stroke="#fbbf24" strokeWidth="1" />
+                      {d.deductionNotice.split('\n').map((line, lIdx) => <text key={lIdx} x={x} y={getY(d.high) - 59 + (lIdx * 13)} fill="#fbbf24" fontSize="10" fontWeight="bold" textAnchor="middle">{line}</text>)}
+                    </g>
+                  )}
+                  
+                  <g textAnchor="middle" fontSize="12" fontWeight="bold">
+                    {!hideSignals && toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
+                    
+                    {!hideSignals && (d.customRenderMarks || (d.customMarks ? d.customMarks.map(m => ({ displayStyle: 'marker', marker: m })) : [])).map((markObj, mIdx) => {
+                      if (markObj.displayStyle === 'line') {
+                        const markY = getY(markObj.priceVal);
+                        return (
+                          <g key={`s-line-${i}-${mIdx}`}>
+                            <line x1={x} y1={markY} x2={width - paddingRight} y2={markY} stroke={markObj.lineColor} strokeWidth="1.5" strokeDasharray={markObj.lineStyle === 'dashed' ? '5,5' : 'none'} opacity="0.6" />
+                            <text x={x} y={markY - 6} fill={markObj.lineColor} fontSize="11" fontWeight="bold" textAnchor="middle">{markObj.marker} {markObj.priceVal}</text>
+                          </g>
+                        );
+                      } else if (markObj.displayStyle === 'text') {
+                        const textY = d.close >= d.open ? getY(d.high) - 15 - (mIdx * 15) : getY(d.low) + 25 + (mIdx * 15);
+                        return <text key={`s-txt-${i}-${mIdx}`} x={x} y={textY} fill={markObj.lineColor} fontSize="12" fontWeight="bold" textAnchor="middle">{markObj.marker} {markObj.priceVal}</text>;
+                      } else if (markObj.displayStyle === 'customText') {
+                        let targetPrice = d.close;
+                        if (markObj.formulaExpr) { try { const calcFunc = new Function('high', 'low', 'open', 'close', `return ${markObj.formulaExpr};`); targetPrice = calcFunc(d.high, d.low, d.open, d.close); } catch (e) { targetPrice = d.close; } }
+                        const priceStr = targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(2);
+                        let fullText = markObj.customText && markObj.formulaExpr ? `${markObj.customText} ${priceStr}` : markObj.customText ? markObj.customText : markObj.formulaExpr ? priceStr : '';
+                        const chunkSize = 12; const chunks = []; for (let j = 0; j < fullText.length; j += chunkSize) chunks.push(fullText.slice(j, j + chunkSize));
+                        const textSize = markObj.customTextSize || 12; const lineHeight = textSize + 2; 
+                        let isAbove = d.close >= d.open; if (markObj.textPlacement === 'above') isAbove = true; if (markObj.textPlacement === 'below') isAbove = false;
+                        let targetY = markObj.formulaExpr ? getY(targetPrice) : null;
+                        const textY = targetY !== null ? targetY - 6 : (isAbove ? getY(d.high) - 20 : getY(d.low) + 20);
+                        return (
+                          <g key={`s-ctxt-${i}-${mIdx}`}>
+                            {targetY !== null && <line x1={x} y1={targetY} x2={x + 65} y2={targetY} stroke={markObj.lineColor || '#38bdf8'} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.8" />}
+                            <text x={x} y={textY} fill={markObj.lineColor || '#38bdf8'} fontSize={textSize} fontWeight="bold" textAnchor="middle">
+                               <tspan x={x} dy="0">{markObj.marker || ''}</tspan>
+                               {chunks.map((chunk, cIdx) => <tspan key={cIdx} x={x} dy={lineHeight}>{chunk}</tspan>)}
+                            </text>
+                          </g>
+                        );
+                      } else {
+                        const textY = getY(d.high) - 10 - (toggles.showHeidun && d.signalHeidun ? 15 : 0) - (mIdx * 15);
+                        return <text key={`s-mrk-${i}-${mIdx}`} x={x} y={textY} fill="#818cf8">{markObj.marker}</text>;
+                      }
+                    })}
+                  </g>
+                  {!hideSignals && toggles.showTrend && d.signalTrend && <text x={x} y={getY(d.low) + 15} fontSize="14" textAnchor="middle">🔺</text>}
+                  {toggles.showMA && maParams?.ma1?.show !== false && i === data.length - (maParams?.ma1?.p || 5) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma1?.c || '#ef4444'} />}
+                  {toggles.showMA && maParams?.ma2?.show !== false && i === data.length - (maParams?.ma2?.p || 10) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma2?.c || '#eab308'} />}
+                  {toggles.showMA && maParams?.ma3?.show !== false && i === data.length - (maParams?.ma3?.p || 20) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma3?.c || '#22c55e'} />}
+                  {toggles.showMA && maParams?.ma4?.show !== false && i === data.length - (maParams?.ma4?.p || 60) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma4?.c || '#3b82f6'} />}
+                  {toggles.showMA && maParams?.ma5?.show !== false && i === data.length - (maParams?.ma5?.p || 120) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma5?.c || '#a855f7'} />}
+                  {toggles.showMA && maParams?.ma6?.show !== false && i === data.length - (maParams?.ma6?.p || 240) - 1 && <circle cx={x} cy={getY(d.close)} r="3" fill={maParams?.ma6?.c || '#f472b6'} />}
+                </g>
+              );
+            })}
+          </g>
+
+          <g transform={`translate(0, ${mainHeight})`} clipPath="url(#chartClip)">
+            {data.map((d, i) => {
+              const x = getX(i); if (x < -100 || x > width + 100) return null;
+              return <rect key={`vol-${i}`} x={x - candleWidth / 2} y={getVolY(d.volume)} width={candleWidth} height={volHeight - getVolY(d.volume)} fill={d.close >= d.open ? '#ef4444' : '#22c55e'} opacity="0.6"/>;
+            })}
+            
+            {toggles.showVolume && vmaParams?.vma1?.show !== false && <path d={getLinePath(data, 'vma1')} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth={vmaParams?.vma1?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showVolume && vmaParams?.vma2?.show !== false && <path d={getLinePath(data, 'vma2')} stroke={vmaParams?.vma2?.c || '#8b5cf6'} strokeWidth={vmaParams?.vma2?.w || 1.5} fill="none" opacity="0.8"/>}
+            {toggles.showVolume && vmaParams?.vma3?.show !== false && <path d={getLinePath(data, 'vma3')} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth={vmaParams?.vma3?.w || 1.5} fill="none" opacity="0.8"/>}
+
+            {data.map((d, i) => {
+              const x = getX(i); if (x < -100 || x > width + 100) return null;
+              
+              const isVma1TurnUp = d.vma1Slope === 1; const isVma1TurnDown = d.vma1Slope === -1;
+              const isVma2TurnUp = d.vma2Slope === 1; const isVma2TurnDown = d.vma2Slope === -1;
+              const ma55 = d.fixedMa60 ?? d.ma4 ?? d.close; const isLong = d.close >= ma55; const isShort = d.close < ma55;
+              const shouldShow = (() => { if (!toggles.showVmaTurn) return false; if (toggles.vmaLongOnly && !isLong) return false; if (toggles.vmaShortOnly && !isShort) return false; return true; });
+
+              return (
+                <g key={`volsignal-${i}`}>
+                  {toggles.showVolume && vmaParams?.vma1?.show !== false && i === data.length - (vmaParams?.vma1?.p || 5) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma1?.c || '#f59e0b'} strokeWidth="2" fill="none" />}
+                  {toggles.showVolume && vmaParams?.vma2?.show !== false && i === data.length - (vmaParams?.vma2?.p || 13) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma2?.c || '#8b5cf6'} strokeWidth="2" fill="none" />}
+                  {toggles.showVolume && vmaParams?.vma3?.show !== false && i === data.length - (vmaParams?.vma3?.p || 34) - 1 && <path d={`M ${x} ${volHeight+8} V ${volHeight+2} M ${x-2} ${volHeight+5} L ${x} ${volHeight+2} L ${x+2} ${volHeight+5}`} stroke={vmaParams?.vma3?.c || '#10b981'} strokeWidth="2" fill="none" />}
+                  
+                  {shouldShow() && isVma1TurnUp && <text x={x} y={volHeight - 5} fontSize="14" fontWeight="bold" textAnchor="middle" fill="#ef4444">▲</text>}
+                  {shouldShow() && isVma1TurnDown && <text x={x} y={12} fontSize="14" fontWeight="bold" textAnchor="middle" fill="#22c55e">▼</text>}
+                  {shouldShow() && isVma2TurnUp && <text x={x} y={volHeight - 16} fontSize="12" fontWeight="bold" textAnchor="middle" fill="#38bdf8">◆</text>}
+                  {shouldShow() && isVma2TurnDown && <text x={x} y={23} fontSize="12" fontWeight="bold" textAnchor="middle" fill="#a855f7">◆</text>}
+                  {toggles.showVolSignal && d.signalVol && <text x={x} y={getVolY(d.volume) - 5} fontSize="10" fontWeight="bold" textAnchor="middle" fill={d.signalVol === '天量' ? '#ef4444' : (d.signalVol === '巨量' ? '#f97316' : '#8b5cf6')}>{d.signalVol === '極限大量' ? '極' : d.signalVol[0]}</text>}
+                </g>
+              );
+            })}
+          </g>
+
+          {/* ✨ 動態渲染所有啟用的副圖 (包含 TOWER) */}
+          {activeSubCharts.map((chartType, index) => {
+             // 💡 關鍵：每個副圖的起始 Y 座標 = 主圖 + 成交量 + (前面有幾個副圖 * 單一副圖的高度)
+             const startY = mainHeight + volHeight + (index * singleIndicatorHeight);
+             
+             return (
+               <g key={chartType} transform={`translate(0, ${startY})`} clipPath="url(#chartClip)">
+                  {/* 副圖之間的頂部水平分隔線 */}
+                  <line x1={0} y1={0} x2={width} y2={0} stroke="#1e293b" strokeWidth="1.5" />
+                  
+                  {chartType === 'OBV' && (() => {
+                      let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
+                      if (maxO === -Infinity) { maxO = 100; minO = 0; } // 防呆
+                      const range = (maxO - minO) || 1; 
+                      const getObvY = (val) => singleIndicatorHeight - ((val - minO) / range) * (singleIndicatorHeight - 20) - 10;
+                      
+                      const midO = (maxO + minO) / 2;
+                      // 💡 格式化大數字 (例如把 15000 變成 1.5W)
+                      const fmt = (v) => Math.abs(v) >= 10000 ? (v/10000).toFixed(1) + 'W' : Math.round(v);
+
+                      return (<g>
+                          {/* ✨ 新增：OBV 頂、中、底 三條輔助線 */}
+                          <line x1={0} y1={getObvY(maxO)} x2={width} y2={getObvY(maxO)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getObvY(midO)} x2={width} y2={getObvY(midO)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getObvY(minO)} x2={width} y2={getObvY(minO)} stroke="#1e293b" strokeDasharray="4,4" />
+
+                          <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getObvY(d.obv)}`).join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                          <path d={data.map((d, i) => d.obvMa != null ? `${i===0||data[i-1]?.obvMa== null?'M':'L'} ${getX(i)} ${getObvY(d.obvMa)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+                          
+                          <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">OBV</text>
+                          <text x={paddingLeft + 40} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MA({indicatorParams.obv?.ma || 20})</text>
+                          
+                          
+                      </g>);
+                  })()}
+
+                  {chartType === 'EdwinMomentum' && (() => {
+                      let maxM = -Infinity, minM = Infinity;
+                      data.forEach(d => {
+                          if (d.edwinMomentum != null && d.edwinMomentum > maxM) maxM = d.edwinMomentum;
+                          if (d.edwinMomentum != null && d.edwinMomentum < minM) minM = d.edwinMomentum;
+                      });
+                      const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
+                      const getMomY = (val) => singleIndicatorHeight / 2 - (val / absLimit) * (singleIndicatorHeight / 2 - 15);
+                      
+                      const zeroY = getMomY(0);
+                      const alertY = getMomY(7.5);
+                      const alertLowY = getMomY(-4);
+
+                      return (
+                          <g>
+                              <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#94a3b8" strokeDasharray="4,4" opacity="0.6" />
+                              <line x1={0} y1={alertY} x2={width} y2={alertY} stroke="#ef4444" strokeDasharray="2,2" opacity="0.8" />
+                              <line x1={0} y1={alertLowY} x2={width} y2={alertLowY} stroke="#22c55e" strokeDasharray="2,2" opacity="0.8" />
+                              <path d={data.map((d, i) => d.edwinMomentum != null ? `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getMomY(d.edwinMomentum)}` : '').join(' ')} stroke="#eab308" strokeWidth="2" fill="none" />
+                              
+                              {data.map((d, i) => {
+                                  if (i === 0 || d.edwinMomentum == null) return null;
+                                  
+                                  const tradingValue = (d.volume * 1000) * d.close;
+                                  const isStrong = d.edwinMomentum >= 7.5 && tradingValue >= 500000000;
+                                  const isWeak = d.edwinMomentum <= -4 && tradingValue >= 500000000;
+                                  
+                                  if (isStrong || isWeak) {
+                                      const prevD = data[i-1];
+                                      if (prevD.edwinMomentum == null) return null;
+                                      const x1 = getX(i - 1);
+                                      const y1 = getMomY(prevD.edwinMomentum);
+                                      const x2 = getX(i);
+                                      const y2 = getMomY(d.edwinMomentum);
+                                      const lineColor = isStrong ? '#ef4444' : '#22c55e';
+                                      
+                                      return (
+                                          <g key={`mom-signal-${i}`}>
+                                              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={lineColor} strokeWidth="3" />
+                                              <circle cx={x2} cy={y2} r="3.5" fill={lineColor} />
+                                          </g>
+                                      );
+                                  }
+                                  return null;
+                              })}                             
+                             <text x={paddingLeft} y={15} fill="#eab308" fontSize="10" fontWeight="bold">動能</text>
+                          </g>
+                      );
+                  })()}
+
+                  {['外資', '投信', '自營', '投+外'].includes(chartType) && (() => {
+                      let maxV = -Infinity, minV = Infinity;
+                      data.forEach(d => {
+                          let val = 0;
+                          if (chartType === '外資') val = d.foreign || 0;
+                          else if (chartType === '投信') val = d.trust || 0;
+                          else if (chartType === '自營') val = d.dealer || 0;
+                          else if (chartType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+
+                          if (val > maxV) maxV = val;
+                          if (val < minV) minV = val;
+                      });
+                      const absMax = Math.max(Math.abs(maxV), Math.abs(minV)) || 1;
+                      const getInstY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - indPaddingLeft);
+                      const zeroY = getInstY(0);
+
+                      return (
+                          <g>
+                              <line x1={0} y1={singleIndicatorHeight / 2} x2={width} y2={singleIndicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                              {data.map((d, i) => {
+                                  let val = 0;
+                                  if (chartType === '外資') val = d.foreign || 0;
+                                  else if (chartType === '投信') val = d.trust || 0;
+                                  else if (chartType === '自營') val = d.dealer || 0;
+                                  else if (chartType === '投+外') val = (d.foreign || 0) + (d.trust || 0);
+
+                                  const y = getInstY(val);
+                                  const color = val >= 0 ? '#ef4444' : '#22c55e';
+                                  return <rect key={`inst-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={color} opacity="0.8"/>;
+                              })}
+                              <text x={paddingLeft} y={15} fill="#f8fafc" fontSize="10" fontWeight="bold">
+                                  {chartType === '外資' ? '外資買賣超(張)' : chartType === '投信' ? '投信買賣超(張)' : chartType === '自營' ? '自營商買賣超(張)' : '投信+外資 合計買賣超(張)'}
+                              </text>
+                          </g>
+                      );
+                  })()}
+
+                  {chartType === '資券' && (() => {
+                      let maxM = -Infinity, minM = Infinity; 
+                      data.forEach(d => { 
+                          if (d.marginDiff != null && d.marginDiff > maxM) maxM = d.marginDiff; if (d.marginDiff != null && d.marginDiff < minM) minM = d.marginDiff; 
+                          if (d.shortDiff != null && d.shortDiff > maxM) maxM = d.shortDiff; if (d.shortDiff != null && d.shortDiff < minM) minM = d.shortDiff; 
+                      });
+                      const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
+                      const getMarginY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - indPaddingLeft);
+                      return (<g>
+                          <line x1={0} y1={singleIndicatorHeight / 2} x2={width} y2={singleIndicatorHeight / 2} stroke="#1e293b" strokeDasharray="4,4" />
+                          {data.map((d, i) => {
+                              const y = getMarginY(d.marginDiff || 0); const zeroY = getMarginY(0);
+                              return <rect key={`margin-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={(d.marginDiff || 0) >= 0 ? '#ef4444' : '#22c55e'} opacity="0.7"/>; 
+                          })}
+                          <path d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getMarginY(d.shortDiff || 0)}`).join(' ')} stroke="#3b82f6" strokeWidth="1.5" fill="none" />
+                          <text x={paddingLeft} y={15} fill="#ef4444" fontSize="10" fontWeight="bold">融資增減(柱)</text>
+                          <text x={paddingLeft + 80} y={15} fill="#3b82f6" fontSize="10" fontWeight="bold">融券增減(線)</text>
+                      </g>);
+                  })()}
+                  
+                  {chartType === 'MACD' && (() => {
+                          let maxM = -Infinity, minM = Infinity; 
+                          data.forEach(d => { 
+                              if(d.macd) {
+                                 if (d.macd.dif != null && d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif != null && d.macd.dif < minM) minM = d.macd.dif; 
+                                 if (d.macd.macd != null && d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd != null && d.macd.macd < minM) minM = d.macd.macd; 
+                                 if (d.macd.osc != null && d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc != null && d.macd.osc < minM) minM = d.macd.osc; 
+                              }
+                          });
+                          const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
+                          const getMyY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - 10);
+                          const zeroY = getMyY(0); 
+
+                          return (<g>
+                                  <line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke="#1e293b" strokeDasharray="4,4" />
+                                  {data.map((d, i) => { 
+                                      if(!d.macd || d.macd.osc == null) return null;
+                                      const y = getMyY(d.macd.osc); 
+                                      return <rect key={`osc-${i}`} x={getX(i) - candleWidth / 2} y={Math.min(y, zeroY)} width={candleWidth} height={Math.max(1, Math.abs(y - zeroY))} fill={d.macd.osc >= 0 ? '#ef4444' : '#22c55e'} opacity="0.6"/>; 
+                                  })}
+                                  <path d={data.map((d, i) => (d.macd && d.macd.dif != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.dif)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  <path d={data.map((d, i) => (d.macd && d.macd.macd != null) ? `${i===0?'M':'L'} ${getX(i)} ${getMyY(d.macd.macd)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                                  <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">MACD ({indicatorParams.macd.fast}, {indicatorParams.macd.slow}, {indicatorParams.macd.signal})</text>
+                                  
+                                  
+                              </g>);
+                  })()}
+                  
+                  {chartType === 'KD' && (() => {
+                          const getKdY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
+                          return (<g>
+                                  <line x1={0} y1={getKdY(80)} x2={width} y2={getKdY(80)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  {/* ✨ 補上 50 的中軸線 */}
+                                  <line x1={0} y1={getKdY(50)} x2={width} y2={getKdY(50)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getKdY(20)} x2={width} y2={getKdY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  
+                                  <path d={data.map((d, i) => (d.kd && d.kd.k != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.k)}` : '').join(' ')} stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+                                  <path d={data.map((d, i) => (d.kd && d.kd.d != null) ? `${i===0?'M':'L'} ${getX(i)} ${getKdY(d.kd.d)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  
+                                  <text x={paddingLeft} y={15} fill="#f59e0b" fontSize="10" fontWeight="bold">KD ({indicatorParams.kd.rsv}, {indicatorParams.kd.k}, {indicatorParams.kd.d})</text>
+                                  
+                                  
+                                  
+                              </g>);
+                  })()}
+                  
+                  {chartType === 'RSI' && (() => {
+                          const getRsiY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
+                          return (<g>
+                                  <line x1={0} y1={getRsiY(80)} x2={width} y2={getRsiY(80)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getRsiY(50)} x2={width} y2={getRsiY(50)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  <line x1={0} y1={getRsiY(20)} x2={width} y2={getRsiY(20)} stroke="#1e293b" strokeDasharray="4,4" />
+                                  
+                                  <path d={data.map((d, i) => (d.rsi && d.rsi.rsi1 != null) ? `${i===0||data[i-1]?.rsi?.rsi1==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi1)}` : '').join(' ')} stroke="#ec4899" strokeWidth="1.5" fill="none" />
+                                  <path d={data.map((d, i) => (d.rsi && d.rsi.rsi2 != null) ? `${i===0||data[i-1]?.rsi?.rsi2==null?'M':'L'} ${getX(i)} ${getRsiY(d.rsi.rsi2)}` : '').join(' ')} stroke="#38bdf8" strokeWidth="1.5" fill="none" />
+                                  
+                                  <text x={paddingLeft} y={15} fill="#ec4899" fontSize="10" fontWeight="bold">RSI ({indicatorParams.rsi.p1}, {indicatorParams.rsi.p2})</text>
+
+                                  {/* ✨ 新增：RSI 右側 80/50/20 標籤 */}
+                                  
+                              </g>);
+                  })()}
+
+                  {/* ✨ 新增：獨立出來的寶塔線副圖 */}
+                  {chartType === 'TOWER' && (() => {
+                      let maxT = -Infinity, minT = Infinity; 
+                      data.forEach(d => { 
+                        if (d.tower?.top > maxT) maxT = d.tower.top; 
+                        if (d.tower?.bottom < minT) minT = d.tower.bottom; 
+                      });
+                      if (maxT === -Infinity) { maxT = 100; minT = 0; } // 防呆
+                      const range = (maxT - minT) || 1; 
+                      const getTY = (val) => singleIndicatorHeight - ((val - minT) / range) * (singleIndicatorHeight - 20) - 10;
+                      
+                      const midT = (maxT + minT) / 2;
+
+                      return (<g>
+                          {/* ✨ 新增：寶塔線 頂、中、底 三條輔助線 */}
+                          <line x1={0} y1={getTY(maxT)} x2={width} y2={getTY(maxT)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getTY(midT)} x2={width} y2={getTY(midT)} stroke="#1e293b" strokeDasharray="4,4" />
+                          <line x1={0} y1={getTY(minT)} x2={width} y2={getTY(minT)} stroke="#1e293b" strokeDasharray="4,4" />
+
+                          {data.map((d, i) => { 
+                            if(!d.tower) return null; 
+                            return <rect key={`tw-${i}`} x={getX(i) - candleWidth/1.5} y={getTY(d.tower.top)} width={candleWidth*1.33} height={Math.max(1, Math.abs(getTY(d.tower.bottom) - getTY(d.tower.top)))} fill={d.tower.color} opacity="0.85" />; 
+                          })}
+                          
+                          <text x={paddingLeft} y={15} fill="#38bdf8" fontSize="10" fontWeight="bold">寶塔線 ({indicatorParams.tower?.p || 3}日)</text>
+                          
+                          
+                      </g>);
+                  })()}
+
+               </g>
+             );
+          })}
+
+          <g clipPath="url(#chartClip)">
+            {drawings.map(d => renderDrawingObject(d))}
+            {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && draftPoints.length > 0 && hoverPoint &&
+              renderDrawingObject({ type: activeTool, points: activeTool === 'crossline' ? [hoverPoint] : [...draftPoints, hoverPoint], color: drawColor, width: drawWidth, opacity: drawOpacity }, true)
+            }
+          </g>
+
+          {/* 查價線 */}
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && (() => {
+            // ✨ 如果滑鼠移動到未來空白區，data[crosshair.idx] 會是 undefined，防呆處理
+            const hoverD = data[crosshair.idx] || { date: '未來預測區', open: 0, high: 0, low: 0, close: 0, volume: 0 };
+            
+            const tooltipLines = [];
+            tooltipLines.push({ color: '#94a3b8', text: hoverD?.date });
+            tooltipLines.push({ color: '#e2e8f0', text: `開： ${hoverD?.open?.toFixed(2)}` });
+            tooltipLines.push({ color: '#e2e8f0', text: `高： ${hoverD?.high?.toFixed(2)}` });
+            tooltipLines.push({ color: '#e2e8f0', text: `低： ${hoverD?.low?.toFixed(2)}` });
+            tooltipLines.push({ color: '#e2e8f0', text: `收： ${hoverD?.close?.toFixed(2)}` });
+            
+            const prevD = crosshair.idx > 0 && data[crosshair.idx - 1] ? data[crosshair.idx - 1] : null;
+            const changeRatio = (prevD && prevD.close > 0) ? ((hoverD.close - prevD.close) / prevD.close) * 100 : 0;
+            const changeColor = changeRatio > 0 ? '#ef4444' : (changeRatio < 0 ? '#22c55e' : '#e2e8f0');
+            const changeSign = changeRatio > 0 ? '+' : '';
+            
+            tooltipLines.push({ color: changeColor, text: `漲跌： ${changeSign}${changeRatio.toFixed(2)}%` });
+            tooltipLines.push({ color: '#e2e8f0', text: `量： ${hoverD?.volume} 張` });
+            
+            if (activeIndicators === 'EdwinMomentum' && hoverD?.edwinMomentum !== undefined) {
+                const momVal = hoverD.edwinMomentum;
+                const momColor = momVal >= 0 ? '#ef4444' : '#22c55e';
+                tooltipLines.push({ color: momColor, text: `動能： ${momVal.toFixed(2)}` });
+            }
+            if (toggles.showMA) {
+                if (maParams?.ma1?.show !== false) tooltipLines.push({ color: maParams?.ma1?.c || '#ef4444', text: `MA${maParams?.ma1?.p || 5}： ${hoverD?.ma1?.toFixed(2) || '-'}` });
+                if (maParams?.ma2?.show !== false) tooltipLines.push({ color: maParams?.ma2?.c || '#eab308', text: `MA${maParams?.ma2?.p || 10}： ${hoverD?.ma2?.toFixed(2) || '-'}` });
+                if (maParams?.ma3?.show !== false) tooltipLines.push({ color: maParams?.ma3?.c || '#22c55e', text: `MA${maParams?.ma3?.p || 20}： ${hoverD?.ma3?.toFixed(2) || '-'}` });
+                if (maParams?.ma4?.show !== false) tooltipLines.push({ color: maParams?.ma4?.c || '#3b82f6', text: `MA${maParams?.ma4?.p || 60}： ${hoverD?.ma4?.toFixed(2) || '-'}` });
+                if (maParams?.ma5?.show !== false) tooltipLines.push({ color: maParams?.ma5?.c || '#a855f7', text: `MA${maParams?.ma5?.p || 120}： ${hoverD?.ma5?.toFixed(2) || '-'}` });
+                if (maParams?.ma6?.show !== false) tooltipLines.push({ color: maParams?.ma6?.c || '#f472b6', text: `MA${maParams?.ma6?.p || 240}： ${hoverD?.ma6?.toFixed(2) || '-'}` });
+            }
+            if (toggles.showVolume && vmaParams?.vma1?.show !== false) {
+                tooltipLines.push({ color: vmaParams?.vma1?.c || '#f59e0b', text: `VMA${vmaParams?.vma1?.p || 5}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
+            }
+
+            if (toggles.showTooltipDetail) {
+                if (toggles.showBBands) {
+                    tooltipLines.push({ color: '#a855f7', text: `布林上： ${hoverD?.bbands?.up?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: '#d8b4fe', text: `布林中： ${hoverD?.bbands?.mid?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: '#a855f7', text: `布林下： ${hoverD?.bbands?.down?.toFixed(2) || '-'}` });
+                }
+                if (toggles.showBBands3) {
+                    tooltipLines.push({ color: '#f472b6', text: `高布林上： ${hoverD?.bbands?.up3?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: '#f472b6', text: `高布林下： ${hoverD?.bbands?.down3?.toFixed(2) || '-'}` });
+                }
+                if (toggles.showSAR && hoverD?.sar !== undefined) {
+                    tooltipLines.push({ color: '#d946ef', text: `SAR： ${hoverD?.sar?.toFixed(2) || '-'}` });
+                }
+                if (toggles.showVolume) {
+                    if (vmaParams?.vma2?.show !== false) tooltipLines.push({ color: vmaParams?.vma2?.c || '#8b5cf6', text: `VMA${vmaParams?.vma2?.p || 13}： ${hoverD?.vma2?.toFixed(2) || '-'}` });
+                    if (vmaParams?.vma3?.show !== false) tooltipLines.push({ color: vmaParams?.vma3?.c || '#10b981', text: `VMA${vmaParams?.vma3?.p || 34}： ${hoverD?.vma3?.toFixed(2) || '-'}` });
+                }
+
+                if (activeIndicators === 'MACD') {
+                    tooltipLines.push({ color: "#38bdf8", text: `DIF： ${hoverD?.macd?.dif?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: "#f59e0b", text: `MACD： ${hoverD?.macd?.macd?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: hoverD?.macd?.osc >= 0 ? '#ef4444' : '#22c55e', text: `OSC： ${hoverD?.macd?.osc?.toFixed(2) || '-'}` });
+                } else if (activeIndicators === 'KD') {
+                    tooltipLines.push({ color: "#f59e0b", text: `K(${indicatorParams.kd.k})： ${hoverD?.kd?.k?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: "#38bdf8", text: `D(${indicatorParams.kd.d})： ${hoverD?.kd?.d?.toFixed(2) || '-'}` });
+                } else if (activeIndicators === 'RSI') {
+                    tooltipLines.push({ color: "#ec4899", text: `RSI(${indicatorParams.rsi.p1})： ${hoverD?.rsi?.rsi1?.toFixed(2) || '-'}` });
+                    tooltipLines.push({ color: "#38bdf8", text: `RSI(${indicatorParams.rsi.p2})： ${hoverD?.rsi?.rsi2?.toFixed(2) || '-'}` });
+                } else if (activeIndicators === 'OBV') {
+                    tooltipLines.push({ color: "#eab308", text: `OBV： ${hoverD?.obv}` });
+                    tooltipLines.push({ color: "#38bdf8", text: `MA： ${hoverD?.obvMa?.toFixed(0) || '-'}` });
+                } else if (activeIndicators === 'TOWER') {
+                    tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔頂： ${hoverD?.tower?.top?.toFixed(2)}` });
+                    tooltipLines.push({ color: hoverD?.tower?.color, text: `寶塔底： ${hoverD?.tower?.bottom?.toFixed(2)}` });
+                } else if (['外資', '投信', '自營', '投+外'].includes(activeIndicators)) {
+                    if (activeIndicators === '外資') tooltipLines.push({ color: "#f472b6", text: `外資： ${hoverD?.foreign?.toFixed(0) || 0} 張` });
+                    if (activeIndicators === '投信') tooltipLines.push({ color: "#34d399", text: `投信： ${hoverD?.trust?.toFixed(0) || 0} 張` });
+                    if (activeIndicators === '自營') tooltipLines.push({ color: "#fbbf24", text: `自營： ${hoverD?.dealer?.toFixed(0) || 0} 張` });
+                    if (activeIndicators === '投+外') {
+                        tooltipLines.push({ color: "#f472b6", text: `外資： ${hoverD?.foreign?.toFixed(0) || 0} 張` });
+                        tooltipLines.push({ color: "#34d399", text: `投信： ${hoverD?.trust?.toFixed(0) || 0} 張` });
+                        tooltipLines.push({ color: "#38bdf8", text: `合買： ${((hoverD?.foreign || 0) + (hoverD?.trust || 0)).toFixed(0)} 張` });
+                    }
+                } else if (activeIndicators === '資券') {
+                    tooltipLines.push({ color: "#ef4444", text: `融資增減： ${hoverD?.marginDiff?.toFixed(0) || 0} 張` });
+                    tooltipLines.push({ color: "#3b82f6", text: `融券增減： ${hoverD?.shortDiff?.toFixed(0) || 0} 張` });
+                }
+            }
+
+            const boxWidth = 140; 
+            const boxHeight = tooltipLines.length * 22 + 10;
+            
+            // ✨ 虛擬視窗引擎中，原生捲軸 scrollLeft 永遠是 0，直接使用滑鼠的 rawX 就是螢幕座標
+            const screenX = crosshair.x;
+            let tooltipX = screenX > (width * 0.6) ? crosshair.x - boxWidth - 15 : crosshair.x + 15;
+            
+            if (tooltipX + boxWidth > width) tooltipX = crosshair.x - boxWidth - 15;
+            if (tooltipX < 0) tooltipX = 15;
+
+            let tooltipY = crosshair.y - boxHeight / 2;
+            if (tooltipY < 0) tooltipY = 5; 
+            if (tooltipY + boxHeight > mainHeight + volHeight + indicatorHeight) tooltipY = mainHeight + volHeight + indicatorHeight - boxHeight - 5;
+
+            return (
+              <g className="pointer-events-none">
+                <line x1={crosshair.x} y1={paddingLeft} x2={crosshair.x} y2={mainHeight + volHeight + indicatorHeight} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" />
+                {crosshair.priceHover !== null && (
+                  <g>
+                    <line x1={0} y1={crosshair.y} x2={width} y2={crosshair.y} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" />
+                    <rect x={width - 55} y={crosshair.y - 12} width={55} height={24} fill="#0ea5e9" rx="4" />
+                    <text x={width - 27} y={crosshair.y + 4} fill="#0f172a" fontSize="13" fontWeight="bold" textAnchor="middle">{crosshair.priceHover.toFixed(2)}</text>
+                  </g>
+                )}
+                <g transform={`translate(${tooltipX}, ${tooltipY})`} opacity="0.8">
+                  <rect x={0} y={0} width={boxWidth} height={boxHeight} fill="rgba(15, 23, 42, 0.30)" stroke="#0ea5e9" rx="8" />
+                  {tooltipLines.map((l, i) => <text key={i} x={12} y={22 + i * 22} fontSize="13" fill={l.color} fontWeight="bold" opacity="0.8">{l.text}</text>)}
+                </g>
+              </g>
+            );
+          })()}
+
+          {/* 圖表底部圖例 */}
+          <g id="bottom-legend-group" transform={`translate(${width / 2}, ${mainHeight + volHeight + indicatorHeight + 60})`} textAnchor="middle" fontSize="14" fill="#94a3b8">
+            {toggles.showTrend && <text x="-240"><tspan fill="#10b981" fontWeight="bold">🔺</tspan> 起漲</text>}
+            {toggles.showVolSignal && <text x="-160"><tspan fill="#ef4444" fontWeight="bold">天</tspan> 天量</text>}
+            {toggles.showVolSignal && <text x="-80"><tspan fill="#f97316" fontWeight="bold">巨</tspan> 巨量</text>}
+            {toggles.showVolSignal && <text x="0"><tspan fill="#8b5cf6" fontWeight="bold">極</tspan> 極限量</text>}
+            {toggles.showHeidun && <text x="80"><tspan fill="#f8fafc" fontWeight="bold">黑頓</tspan></text>}
+            {customStrategies.filter(s => s.isActive).map((strat, idx) => <text key={strat.id} x={180 + (idx * 100)}><tspan fill="#4f46e5" fontWeight="bold">{strat.marker}</tspan> {strat.name}</text>)}
+          </g>
+
+          {/* 雙缺口線 */}
+          {Object.values(gapLevels).map((l, i) => {
+            const currentItem = l.date && data ? data.find(d => d.date === l.date) : null;
+            const targetVal = currentItem ? currentItem[l.priceType] : null;
+            if (!l.active || targetVal === null) return null;
+            return (
+              <g key={`gap-${i}`}>
+                <line x1={0} y1={getY(targetVal)} x2={width} y2={getY(targetVal)} stroke={i === 0 ? "#f472b6" : "#fbbf24"} strokeWidth="2" strokeDasharray="6,4" opacity="0.7" pointerEvents="none" />
+                <text x={paddingLeft + 5} y={getY(targetVal) - 5} fill={i === 0 ? "#f472b6" : "#fbbf24"} fontSize="11" fontWeight="bold" pointerEvents="none">缺口線 {i+1}: {targetVal.toFixed(2)}</text>
+              </g>
+            );
+          })}
+          
+          <g>
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const priceLabel = drawMinPrice + (drawMaxPrice - drawMinPrice) * ratio;
+              return <line key={`grid-p-${ratio}`} x1={0} y1={getY(priceLabel)} x2={width} y2={getY(priceLabel)} stroke="#1e293b" strokeDasharray="2,6" opacity="0.5" />;
+            })}
+          </g>
+
+          <g>
+            {[0.33, 0.66, 1].map((ratio) => {
+              const volLabel = maxVol * ratio;
+              return <line key={`grid-v-${ratio}`} x1={0} y1={mainHeight + getVolY(volLabel)} x2={width} y2={mainHeight + getVolY(volLabel)} stroke="#1e293b" strokeDasharray="2,6" opacity="0.5" />;
+            })}
+          </g>
+
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
+            <line x1={0} y1={crosshair.y} x2={width} y2={crosshair.y} stroke="#38bdf8" strokeDasharray="4,4" strokeWidth="1.2" pointerEvents="none" />
+          )}          
+        </svg>
+      </div>  
+
+        {/* 固定 Y 軸刻度區 */}
+        <div className="pointer-events-none z-50 bg-[#020617]/95 border-l border-slate-800 shadow-2xl shrink-0" style={{ width: `${yAxisWidth}px`, height: '100%' }}>
+          <svg width={yAxisWidth} height={totalSVGHeight}>
+          <g transform="translate(5, 0)">
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const priceLabel = activeMin + (activeMax - activeMin) * ratio; 
+              let textY = getY(drawMinPrice + (drawMaxPrice - drawMinPrice) * ratio); 
+              if (ratio === 1) textY += 10;
+              if (ratio === 0) textY -= 5;
+              return (
+                <g key={`sticky-y-price-${ratio}`}>
+                  <line x1="-5" y1={textY} x2="0" y2={textY} stroke="#475569" strokeWidth="1" />
+                  <text x="2" y={textY} fill="#cbd5e1" fontSize="11" fontWeight="bold" dominantBaseline="middle">{priceLabel > 1000 ? Math.round(priceLabel) : priceLabel.toFixed(1)}</text>
+                </g>
+              );
+            })}
+          </g>
+          <g transform={`translate(5, ${mainHeight})`}>
+            {[0.33, 0.66, 1].map((ratio) => {
+              const volLabel = realMaxVol * ratio; 
+              let textY = getVolY(maxVol * ratio); 
+              return (
+                <g key={`sticky-y-vol-${ratio}`}>
+                  <line x1="-5" y1={textY} x2="0" y2={textY} stroke="#475569" strokeWidth="1" />
+                  <text x="2" y={textY} fill="#94a3b8" fontSize="10" dominantBaseline="middle">{Math.round(volLabel)}</text>
+                </g>
+              );
+            })}
+          </g>
+          {/* ✨ 動態渲染所有啟用副圖的 Y 軸刻度 */}
+          {activeSubCharts.map((chartType, index) => {
+             const startY = mainHeight + volHeight + (index * singleIndicatorHeight);
+             
+             return (
+               <g key={`sticky-y-${chartType}`} transform={`translate(5, ${startY})`}>
+                  {chartType === 'OBV' && (() => {
+                      let maxO = -Infinity, minO = Infinity; data.forEach(d => { if (d.obv > maxO) maxO = d.obv; if (d.obv < minO) minO = d.obv; if (d.obvMa !== null && d.obvMa > maxO) maxO = d.obvMa; if (d.obvMa !== null && d.obvMa < minO) minO = d.obvMa; });
+                      if (maxO === -Infinity) { maxO = 100; minO = 0; }
+                      const range = (maxO - minO) || 1; 
+                      const getObvY = (val) => singleIndicatorHeight - ((val - minO) / range) * (singleIndicatorHeight - 20) - 10;
+                      const midO = (maxO + minO) / 2;
+                      const fmt = (v) => Math.abs(v) >= 10000 ? (v/10000).toFixed(1) + 'W' : Math.round(v);
+                      return (<>
+                        <text x="2" y={getObvY(maxO) + 6} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(maxO)}</text>
+                        <text x="2" y={getObvY(midO)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">{fmt(midO)}</text>
+                        <text x="2" y={getObvY(minO) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{fmt(minO)}</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'EdwinMomentum' && (() => {
+                      let maxM = -Infinity, minM = Infinity;
+                      data.forEach(d => { if (d.edwinMomentum != null && d.edwinMomentum > maxM) maxM = d.edwinMomentum; if (d.edwinMomentum != null && d.edwinMomentum < minM) minM = d.edwinMomentum; });
+                      const absLimit = Math.max(Math.abs(maxM), Math.abs(minM), 10) * 1.1;
+                      const getMomY = (val) => singleIndicatorHeight / 2 - (val / absLimit) * (singleIndicatorHeight / 2 - 15);
+                      return (<>                        
+                        <text x="2" y={getMomY(7.5)} fill="#ef4444" fontSize="10" fontWeight="bold" dominantBaseline="middle">7.5</text>
+                        <text x="2" y={getMomY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>
+                        <text x="2" y={getMomY(-4)} fill="#22c55e" fontSize="10" fontWeight="bold" dominantBaseline="middle">-4</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'MACD' && (() => {
+                      let maxM = -Infinity, minM = Infinity; 
+                      data.forEach(d => { if(d.macd) { if (d.macd.dif != null && d.macd.dif > maxM) maxM = d.macd.dif; if (d.macd.dif != null && d.macd.dif < minM) minM = d.macd.dif; if (d.macd.macd != null && d.macd.macd > maxM) maxM = d.macd.macd; if (d.macd.macd != null && d.macd.macd < minM) minM = d.macd.macd; if (d.macd.osc != null && d.macd.osc > maxM) maxM = d.macd.osc; if (d.macd.osc != null && d.macd.osc < minM) minM = d.macd.osc; } });
+                      const absMax = Math.max(Math.abs(maxM), Math.abs(minM)) || 1; 
+                      const getMyY = (val) => singleIndicatorHeight / 2 - (val / absMax) * (singleIndicatorHeight / 2 - 10);
+                      return (<text x="2" y={getMyY(0)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">0</text>);
+                  })()}
+
+                  {chartType === 'KD' && (() => {
+                      const getKdY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
+                      return (<>
+                        <text x="2" y={getKdY(80)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">80</text>
+                        <text x="2" y={getKdY(50)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">50</text>
+                        <text x="2" y={getKdY(20)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">20</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'RSI' && (() => {
+                      const getRsiY = (val) => singleIndicatorHeight - ((val) / 100) * (singleIndicatorHeight - 20) - 10;
+                      return (<>
+                        <text x="2" y={getRsiY(80)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">80</text>
+                        <text x="2" y={getRsiY(50)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">50</text>
+                        <text x="2" y={getRsiY(20)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">20</text>
+                      </>);
+                  })()}
+
+                  {chartType === 'TOWER' && (() => {
+                      let maxT = -Infinity, minT = Infinity; 
+                      data.forEach(d => { if (d.tower?.top > maxT) maxT = d.tower.top; if (d.tower?.bottom < minT) minT = d.tower.bottom; });
+                      if (maxT === -Infinity) { maxT = 100; minT = 0; }
+                      const range = (maxT - minT) || 1; 
+                      const getTY = (val) => singleIndicatorHeight - ((val - minT) / range) * (singleIndicatorHeight - 20) - 10;
+                      const midT = (maxT + minT) / 2;
+                      return (<>
+                        <text x="2" y={getTY(maxT) + 6} fill="#94a3b8" fontSize="10" fontWeight="bold">{maxT > 1000 ? Math.round(maxT) : maxT.toFixed(1)}</text>
+                        <text x="2" y={getTY(midT)} fill="#94a3b8" fontSize="10" fontWeight="bold" dominantBaseline="middle">{midT > 1000 ? Math.round(midT) : midT.toFixed(1)}</text>
+                        <text x="2" y={getTY(minT) - 4} fill="#94a3b8" fontSize="10" fontWeight="bold">{minT > 1000 ? Math.round(minT) : minT.toFixed(1)}</text>
+                      </>);
+                  })()}
+               </g>
+             );
+          })}
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
+            <g>
+              <rect x={0} y={crosshair.y - 12} width={yAxisWidth} height={24} fill="#ef4444" rx="2" />
+              <text x={yAxisWidth / 2} y={crosshair.y + 4} fill="#ffffff" fontSize="12" fontWeight="bold" textAnchor="middle">{crosshair.priceHover > 1000 ? Math.round(crosshair.priceHover) : crosshair.priceHover.toFixed(2)}</text>
+            </g>
+          )}
+        </svg>
+      </div>
+     </div>
+    </div> 
+  );
+};
 const generateMockData = () => {
   let price = 500;
   const today = new Date();
