@@ -3281,7 +3281,7 @@ const App = () => {
             }
           }
         } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
-      } // ✨ 就是缺了這個右括號！！已經幫您補上了！
+      } 
 
       // ==========================================
       // ✨ [FinMind 融合區塊] 開始 (包含基本面)
@@ -4954,9 +4954,7 @@ const handleOpenSectorMomentum = async () => {
                 totalDataLength={klineData.length}
                 savedLayouts={savedLayouts}        // ✨ 傳入畫板資料
                 setSavedLayouts={setSavedLayouts}  // ✨ 傳入更新畫板的方法
-                onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
-                showFvgIndicator={showFvgIndicator}
-                setShowFvgIndicator={setShowFvgIndicator}
+                onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法               
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
                 rankingModalContent={
