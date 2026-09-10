@@ -6919,7 +6919,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 const sarColor = d.sarTrend === 1 ? '#ef4444' : '#22c55e';
                 return <circle key={`sar-${i}`} cx={x} cy={getY(d.sar)} r="2" fill={sarColor} opacity="0.4" />;
             })}
-            {/* 🌟 升級版 FVG 缺口自動偵測：實體區間方框與向右延伸中線繪製 */}
+            {/* 🌟 升級版 FVG 缺口自動偵測與橫向延伸中線繪製 */}
 {showFvgIndicator && data.map((d, i, arr) => {
   // 必須確保左右兩側都有 K 棒可供對照 (需要 i >= 2 且 i < arr.length - 1)
   if (i < 2 || i >= arr.length - 1) return null;
@@ -6939,65 +6939,41 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       // 4. 依照您的要求計算中線價：(右側最低價 + 左側最高價) / 2
       const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
       
-      // 5. 計算方框與延伸線的座標
-      const xBoxStart = getX(i - 2);   // 從左邊那根（i-2）的 X 開始
-      const xMiddle = getX(i - 1);     // 中間那根（i-1）的 X
-      const xEnd = xMiddle + 80;       // 向右延伸一小段距離供觀察
-      
-      const boxWidth = Math.max(30, xEnd - xBoxStart); // 方框總寬度
+      const yCoord = getY(fvgPrice);
+      const xStart = getX(i - 1); // 釘在中間那根 K 棒的 X 座標
+      const xEnd = xStart + 80;   // 向右延伸一小段距離供觀察
 
-      // 6. 計算價位對應的 Y 座標（左側高點為方框上緣，右側低點為方框下緣）
-      const yHigh = getY(leftCandle.high);   // 左側最高價 (方框上緣)
-      const yLow = getY(rightCandle.low);    // 右側最低價 (方框下緣)
-      const yMid = getY(fvgPrice);           // FVG 中線價
-
-      if (yLow < paddingLeft || yHigh > mainHeight - paddingLeft) return null;
+      if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
 
       return (
-        <g key={`fvg-${i}`} pointerEvents="none">
-          {/* 🌟 FVG 實體區間方框 (半透明填色，讓 K 棒穿透但能清楚看見區間範圍) */}
-          <rect 
-            x={xBoxStart} 
-            y={yHigh} 
-            width={boxWidth} 
-            height={Math.max(4, yLow - yHigh)} 
-            fill="#f59e0b" 
-            fillOpacity="0.15" 
-            stroke="#f59e0b" 
-            strokeWidth="1.2" 
-            strokeDasharray="2,2" 
-            rx="2"
-          />
-
-          {/* 🌟 從左側一直貫穿到右側延伸的橫向中線虛線 */}
+        <g key={`fvg-${i}`}>
+          {/* 從中間那根 K 棒開始，向右畫出短的橫向虛線 */}
           <line 
-            x1={xBoxStart} 
-            y1={yMid} 
+            x1={xStart} 
+            y1={yCoord} 
             x2={xEnd} 
-            y2={yMid} 
-            stroke="#fbbf24" 
+            y2={yCoord} 
+            stroke="#f59e0b" 
             strokeWidth="1.5" 
             strokeDasharray="3,3" 
           />
-
-          {/* 🌟 價格標籤背景框 (放在延伸線最右側，徹底避開 K 棒密集區，絕對不被遮擋) */}
+          {/* 價格標籤背景框 */}
           <rect 
             x={xEnd - 45} 
-            y={yMid - 18} 
+            y={yCoord - 18} 
             width="75" 
             height="16" 
             fill="#0f172a" 
-            fillOpacity="0.95" 
+            fillOpacity="0.9" 
             rx="3" 
-            stroke="#fbbf24" 
-            strokeWidth="1.2" 
+            stroke="#f59e0b" 
+            strokeWidth="1" 
           />
-
-          {/* 🌟 FVG 字樣與計算價格文字 */}
+          {/* 計算出來的中間價格文字 */}
           <text 
             x={xEnd - 7} 
-            y={yMid - 6} 
-            fill="#fbbf24" 
+            y={yCoord - 6} 
+            fill="#f59e0b" 
             fontSize="9" 
             fontWeight="bold" 
             textAnchor="middle"
