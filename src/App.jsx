@@ -3281,7 +3281,7 @@ const App = () => {
             }
           }
         } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
-      } 
+      } // ✨ 就是缺了這個右括號！！已經幫您補上了！
 
       // ==========================================
       // ✨ [FinMind 融合區塊] 開始 (包含基本面)
@@ -4738,18 +4738,6 @@ const handleOpenSectorMomentum = async () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
-                  {/* 📊 控制面板內的 FVG 按鈕 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700">
-          <input 
-            type="checkbox" 
-            checked={showFvgIndicator} 
-            onChange={() => setShowFvgIndicator(!showFvgIndicator)} 
-            className="w-3.5 h-3.5 text-amber-400 rounded bg-slate-900 border-slate-600" 
-          />
-          <span className="text-xs text-amber-400 font-bold">FVG中線</span>
-        </label>
-      </div>
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -4954,7 +4942,7 @@ const handleOpenSectorMomentum = async () => {
                 totalDataLength={klineData.length}
                 savedLayouts={savedLayouts}        // ✨ 傳入畫板資料
                 setSavedLayouts={setSavedLayouts}  // ✨ 傳入更新畫板的方法
-                onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法               
+                onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
                 rankingModalContent={
@@ -5652,15 +5640,13 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (🚀 PRO 級虛擬視窗引擎升級版) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, setShowFvgIndicator, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
- 
-  
 
   // ✨ 1. 【虛擬視窗引擎核心】
   // rightOffset: 記錄畫面距離最新 K 棒往左平移了多少根 K 棒
@@ -6915,59 +6901,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 const x = getX(i); if (x < -20 || x > width + 20) return null; // 效能過濾
                 const sarColor = d.sarTrend === 1 ? '#ef4444' : '#22c55e';
                 return <circle key={`sar-${i}`} cx={x} cy={getY(d.sar)} r="2" fill={sarColor} opacity="0.4" />;
-            })}
-            {/* 🌟 第三步：FVG 缺口自動偵測與橫向延伸中線繪製 (貼在這裡剛剛好！) */}
-            {showFvgIndicator && data.map((d, i, arr) => {
-              if (i < 2) return null;
-              const prev1Low = arr[i - 1].low;    // 1日前（昨天）的最低價
-              const prev2High = arr[i - 2].high;  // 2日前（大前天）的最高價
-              
-              if (prev1Low > prev2High) {
-                // 依公式計算中線價：(1日前低點 + 2日前高點) / 2
-                const fvgPrice = (arr[i - 1].low + arr[i - 2].high) / 2;
-                
-                const yCoord = getY(fvgPrice);
-                const xStart = getX(i - 1); 
-                const xEnd = xStart + 80; // 向右延伸一段供觀察
-
-                if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
-
-                return (
-                  <g key={`fvg-${i}`}>
-                    <line 
-                      x1={xStart} 
-                      y1={yCoord} 
-                      x2={xEnd} 
-                      y2={yCoord} 
-                      stroke="#f59e0b" 
-                      strokeWidth="1.5" 
-                      strokeDasharray="3,3" 
-                    />
-                    <rect 
-                      x={xEnd - 45} 
-                      y={yCoord - 18} 
-                      width="75" 
-                      height="16" 
-                      fill="#0f172a" 
-                      fillOpacity="0.9" 
-                      rx="3" 
-                      stroke="#f59e0b" 
-                      strokeWidth="1" 
-                    />
-                    <text 
-                      x={xEnd - 7} 
-                      y={yCoord - 6} 
-                      fill="#f59e0b" 
-                      fontSize="9" 
-                      fontWeight="bold" 
-                      textAnchor="middle"
-                    >
-                      FVG: {fvgPrice.toFixed(1)}
-                    </text>
-                  </g>
-                );
-              }
-              return null;
             })}
 
             {toggles.showBBandsCompress && (<g>
