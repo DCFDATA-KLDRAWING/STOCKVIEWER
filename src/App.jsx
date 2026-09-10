@@ -6919,61 +6919,70 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 const sarColor = d.sarTrend === 1 ? '#ef4444' : '#22c55e';
                 return <circle key={`sar-${i}`} cx={x} cy={getY(d.sar)} r="2" fill={sarColor} opacity="0.4" />;
             })}
-            {/* 🌟 FVG 缺口自動偵測與橫向延伸中線繪製 */}
+            {/* 🌟 升級版 FVG 缺口自動偵測與橫向延伸中線繪製 */}
 {showFvgIndicator && data.map((d, i, arr) => {
-  if (i < 2) return null;
+  // 必須確保左右兩側都有 K 棒可供對照 (需要 i >= 2 且 i < arr.length - 1)
+  if (i < 2 || i >= arr.length - 1) return null;
   
-  const prev1Low = arr[i - 1].low;    // 1日前（中間那根 K 棒的低點）
-  const prev2High = arr[i - 2].high;  // 2日前（左邊那根 K 棒的高點）
+  const midCandle = arr[i - 1];     // 中間那根 K 棒（FVG 成立主體）
+  const leftCandle = arr[i - 2];    // 左側 K 棒（2天前）
+  const rightCandle = arr[i];       // 右側 K 棒（今天/下一根）
+
+  // 1. 計算中間那根 K 棒的實體漲幅 (%)
+  const bodyRatio = midCandle.open === 0 ? 0 : ((midCandle.close - midCandle.open) / midCandle.open) * 100;
   
-  // 標準 FVG 缺口判定
-  if (prev1Low > prev2High) {
-    // 依您要求的公式計算中線價：(1日前低點 + 2日前高點) / 2
-    const fvgPrice = (prev1Low + prev2High) / 2;
-    
-    const yCoord = getY(fvgPrice);
-    const xStart = getX(i - 1); // 釘在中間那根 K 棒的 X 座標
-    const xEnd = xStart + 80;   // 向右延伸一小段距離供觀察
+  // 2. 檢核實體漲幅是否大於或等於 5%
+  if (bodyRatio >= 5) {
+    // 3. 缺口判定：右側 K 棒的最低價 > 左側 K 棒的最高價（無交疊缺口）
+    if (rightCandle.low > leftCandle.high) {
+      
+      // 4. 依照您的要求計算中線價：(右側最低價 + 左側最高價) / 2
+      const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
+      
+      const yCoord = getY(fvgPrice);
+      const xStart = getX(i - 1); // 釘在中間那根 K 棒的 X 座標
+      const xEnd = xStart + 80;   // 向右延伸一小段距離供觀察
 
-    if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
+      if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
 
-    return (
-      <g key={`fvg-${i}`}>
-        {/* 從中間那根 K 棒開始，向右畫出短的橫向虛線 */}
-        <line 
-          x1={xStart} 
-          y1={yCoord} 
-          x2={xEnd} 
-          y2={yCoord} 
-          stroke="#f59e0b" 
-          strokeWidth="1.5" 
-          strokeDasharray="3,3" 
-        />
-        {/* 價格標籤背景框 */}
-        <rect 
-          x={xEnd - 45} 
-          y={yCoord - 18} 
-          width="75" 
-          height="16" 
-          fill="#0f172a" 
-          fillOpacity="0.9" 
-          rx="3" 
-          stroke="#f59e0b" 
-          strokeWidth="1" 
-        />
-        {/* 計算出來的中間價格文字 */}
-        <text 
-          x={xEnd - 7} 
-          y={yCoord - 6} 
-          fill="#f59e0b" 
-          fontSize="9" 
-          fontWeight="bold" 
-          textAnchor="middle"
-        >
-          FVG: {fvgPrice.toFixed(1)}
-        </text>
-      </g>
-    );
+      return (
+        <g key={`fvg-${i}`}>
+          {/* 從中間那根 K 棒開始，向右畫出短的橫向虛線 */}
+          <line 
+            x1={xStart} 
+            y1={yCoord} 
+            x2={xEnd} 
+            y2={yCoord} 
+            stroke="#f59e0b" 
+            strokeWidth="1.5" 
+            strokeDasharray="3,3" 
+          />
+          {/* 價格標籤背景框 */}
+          <rect 
+            x={xEnd - 45} 
+            y={yCoord - 18} 
+            width="75" 
+            height="16" 
+            fill="#0f172a" 
+            fillOpacity="0.9" 
+            rx="3" 
+            stroke="#f59e0b" 
+            strokeWidth="1" 
+          />
+          {/* 計算出來的中間價格文字 */}
+          <text 
+            x={xEnd - 7} 
+            y={yCoord - 6} 
+            fill="#f59e0b" 
+            fontSize="9" 
+            fontWeight="bold" 
+            textAnchor="middle"
+          >
+            FVG: {fvgPrice.toFixed(1)}
+          </text>
+        </g>
+      );
+    }
   }
   return null;
 })}
