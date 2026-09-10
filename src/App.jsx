@@ -6939,17 +6939,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       // 4. 依照您的要求計算中線價：(右側最低價 + 左側最高價) / 2
       const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
       
+      // 🌟 變數宣告順序修正：先有 xStart 與 xEnd，才能算 boxWidth 與 y 座標
       const xBoxStart = getX(i - 2);                 
-                         
-                          
+      const xStart = getX(i - 1); 
+      const xEnd = xStart + 80;   
       const boxWidth = Math.max(30, xEnd - xBoxStart); 
 
       const yHigh = getY(leftCandle.high);           
       const yLow = getY(rightCandle.low);            
-      
       const yCoord = getY(fvgPrice);
-      const xStart = getX(i - 1); // 釘在中間那根 K 棒的 X 座標
-      const xEnd = xStart + 80;   // 向右延伸一小段距離供觀察
 
       if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
 
@@ -6966,17 +6964,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeDasharray="3,3" 
           />
           <rect 
-  x={xBoxStart} 
-  y={yHigh} 
-  width={boxWidth} 
-  height={Math.max(4, yLow - yHigh)} 
-  fill="#f59e0b" 
-  fillOpacity="0.15" 
-  stroke="#f59e0b" 
-  strokeWidth="1.2" 
-  strokeDasharray="2,2" 
-  rx="2"
-/>
+            x={xBoxStart} 
+            y={yHigh} 
+            width={boxWidth} 
+            height={Math.max(4, yLow - yHigh)} 
+            fill="#f59e0b" 
+            fillOpacity="0.15" 
+            stroke="#f59e0b" 
+            strokeWidth="1.2" 
+            strokeDasharray="2,2" 
+            rx="2"
+          />
           {/* 計算出來的中間價格文字 */}
           <text 
             x={xEnd - 7} 
