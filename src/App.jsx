@@ -6921,33 +6921,31 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             })}
             {/* 🌟 升級版 FVG 缺口自動偵測與橫向延伸中線繪製 */}
 {showFvgIndicator && data.map((d, i, arr) => {
-  // 必須確保左右兩側都有 K 棒可供對照 (需要 i >= 2 且 i < arr.length - 1)
   if (i < 2 || i >= arr.length - 1) return null;
   
-  const midCandle = arr[i - 1];     // 中間那根 K 棒（FVG 成立主體）
-  const leftCandle = arr[i - 2];    // 左側 K 棒（2天前）
-  const rightCandle = arr[i];       // 右側 K 棒（今天/下一根）
+  const midCandle = arr[i - 1];     // 中間那根 K 棒
+  const leftCandle = arr[i - 2];    // 左側 K 棒（2天前，i - 2）
+  const rightCandle = arr[i];       // 右側 K 棒（今天/下一根，i）
 
-  // 1. 計算中間那根 K 棒的實體漲幅 (%)
   const bodyRatio = midCandle.open === 0 ? 0 : ((midCandle.close - midCandle.open) / midCandle.open) * 100;
   
-  // 2. 檢核實體漲幅是否大於或等於 5%
   if (bodyRatio >= 5) {
-    // 3. 缺口判定：右側 K 棒的最低價 > 左側 K 棒的最高價（無交疊缺口）
     if (rightCandle.low > leftCandle.high) {
       
-      // 4. 依照您的要求計算中線價：(右側最低價 + 左側最高價) / 2
       const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
       
-      // 🌟 變數宣告順序修正：先有 xStart 與 xEnd，才能算 boxWidth 與 y 座標
       const xBoxStart = getX(i - 2);
-      const xBoxEnd = getX(i + 70);                 
+      const xBoxEnd = getX(i) + 70;                 
       const xStart = getX(i - 1); 
       const xEnd = xStart + 80;   
       const boxWidth = Math.max(30, xBoxEnd - xBoxStart); 
 
-      const yHigh = getY(leftCandle.high);           
-      const yLow = getY(rightCandle.low);            
+      // 🌟 使用價格高低極值來正確對應 Y 軸高度
+      const highestPrice = Math.max(leftCandle.high, rightCandle.high);
+      const lowestPrice = Math.min(leftCandle.low, rightCandle.low);
+
+      const yHigh = getY(highestPrice);           
+      const yLow = getY(lowestPrice);            
       const yCoord = getY(fvgPrice);
 
       if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
