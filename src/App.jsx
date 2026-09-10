@@ -6977,12 +6977,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           
           {/* 計算出來的中間價格文字 */}
           <text 
-            x={xEnd - 3} 
-            y={yCoord - 2} 
+            x={xEnd - 9} 
+            y={yCoord - 8} 
             fill="#f59e0b" 
             fontSize="9" 
             fontWeight="bold" 
-            textAnchor="Right"
+            textAnchor="Middle"
           >
             FVG: {fvgPrice.toFixed(1)}
           </text>
