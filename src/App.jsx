@@ -6921,39 +6921,32 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             })}
             {/* 🌟 升級版 FVG 缺口自動偵測：實體區間方框與向右延伸中線繪製 */}
 {showFvgIndicator && data.map((d, i, arr) => {
-  // 必須確保左右兩側都有 K 棒可供對照 (需要 i >= 2 且 i < arr.length - 1)
   if (i < 2 || i >= arr.length - 1) return null;
   
-  const midCandle = arr[i - 1];     // 中間那根 K 棒（FVG 成立主體）
-  const leftCandle = arr[i - 2];    // 左側 K 棒（2天前）
-  const rightCandle = arr[i];       // 右側 K 棒（今天/下一根）
+  const midCandle = arr[i - 1];     
+  const leftCandle = arr[i - 2];    
+  const rightCandle = arr[i];       
 
-  // 1. 計算中間那根 K 棒的實體漲幅 (%)
   const bodyRatio = midCandle.open === 0 ? 0 : ((midCandle.close - midCandle.open) / midCandle.open) * 100;
   
-  // 2. 檢核實體漲幅是否大於或等於 5%
   if (bodyRatio >= 5) {
-    // 3. 缺口判定：右側 K 棒的最低價 > 左側 K 棒的最高價（無交疊缺口）
     if (rightCandle.low > leftCandle.high) {
       
-      // 4. 依照您的要求計算中線價：(右側最低價 + 左側最高價) / 2
       const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
       
-      // 🌟 補上缺少的變數定義
-      const xBoxStart = getX(i - 2);                 // 方框左側起始 X (對應左側 K 棒)
-      const xMiddle = getX(i - 1);                   // 中間那根 X
-      const xEnd = xMiddle + 80;                     // 延伸線右側終點 X
-      const boxWidth = Math.max(30, xEnd - xBoxStart); // 方框寬度
+      const xBoxStart = getX(i - 2);                 
+      const xMiddle = getX(i - 1);                   
+      const xEnd = xMiddle + 80;                     
+      const boxWidth = Math.max(30, xEnd - xBoxStart); 
 
-      const yHigh = getY(leftCandle.high);           // 方框上緣 Y (對應左側高點)
-      const yLow = getY(rightCandle.low);            // 方框下緣 Y (對應右側低點)
-      const yCoord = getY(fvgPrice);                 // 中線 Y
+      const yHigh = getY(leftCandle.high);           
+      const yLow = getY(rightCandle.low);            
+      const yCoord = getY(fvgPrice);                 
 
       if (yLow < paddingLeft || yHigh > mainHeight - paddingLeft) return null;
 
       return (
         <g key={`fvg-${i}`}>
-          {/* 🌟 從左側高點到右側低點的實體區間方框 */}
           <rect 
             x={xBoxStart} 
             y={yHigh} 
@@ -6967,7 +6960,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             rx="2"
           />
 
-          {/* 從中間那根 K 棒開始，向右畫出短的橫向虛線 */}
           <line 
             x1={xBoxStart} 
             y1={yCoord} 
@@ -6978,7 +6970,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeDasharray="3,3" 
           />
           
-          {/* 價格標籤背景框 */}
           <rect 
             x={xEnd - 45} 
             y={yCoord - 18} 
@@ -6991,7 +6982,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeWidth="1" 
           />
           
-          {/* 計算出來的中間價格文字 */}
           <text 
             x={xEnd - 7} 
             y={yCoord - 6} 
