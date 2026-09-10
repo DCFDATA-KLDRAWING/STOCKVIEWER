@@ -6957,29 +6957,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             strokeWidth="1.5" 
             strokeDasharray="3,3" 
           />
+          
           <rect 
-            x={xEnd - 45} 
-            y={yMid - 18} 
-            width="75" 
-            height="16" 
-            fill="#0f172a" 
-            fillOpacity="0.95" 
-            rx="3" 
-            stroke="#fbbf24" 
-            strokeWidth="1.2" 
-          />
-          {/* 價格標籤背景框 */}
-          <rect 
-            x={xEnd - 45} 
-            y={yCoord - 18} 
-            width="75" 
-            height="16" 
-            fill="#0f172a" 
-            fillOpacity="0.9" 
-            rx="3" 
-            stroke="#f59e0b" 
-            strokeWidth="1" 
-          />
+  x={xBoxStart} 
+  y={yHigh} 
+  width={boxWidth} 
+  height={Math.max(4, yLow - yHigh)} 
+  fill="#f59e0b" 
+  fillOpacity="0.15" 
+  stroke="#f59e0b" 
+  strokeWidth="1.2" 
+  strokeDasharray="2,2" 
+  rx="2"
+/>
           {/* 計算出來的中間價格文字 */}
           <text 
             x={xEnd - 7} 
