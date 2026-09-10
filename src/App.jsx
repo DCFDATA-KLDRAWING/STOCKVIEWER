@@ -6919,70 +6919,86 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 const sarColor = d.sarTrend === 1 ? '#ef4444' : '#22c55e';
                 return <circle key={`sar-${i}`} cx={x} cy={getY(d.sar)} r="2" fill={sarColor} opacity="0.4" />;
             })}
-            {/* 🌟 升級版 FVG 缺口自動偵測與橫向延伸中線繪製 */}
+            {/* 🌟 FVG 缺口區間方框與中線向右延伸繪製 */}
 {showFvgIndicator && data.map((d, i, arr) => {
-  // 必須確保左右兩側都有 K 棒可供對照 (需要 i >= 2 且 i < arr.length - 1)
-  if (i < 2 || i >= arr.length - 1) return null;
+  if (i < 2) return null;
   
-  const midCandle = arr[i - 1];     // 中間那根 K 棒（FVG 成立主體）
-  const leftCandle = arr[i - 2];    // 左側 K 棒（2天前）
-  const rightCandle = arr[i];       // 右側 K 棒（今天/下一根）
-
-  // 1. 計算中間那根 K 棒的實體漲幅 (%)
-  const bodyRatio = midCandle.open === 0 ? 0 : ((midCandle.close - midCandle.open) / midCandle.open) * 100;
+  const prev1Low = arr[i - 1].low;    // 1日前（中間那根 K 棒）的低點
+  const prev2High = arr[i - 2].high;  // 2日前（左邊那根 K 棒）的高點
   
-  // 2. 檢核實體漲幅是否大於或等於 5%
-  if (bodyRatio >= 5) {
-    // 3. 缺口判定：右側 K 棒的最低價 > 左側 K 棒的最高價（無交疊缺口）
-    if (rightCandle.low > leftCandle.high) {
-      
-      // 4. 依照您的要求計算中線價：(右側最低價 + 左側最高價) / 2
-      const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
-      
-      const yCoord = getY(fvgPrice);
-      const xStart = getX(i - 1); // 釘在中間那根 K 棒的 X 座標
-      const xEnd = xStart + 80;   // 向右延伸一小段距離供觀察
+  // 標準 FVG 缺口判定
+  if (prev1Low > prev2High) {
+    // 1. 計算 FVG 中線價：(1日前低點 + 2日前高點) / 2
+    const fvgPrice = (prev1Low + prev2High) / 2;
+    
+    // 2. 計算方框的座標
+    // 左邊界：從 2日前（左邊那根）的右側或中心開始
+    const xBoxStart = getX(i - 2); 
+    // 右邊界：到 1日前（中間那根）的右側結束，並向右多延伸一段觀察區 (例如 +70 像素)
+    const xBoxEnd = getX(i - 1) + 70; 
+    const boxWidth = Math.max(20, xBoxEnd - xBoxStart);
 
-      if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
+    // 3. 計算價格對應的 Y 座標（高點與低點）
+    const yHigh = getY(prev2High); // 2日前高點 (方框上緣)
+    const yLow = getY(prev1Low);   // 1日前低點 (方框下緣)
+    const yMid = getY(fvgPrice);   // 中線價
 
-      return (
-        <g key={`fvg-${i}`}>
-          {/* 從中間那根 K 棒開始，向右畫出短的橫向虛線 */}
-          <line 
-            x1={xStart} 
-            y1={yCoord} 
-            x2={xEnd} 
-            y2={yCoord} 
-            stroke="#f59e0b" 
-            strokeWidth="1.5" 
-            strokeDasharray="3,3" 
-          />
-          {/* 價格標籤背景框 */}
-          <rect 
-            x={xEnd - 45} 
-            y={yCoord - 18} 
-            width="75" 
-            height="16" 
-            fill="#0f172a" 
-            fillOpacity="0.9" 
-            rx="3" 
-            stroke="#f59e0b" 
-            strokeWidth="1" 
-          />
-          {/* 計算出來的中間價格文字 */}
-          <text 
-            x={xEnd - 7} 
-            y={yCoord - 6} 
-            fill="#f59e0b" 
-            fontSize="9" 
-            fontWeight="bold" 
-            textAnchor="middle"
-          >
-            FVG: {fvgPrice.toFixed(1)}
-          </text>
-        </g>
-      );
-    }
+    // 確保範圍合理
+    if (yLow < paddingLeft || yHigh > mainHeight - paddingLeft) return null;
+
+    return (
+      <g key={`fvg-box-${i}`} pointerEvents="none">
+        {/* 🌟 矩形區間方框 (使用半透明金黃色填充，不遮擋 K 棒但看得見區間) */}
+        <rect 
+          x={xBoxStart} 
+          y={yHigh} 
+          width={boxWidth} 
+          height={Math.max(4, yLow - yHigh)} 
+          fill="#f59e0b" 
+          fillOpacity="0.18" 
+          stroke="#f59e0b" 
+          strokeWidth="1" 
+          strokeDasharray="2,2" 
+          rx="2"
+        />
+
+        {/* 🌟 向右延伸的中線虛線 */}
+        <line 
+          x1={xBoxStart} 
+          y1={yMid} 
+          x2={xBoxEnd} 
+          y2={yMid} 
+          stroke="#fbbf24" 
+          strokeWidth="1.5" 
+          strokeDasharray="3,3" 
+        />
+
+        {/* 🌟 價格標籤背景框 (放在延伸線最右側，避開 K 棒密集區) */}
+        <rect 
+          x={xBoxEnd - 45} 
+          y={yMid - 18} 
+          width="75" 
+          height="16" 
+          fill="#0f172a" 
+          fillOpacity="0.95" 
+          rx="3" 
+          stroke="#fbbf24" 
+          strokeWidth="1.2" 
+        />
+
+        {/* 🌟 FVG 字樣與計算價格 */}
+        <text 
+          x={xBoxEnd - 7} 
+          y={yMid - 6} 
+          fill="#fbbf24" 
+          fontSize="9" 
+          fontWeight="bold" 
+          textAnchor="middle"
+        >
+          FVG: {fvgPrice.toFixed(1)}
+        </text>
+      </g>
+    );
   }
   return null;
 })}
