@@ -6977,8 +6977,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           
           {/* 計算出來的中間價格文字 */}
           <text 
-            x={xStart + 35} 
-            y={yCoord + 13} 
+            x={xStart + 45} 
+            y={yCoord + 10} 
             fill="#f59e0b" 
             fontSize="9" 
             fontWeight="bold" 
