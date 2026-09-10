@@ -6941,10 +6941,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       
       // 🌟 變數宣告順序修正：先有 xStart 與 xEnd，才能算 boxWidth 與 y 座標
       const xBoxStart = getX(i - 2);
-      const xBoxEnd = getX(i);                 
+      const xBoxEnd = getX(i) + 70;                 
       const xStart = getX(i - 1); 
       const xEnd = xStart + 80;   
-      const boxWidth = Math.max(30, xEnd - xBoxStart); 
+      const boxWidth = Math.max(30, xBoxEnd - xBoxStart); 
 
       const yHigh = getY(leftCandle.high);           
       const yLow = getY(rightCandle.low);            
