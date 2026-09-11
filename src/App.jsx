@@ -2248,7 +2248,7 @@ const App = () => {
   const [activeIndicators, setActiveIndicators] = useState(['EdwinMomentum', 'MACD']);
 
   // 🌟 新增 FVG 指標開關狀態 (預設開啟)
-  const [showFvgIndicator, setShowFvgIndicator] = useState(true);
+  const [showFvgIndicator, setShowFvgIndicator] = useState(false);
   
   // 1. 副圖指標參數記憶
   const [indicatorParams, setIndicatorParams] = useState(() => {
