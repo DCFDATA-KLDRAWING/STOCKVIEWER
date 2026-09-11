@@ -2618,12 +2618,10 @@ const App = () => {
     });
   };
 
-  // ✨ 翻譯蒟蒻：把中文陣列轉換成系統懂的 JSON 條件 (升級支援四則運算與實體漲幅)
+  // ✨ 升級版翻譯蒟蒻：支援左右雙邊四則運算、括號與複雜數學公式的解析引擎
   const parseFormulaToStrategy = (formulaArray, customName, customMarker) => {
     try {
       const conditions = [];
-      let currentLeft = null;
-      let currentOp = null;
       let matchType = 'AND'; // 預設多個條件用「而且(AND)」連接
 
       // 字典表：把中文名詞對應到我們系統的底層變數
@@ -2634,8 +2632,8 @@ const App = () => {
         '收盤價': { target: 'close', scope: 'today', n: 1 },
         '成交量': { target: 'volume', scope: 'today', n: 1 },
         '漲跌幅': { target: 'changeRatio', scope: 'today', n: 1 },
-        '實體漲幅': { target: 'bodyRatio', scope: 'today', n: 1 }, // ✨ 新增：實體K漲幅
-        '振幅': { target: 'amplitude', scope: 'today', n: 1 },     // ✨ 新增：振幅
+        '實體漲幅': { target: 'bodyRatio', scope: 'today', n: 1 },
+        '振幅': { target: 'amplitude', scope: 'today', n: 1 },
         '5日均線': { target: 'fixedMa5', scope: 'today', n: 1 },
         '10日均線': { target: 'fixedMa10', scope: 'today', n: 1 },
         '20日均線': { target: 'fixedMa20', scope: 'today', n: 1 },
@@ -2667,116 +2665,112 @@ const App = () => {
         '布林下軌': { target: 'bbands.down', scope: 'today', n: 1 }
       };
 
-      // 解析邏輯
-      for (let i = 0; i < formulaArray.length; i++) {
-        let token = formulaArray[i];
-
-        // ✨ 0. 防呆機制：如果單獨按了後綴詞卻沒有數字，阻擋並提醒
-        if (['日前的', '日內最高', '日內最低', '日內均值'].includes(token)) {
-            throw new Error(`「${token}」前面必須加上數字！請先到「運算」點擊數字 (例如 5)，再按「${token}」。`);
-        }
-
-        // 1. 處理時間偏移
-        let offset = 0;
-        if (token.includes('日前的')) {
-          offset = parseInt(token) || 0;
-          i++; 
-          if (i >= formulaArray.length) break;
-          token = formulaArray[i]; 
-        }
-
-        // ✨ 1.5 處理動態區間範圍 (N日內最高 / 最低 / 均值)
-        let dynScopeMatch = token.match(/^(\d+)日內(最高|最低|均值)$/);
-        let dynScope = null;
-        let dynN = 1;
-        if (dynScopeMatch) {
-            dynN = parseInt(dynScopeMatch[1]);
-            const type = dynScopeMatch[2];
-            dynScope = type === '最高' ? 'max' : type === '最低' ? 'min' : 'avg';
-
-            i++; // 跳到下一個詞 (必須是指標，例如收盤價)
-            if (i >= formulaArray.length) throw new Error(`「${token}」後面缺少要計算的指標（例如：收盤價）！`);
-            token = formulaArray[i];
-        }
-
-        if (token === '而且') { matchType = 'AND'; continue; } 
-        else if (token === '或者') { matchType = 'OR'; continue; }
-
-        // ✨ 2. 新增：處理四則運算 (只限於修飾右邊條件，例如 1日前的 成交量 × 2)
-        if (['+', '-', '×', '÷'].includes(token)) {
-          if (conditions.length === 0 || currentLeft !== null) {
-            throw new Error("四則運算必須接在右側條件之後！例如: 收盤價 > 5日均線 + 10");
+      // 1. 將整條公式陣列以「而且」、「或者」切分成多個獨立子條件
+      const subFormulas = [];
+      let currentSub = [];
+      
+      for (let token of formulaArray) {
+        if (token === '而且' || token === '或者') {
+          if (token === '或者') matchType = 'OR';
+          if (currentSub.length > 0) {
+            subFormulas.push(currentSub);
+            currentSub = [];
           }
-          const lastCond = conditions[conditions.length - 1];
-          if (token === '×') lastCond.rightMathOp = '*';
-          else if (token === '÷') lastCond.rightMathOp = '/';
-          else lastCond.rightMathOp = token;
-          
-          i++;
-          if (i >= formulaArray.length) throw new Error("四則運算後面缺少數字！");
-          const nextToken = formulaArray[i];
-          if (isNaN(nextToken)) throw new Error(`四則運算後面必須是數字，不能是「${nextToken}」`);
-          lastCond.rightMathNum = parseFloat(nextToken);
-          continue;
-        }
-
-        // ✨ 解除括號封印：將括號視為「視覺排版」，直接略過不報錯，讓底層繼續平鋪運算
-        if (['(', ')'].includes(token)) {
-          continue; 
-        }
-
-        // 3. 如果遇到比較符號
-        if (['>', '<', '≥', '≤', '=', '≠'].includes(token)) {
-          let op = token;
-          if (op === '≥') op = '>=';
-          if (op === '≤') op = '<=';
-          if (op === '=') op = '==';
-          if (op === '≠') op = '!=';
-          currentOp = op;
-          continue;
-        }
-
-        // 4. 判斷這個詞是數字還是字典裡的名詞
-        let parsedValue;
-        if (!isNaN(token)) {
-          parsedValue = { type: 'number', value: parseFloat(token) };
-        } else if (dictionary[token]) {
-          // ✨ 將偏移量與動態區間一併打包送給底層引擎計算
-          parsedValue = { 
-            type: 'metric', 
-            metric: { 
-              ...dictionary[token], 
-              offset: offset,
-              scope: dynScope || dictionary[token].scope,
-              n: dynScope ? dynN : dictionary[token].n
-            } 
-          };
         } else {
-          throw new Error(`目前系統尚未支援「${token}」的資料，請先移除。`);
-        }
-
-        // 5. 組裝左邊與右邊
-        if (!currentLeft) {
-          if (parsedValue.type === 'number') throw new Error('公式左邊不能是純數字！');
-          currentLeft = parsedValue.metric;
-        } else if (currentOp) {
-          const condition = {
-            left: currentLeft,
-            operator: currentOp,
-            rightType: parsedValue.type,
-            rightNumber: parsedValue.type === 'number' ? parsedValue.value : null,
-            rightMetric: parsedValue.type === 'metric' ? parsedValue.metric : null,
-            rightMathOp: 'none',
-            rightMathNum: 1
-          };
-          conditions.push(condition);
-          currentLeft = null;
-          currentOp = null;
+          currentSub.push(token);
         }
       }
+      if (currentSub.length > 0) subFormulas.push(currentSub);
 
-      if (currentLeft && currentOp) {
-        throw new Error('公式尚未完成，比較符號後面缺少條件！');
+      // 2. 逐一解析每個子條件
+      for (let sub of subFormulas) {
+        // 尋找比較符號的位置 (>, <, ≥, ≤, =, ≠)
+        let opIdx = -1;
+        let foundOp = '';
+        const opMap = { '>': '>', '<': '<', '≥': '>=', '≤': '<=', '=': '==', '≠': '!=' };
+
+        for (let i = 0; i < sub.length; i++) {
+          if (['>', '<', '≥', '≤', '=', '≠'].includes(sub[i])) {
+            opIdx = i;
+            foundOp = opMap[sub[i]];
+            break;
+          }
+        }
+
+        if (opIdx === -1) throw new Error("公式中缺少比較符號（例如：>、<、≥、≤）！");
+
+        const leftTokens = sub.slice(0, opIdx);
+        const rightTokens = sub.slice(opIdx + 1);
+
+        // 輔助函式：將 Token 陣列轉譯成安全的 JavaScript 運算式字串與對應的 metrics 物件
+        const compileExpression = (tokens) => {
+          let jsExpr = "";
+          let metricCounter = 0;
+          const metricsMap = {};
+
+          let i = 0;
+          while (i < tokens.length) {
+            let token = tokens[i];
+
+            // 處理時間偏移 (例如: 1日前的)
+            let offset = 0;
+            if (token.includes('日前的')) {
+              offset = parseInt(token) || 0;
+              i++;
+              if (i >= tokens.length) break;
+              token = tokens[i];
+            }
+
+            // 處理動態區間 (N日內最高/最低/均值)
+            let dynScopeMatch = token.match(/^(\d+)日內(最高|最低|均值)$/);
+            let dynScope = null;
+            let dynN = 1;
+            if (dynScopeMatch) {
+              dynN = parseInt(dynScopeMatch[1]);
+              const type = dynScopeMatch[2];
+              dynScope = type === '最高' ? 'max' : type === '最低' ? 'min' : 'avg';
+              i++;
+              if (i >= tokens.length) throw new Error(`「${token}」後面缺少指標！`);
+              token = tokens[i];
+            }
+
+            if (['+', '-', '×', '÷', '(', ')'].includes(token)) {
+              if (token === '×') jsExpr += ' * ';
+              else if (token === '÷') jsExpr += ' / ';
+              else jsExpr += ` ${token} `;
+            } else if (!isNaN(token)) {
+              jsExpr += ` ${token} `;
+            } else if (dictionary[token]) {
+              const metricKey = `m_${metricCounter++}`;
+              metricsMap[metricKey] = {
+                ...dictionary[token],
+                offset: offset,
+                scope: dynScope || dictionary[token].scope,
+                n: dynScope ? dynN : dictionary[token].n
+              };
+              jsExpr += ` vals['${metricKey}'] `;
+            } else {
+              throw new Error(`無法識別的詞彙：「${token}」`);
+            }
+            i++;
+          }
+          return { jsExpr, metricsMap };
+        };
+
+        const leftCompiled = compileExpression(leftTokens);
+        const rightCompiled = compileExpression(rightTokens);
+
+        // 合併左右兩邊的 metrics 對應表
+        const combinedMetrics = { ...leftCompiled.metricsMap, ...rightCompiled.metricsMap };
+
+        // 建立複合條件物件，交由底層 evaluator 執行
+        conditions.push({
+          type: 'complex',
+          leftJs: leftCompiled.jsExpr,
+          rightJs: rightCompiled.jsExpr,
+          operator: foundOp,
+          metricsMap: combinedMetrics
+        });
       }
 
       return {
@@ -3526,18 +3520,66 @@ const App = () => {
     return null;
   };
   const evaluateCondition = (data, index, condition) => {
-    const leftVal = getMetricValue(data, index, condition.left); if (leftVal === null) return false;
+    // 🌟 ✨ 新增：支援我們剛才升級的複雜雙邊運算與括號解析引擎 (type === 'complex')
+    if (condition.type === 'complex') {
+      try {
+        const vals = {};
+        for (let [key, metricDef] of Object.entries(condition.metricsMap)) {
+          vals[key] = getMetricValue(data, index, metricDef);
+          if (vals[key] === null || isNaN(vals[key])) return false; // 只要有任何一個指標是空的，直接判斷不成立
+        }
+
+        // 動態安全執行左右兩邊的數學算式
+        const leftVal = Function('vals', `return ${condition.leftJs};`)(vals);
+        const rightVal = Function('vals', `return ${condition.rightJs};`)(vals);
+
+        if (leftVal === null || rightVal === null || isNaN(leftVal) || isNaN(rightVal)) return false;
+
+        switch (condition.operator) {
+          case '>': return leftVal > rightVal;
+          case '<': return leftVal < rightVal;
+          case '>=': return leftVal >= rightVal;
+          case '<=': return leftVal <= rightVal;
+          case '==': return leftVal === rightVal;
+          case '!=': return leftVal !== rightVal;
+          default: return false;
+        }
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // 💡 原本舊版的單一條件判斷（向下相容，讓您以前寫的策略也能繼續跑）
+    const leftVal = getMetricValue(data, index, condition.left); 
+    if (leftVal === null) return false;
+    
     let rightVal;
-    if (condition.rightType === 'number') rightVal = parseFloat(condition.rightNumber); 
-    else {
+    if (condition.rightType === 'number') {
+      rightVal = parseFloat(condition.rightNumber); 
+    } else {
       rightVal = getMetricValue(data, index, condition.rightMetric);
       if (rightVal !== null && condition.rightMathOp && condition.rightMathOp !== 'none') {
         const mathNum = parseFloat(condition.rightMathNum || 0);
-        switch (condition.rightMathOp) { case '+': rightVal += mathNum; break; case '-': rightVal -= mathNum; break; case '*': rightVal *= mathNum; break; case '/': rightVal /= mathNum; break; }
+        switch (condition.rightMathOp) { 
+          case '+': rightVal += mathNum; break; 
+          case '-': rightVal -= mathNum; break; 
+          case '*': rightVal *= mathNum; break; 
+          case '/': rightVal /= mathNum; break; 
+        }
       }
     }
+    
     if (rightVal === null) return false;
-    switch (condition.operator) { case '>': return leftVal > rightVal; case '<': return leftVal < rightVal; case '>=': return leftVal >= rightVal; case '<=': return leftVal <= rightVal; case '==': return leftVal === rightVal; case '!=': return leftVal !== rightVal; default: return false; }
+    
+    switch (condition.operator) { 
+      case '>': return leftVal > rightVal; 
+      case '<': return leftVal < rightVal; 
+      case '>=': return leftVal >= rightVal; 
+      case '<=': return leftVal <= rightVal; 
+      case '==': return leftVal === rightVal; 
+      case '!=': return leftVal !== rightVal; 
+      default: return false; 
+    }
   };
 
   const analyzeSignals = (data, customStrats, shares, maParams, vmaParams, indParams, maxVolDaysParam = 90, volLineAnchorParam = 'close',sarParams = { start: 0.02, step: 0.02, max: 0.20 }) => {
