@@ -2246,6 +2246,9 @@ const App = () => {
     
   // ✨ 新增// ✨ 替換為多選狀態 (預設開啟 資金動能 與 MACD)
   const [activeIndicators, setActiveIndicators] = useState(['EdwinMomentum', 'MACD']);
+
+  // 🌟 新增 FVG 指標開關狀態 (預設開啟)
+  const [showFvgIndicator, setShowFvgIndicator] = useState(true);
   
   // 1. 副圖指標參數記憶
   const [indicatorParams, setIndicatorParams] = useState(() => {
@@ -3281,7 +3284,7 @@ const App = () => {
             }
           }
         } catch (intraErr) { console.warn("盤中資料解析失敗", intraErr); }
-      } // ✨ 就是缺了這個右括號！！已經幫您補上了！
+      } 
 
       // ==========================================
       // ✨ [FinMind 融合區塊] 開始 (包含基本面)
@@ -4738,6 +4741,16 @@ const handleOpenSectorMomentum = async () => {
                     <span className="text-[10px] text-slate-400">最大</span>
                     <input type="number" step="0.01" value={sarParams.max} onChange={(e) => setSarParams(p => ({...p, max: Number(e.target.value)}))} className="w-12 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="最大值" />
                   </div>
+                  {/* 🌟 新增 FVG 指標切換按鈕 */}
+<label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+  <input 
+    type="checkbox" 
+    checked={showFvgIndicator} 
+    onChange={() => setShowFvgIndicator(!showFvgIndicator)} 
+    className="w-3.5 h-3.5 text-amber-400 rounded bg-slate-900 border-slate-600" 
+  />
+  <span className="text-xs text-amber-400 font-bold">FVG中線</span>
+</label>
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -4936,13 +4949,15 @@ const handleOpenSectorMomentum = async () => {
                 defensivePrice={globalDefensivePrice}
                 realSymbol={currentRealSymbol} // ✨ 修正：傳入分離出來的真實股號，防止存檔存到空字串
                 displayCount={displayCount}
+                showFvgIndicator={showFvgIndicator}
+                setShowFvgIndicator={setShowFvgIndicator}
                 activeIndicators={activeIndicators} // 👈 傳入陣列
                 indicatorParams={indicatorParams}
                 setDisplayCount={setDisplayCount}
                 totalDataLength={klineData.length}
                 savedLayouts={savedLayouts}        // ✨ 傳入畫板資料
                 setSavedLayouts={setSavedLayouts}  // ✨ 傳入更新畫板的方法
-                onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法
+                onLoadLayout={handleLoadLayout}    // ✨ 傳入載入畫板的方法               
                 rankingList={rankingList}
                 onOpenRanking={() => setIsRankingOpen(true)}
                 rankingModalContent={
@@ -5640,13 +5655,15 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (🚀 PRO 級虛擬視窗引擎升級版) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, setShowFvgIndicator, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState(null); 
   const [chartModal, setChartModal] = useState(null);
+ 
+  
 
   // ✨ 1. 【虛擬視窗引擎核心】
   // rightOffset: 記錄畫面距離最新 K 棒往左平移了多少根 K 棒
@@ -6902,6 +6919,79 @@ const TrendChart = ({ data, timeframe, stockName, toggles, isFocusMode, focusMod
                 const sarColor = d.sarTrend === 1 ? '#ef4444' : '#22c55e';
                 return <circle key={`sar-${i}`} cx={x} cy={getY(d.sar)} r="2" fill={sarColor} opacity="0.4" />;
             })}
+            {/* 🌟 升級版 FVG 缺口自動偵測與橫向延伸中線繪製 */}
+{showFvgIndicator && data.map((d, i, arr) => {
+  if (i < 2 || i >= arr.length - 1) return null;
+  
+  const midCandle = arr[i - 1];     // 中間那根 K 棒
+  const leftCandle = arr[i - 2];    // 左側 K 棒（2天前，i - 2）
+  const rightCandle = arr[i];       // 右側 K 棒（今天/下一根，i）
+
+  const bodyRatio = midCandle.open === 0 ? 0 : ((midCandle.close - midCandle.open) / midCandle.open) * 100;
+  
+  if (bodyRatio >= 5) {
+    if (rightCandle.low > leftCandle.high & rightCandle.high > midCandle.high)  {
+      
+      const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
+      
+      const xBoxStart = getX(i - 2);
+      const xBoxEnd = getX(i) + 70;                 
+      const xStart = getX(i - 1); 
+      const xEnd = xStart + 80;   
+      const boxWidth = Math.max(30, xBoxEnd - xBoxStart); 
+
+      // 🌟 使用價格高低極值來正確對應 Y 軸高度
+      const highestPrice = Math.max(leftCandle.high, rightCandle.low);
+      const lowestPrice = Math.min(leftCandle.high, rightCandle.low);
+
+      const yHigh = getY(highestPrice);           
+      const yLow = getY(lowestPrice);            
+      const yCoord = getY(fvgPrice);
+
+      if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
+
+      return (
+        <g key={`fvg-${i}`}>
+          {/* 從中間那根 K 棒開始，向右畫出短的橫向虛線 */}
+          <line 
+            x1={xStart} 
+            y1={yCoord} 
+            x2={xEnd} 
+            y2={yCoord} 
+            stroke="#f59e0b" 
+            strokeWidth="1.5" 
+            strokeDasharray="3,3" 
+          />
+          <rect 
+            x={xBoxStart} 
+            y={yHigh}    
+            width={boxWidth} 
+            height={Math.max(4, yLow - yHigh)} 
+            fill="#f59e0b" 
+            fillOpacity="0.15" 
+            stroke="#f59e0b" 
+            strokeWidth="1.2" 
+            strokeDasharray="2,2" 
+            rx="2"
+          />
+          
+          {/* 計算出來的中間價格文字 */}
+          <text 
+            x={xStart + 45} 
+            y={yCoord + 10} 
+            fill="#f59e0b" 
+            fontSize="9" 
+            fontWeight="bold" 
+            textAnchor="Middle"
+          >
+            FVG: {fvgPrice.toFixed(1)}
+          </text>
+        </g>
+      );
+    }
+  }
+  return null;
+})}
 
             {toggles.showBBandsCompress && (<g>
                 {(() => {
