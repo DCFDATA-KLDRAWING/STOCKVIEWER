@@ -7010,28 +7010,36 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 })}
             {/* 🌟 仙人指路指標自動偵測與延伸中線繪製 */}
 {showXianRenIndicator && data.map((d, i, arr) => {
-  // 需要確保至少有前一根(測試棒 i-1)與當前根(確認棒 i)
   if (i < 1 || !arr[i - 1] || !arr[i]) return null;
 
   const testCandle = arr[i - 1];   // 前一根 K 棒（仙人指路測試棒）
   const confirmCandle = arr[i];    // 當前根 K 棒（隔日確認棒）
+
+  if (
+    typeof testCandle.open !== 'number' || 
+    typeof testCandle.close !== 'number' || 
+    typeof testCandle.high !== 'number' || 
+    typeof confirmCandle.open !== 'number' || 
+    typeof confirmCandle.close !== 'number'
+  ) {
+    return null;
+  }
 
   // 1. 計算前一根 K 棒的實體大小與上影線長度
   const testBodySize = Math.abs(testCandle.close - testCandle.open);
   const testBodyBottom = Math.min(testCandle.open, testCandle.close);
   const testUpperShadow = testCandle.high - testBodyBottom;
 
-  // 條件 A：不論紅綠 K，上影線必須是實體長度的 2 倍以上 (防呆：實體大於 0.01)
   const isLongUpperShadow = testBodySize > 0.01 && testUpperShadow >= testBodySize * 2;
 
   if (isLongUpperShadow) {
-    // 🌟 新增：從均線陣列中抓取測試棒當下的 5、10、20 日均線數值
-    const ma5 = fixedMa5 && fixedMa5[i - 1];
-    const ma10 = fixedMa10 && fixedMa10[i - 1];
-    const ma20 = fixedMa20 && fixedMa20[i - 1];
+    // 🌟 安全修正：直接從 K 棒物件本身讀取均線（相容各種常見命名，如 fixedMa5 或 ma5）
+    const ma5 = testCandle.fixedMa5 ?? testCandle.ma5;
+    const ma10 = testCandle.fixedMa10 ?? testCandle.ma10;
+    const ma20 = testCandle.fixedMa20 ?? testCandle.ma20;
     const testClose = testCandle.close;
 
-    // 🌟 新增條件：測試棒收盤價必須大於 5、10、20 日均線，且均線數值不能高於收盤價（確保均線在下方）
+    // 🌟 檢查均線是否存在，且測試收盤價必須站在 5、10、20 日均線上方
     const isAboveAllMAs = ma5 !== undefined && ma10 !== undefined && ma20 !== undefined &&
       testClose > ma5 && testClose > ma10 && testClose > ma20 &&
       ma5 <= testClose && ma10 <= testClose && ma20 <= testClose;
@@ -7044,13 +7052,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       const isConfirmBreakout = confirmCandle.close > confirmCandle.open && confirmCandle.close >= shadowMidPrice;
 
       if (isConfirmBreakout) {
-        const xTest = getX(i - 1);       // 測試棒的 X 座標
-        const xConfirm = getX(i);        // 確認棒的 X 座標
-        const xEnd = xConfirm + 90;      // 虛線向右延伸的終點
-        const yMid = getY(shadowMidPrice); // 中線的 Y 座標
-        const yShadowTop = getY(testCandle.high); // 測試棒最高價的 Y 座標
+        const xTest = getX(i - 1);       
+        const xConfirm = getX(i);        
+        const xEnd = xConfirm + 90;      
+        const yMid = getY(shadowMidPrice); 
+        const yShadowTop = getY(testCandle.high); 
 
-        if (isNaN(yMid) || isNaN(yShadowTop) || yMid < paddingLeft || yMid > mainHeight - paddingLeft) return null;
+        if (isNaN(yMid) || isNaN(yShadowTop) || yMid < paddingLeft || yMid > mainHeight - paddingLeft) {
+          return null;
+        }
 
         return (
           <g key={`xianren-${i}`} pointerEvents="none">
