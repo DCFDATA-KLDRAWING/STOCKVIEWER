@@ -2245,10 +2245,12 @@ const App = () => {
   const [timeframe, setTimeframe] = useState('D');
     
   // ✨ 新增// ✨ 替換為多選狀態 (預設開啟 資金動能 與 MACD)
-  const [activeIndicators, setActiveIndicators] = useState(['EdwinMomentum', 'MACD']);
+  const [activeIndicators, setActiveIndicators] = useState(['EdwinMomentum']);
 
   // 🌟 新增 FVG 指標開關狀態 (預設開啟)
   const [showFvgIndicator, setShowFvgIndicator] = useState(false);
+  // 🌟 新增：仙人指路指標開關狀態 (預設開啟)
+  const [showXianRenIndicator, setShowXianRenIndicator] = useState(false);
   
   // 1. 副圖指標參數記憶
   const [indicatorParams, setIndicatorParams] = useState(() => {
@@ -4751,6 +4753,18 @@ const handleOpenSectorMomentum = async () => {
   />
   <span className="text-xs text-amber-400 font-bold">FVG中線</span>
 </label>
+                  
+                  {/* 🌟 新進：仙人指路指標切換按鈕 */}
+<label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+  <input 
+    type="checkbox" 
+    checked={showXianRenIndicator} 
+    onChange={() => setShowXianRenIndicator(!showXianRenIndicator)} 
+    className="w-3.5 h-3.5 text-cyan-400 rounded bg-slate-900 border-slate-600" 
+  />
+  <span className="text-xs text-cyan-400 font-bold">仙人指路</span>
+</label>
+
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -4951,6 +4965,8 @@ const handleOpenSectorMomentum = async () => {
                 displayCount={displayCount}
                 showFvgIndicator={showFvgIndicator}
                 setShowFvgIndicator={setShowFvgIndicator}
+                setShowFvgIndicator={setShowFvgIndicator}
+                showXianRenIndicator={showXianRenIndicator}
                 activeIndicators={activeIndicators} // 👈 傳入陣列
                 indicatorParams={indicatorParams}
                 setDisplayCount={setDisplayCount}
@@ -5655,7 +5671,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (🚀 PRO 級虛擬視窗引擎升級版) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, setShowFvgIndicator, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, setShowFvgIndicator, showXianRenIndicator, setShowXianRenIndicator, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
@@ -6992,7 +7008,117 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   }
   return null;
 })}
+            {/* 🌟 仙人指路指標自動偵測與延伸中線繪製 */}
+{showXianRenIndicator && data.map((d, i, arr) => {
+  // 需要確保至少有前一根(測試棒 i-1)與當前根(確認棒 i)
+  if (i < 1 || !arr[i - 1] || !arr[i]) return null;
 
+  const testCandle = arr[i - 1];   // 前一根 K 棒（仙人指路測試棒）
+  const confirmCandle = arr[i];    // 當前根 K 棒（隔日確認棒）
+
+  // 1. 計算前一根 K 棒的實體大小與上影線長度
+  const testBodySize = Math.abs(testCandle.close - testCandle.open);
+  const testBodyBottom = Math.min(testCandle.open, testCandle.close);
+  const testUpperShadow = testCandle.high - testBodyBottom;
+
+  // 條件 A：不論紅綠 K，上影線必須是實體長度的 2 倍以上 (防呆：實體大於 0.01)
+  const isLongUpperShadow = testBodySize > 0.01 && testUpperShadow >= testBodySize * 2;
+
+  if (isLongUpperShadow) {
+    // 🌟 新增：從均線陣列中抓取測試棒當下的 5、10、20 日均線數值
+    const ma5 = fixedMa5 && fixedMa5[i - 1];
+    const ma10 = fixedMa10 && fixedMa10[i - 1];
+    const ma20 = fixedMa20 && fixedMa20[i - 1];
+    const testClose = testCandle.close;
+
+    // 🌟 新增條件：測試棒收盤價必須大於 5、10、20 日均線，且均線數值不能高於收盤價（確保均線在下方）
+    const isAboveAllMAs = ma5 !== undefined && ma10 !== undefined && ma20 !== undefined &&
+      testClose > ma5 && testClose > ma10 && testClose > ma20 &&
+      ma5 <= testClose && ma10 <= testClose && ma20 <= testClose;
+
+    if (isAboveAllMAs) {
+      // 2. 計算仙人指路「上影線的中間值」
+      const shadowMidPrice = testBodyBottom + (testCandle.high - testBodyBottom) / 2;
+
+      // 3. 條件 B：下一根 K 棒（確認棒）必須是紅 K，且收盤價要站上該中線之上
+      const isConfirmBreakout = confirmCandle.close > confirmCandle.open && confirmCandle.close >= shadowMidPrice;
+
+      if (isConfirmBreakout) {
+        const xTest = getX(i - 1);       // 測試棒的 X 座標
+        const xConfirm = getX(i);        // 確認棒的 X 座標
+        const xEnd = xConfirm + 90;      // 虛線向右延伸的終點
+        const yMid = getY(shadowMidPrice); // 中線的 Y 座標
+        const yShadowTop = getY(testCandle.high); // 測試棒最高價的 Y 座標
+
+        if (isNaN(yMid) || isNaN(yShadowTop) || yMid < paddingLeft || yMid > mainHeight - paddingLeft) return null;
+
+        return (
+          <g key={`xianren-${i}`} pointerEvents="none">
+            {/* 🌟 從測試棒的中線位置，向右畫出長虛線延伸作為後續觀看 */}
+            <line 
+              x1={xTest} 
+              y1={yMid} 
+              x2={xEnd} 
+              y2={yMid} 
+              stroke="#f59e0b" 
+              strokeWidth="1.5" 
+              strokeDasharray="3,3" 
+            />
+
+            {/* 🌟 提醒字樣：在仙人指路那根上影線的正上方顯示警告文字 */}
+            <g transform={`translate(${xTest}, ${yShadowTop - 10})`}>
+              <rect 
+                x="-110" 
+                y="-18" 
+                width="220" 
+                height="20" 
+                fill="#0f172a" 
+                fillOpacity="0.9" 
+                rx="4" 
+                stroke="#38bdf8" 
+                strokeWidth="1" 
+              />
+              <text 
+                x="0" 
+                y="-4" 
+                fill="#ecf1f3" 
+                fontSize="10" 
+                fontWeight="bold" 
+                textAnchor="middle"
+              >
+                注意隔日收盤要過上引中線並過高
+              </text>
+            </g>
+
+            {/* 🌟 右側延伸線末端的價格標籤與數值 */}
+            <rect 
+              x={xEnd - 50} 
+              y={yMid - 18} 
+              width="80" 
+              height="16" 
+              fill="#0f172a" 
+              fillOpacity="0.95" 
+              rx="3" 
+              stroke="#38bdf8" 
+              strokeWidth="1" 
+            />
+            <text 
+              x={xEnd - 10} 
+              y={yMid - 6} 
+              fill="#f59e0b"
+              fontSize="9" 
+              fontWeight="bold" 
+              textAnchor="middle"
+            >
+              中線: {shadowMidPrice.toFixed(1)}
+            </text>
+          </g>
+        );
+      }
+    }
+  }
+  return null;
+})}
             {toggles.showBBandsCompress && (<g>
                 {(() => {
                   const zones = []; let startIdx = -1; let count = 0;
@@ -7581,7 +7707,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             {toggles.showTrend && <text x="-240"><tspan fill="#10b981" fontWeight="bold">🔺</tspan> 起漲</text>}
             {toggles.showVolSignal && <text x="-160"><tspan fill="#ef4444" fontWeight="bold">天</tspan> 天量</text>}
             {toggles.showVolSignal && <text x="-80"><tspan fill="#f97316" fontWeight="bold">巨</tspan> 巨量</text>}
-            {toggles.showVolSignal && <text x="0"><tspan fill="#8b5cf6" fontWeight="bold">極</tspan> 極限量</text>}
+            {toggles.showVolSignal && <text x="0"><tspan fill="#e5f532" fontWeight="bold">極</tspan> 極限量</text>}
             {toggles.showHeidun && <text x="80"><tspan fill="#f8fafc" fontWeight="bold">黑頓</tspan></text>}
             {customStrategies.filter(s => s.isActive).map((strat, idx) => <text key={strat.id} x={180 + (idx * 100)}><tspan fill="#4f46e5" fontWeight="bold">{strat.marker}</tspan> {strat.name}</text>)}
           </g>
