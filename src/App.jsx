@@ -2250,7 +2250,7 @@ const App = () => {
   // 🌟 新增 FVG 指標開關狀態 (預設開啟)
   const [showFvgIndicator, setShowFvgIndicator] = useState(false);
   // 🌟 新增：仙人指路指標開關狀態 (預設開啟)
-  const [showXianRenIndicator, setShowXianRenIndicator] = useState(true);
+  const [showXianRenIndicator, setShowXianRenIndicator] = useState(false);
 
   
   // 1. 副圖指標參數記憶
@@ -4964,9 +4964,9 @@ const handleOpenSectorMomentum = async () => {
                 displayCount={displayCount}
                 showFvgIndicator={showFvgIndicator}
                 setShowFvgIndicator={setShowFvgIndicator}
-                activeIndicators={activeIndicators} // 👈 傳入陣列
                 showXianRenIndicator={showXianRenIndicator}
                 setShowXianRenIndicator={setShowXianRenIndicator}
+                activeIndicators={activeIndicators} // 👈 傳入陣列                
                 indicatorParams={indicatorParams}
                 setDisplayCount={setDisplayCount}
                 totalDataLength={klineData.length}
@@ -7049,7 +7049,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             y1={yMid} 
             x2={xEnd} 
             y2={yMid} 
-            stroke="#38bdf8" 
+            stroke="#f59e0b" 
             strokeWidth="1.5" 
             strokeDasharray="3,3" 
           />
@@ -7070,12 +7070,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             <text 
               x="0" 
               y="-4" 
-              fill="#38bdf8" 
+              fill="#ecf1f3" 
               fontSize="10" 
               fontWeight="bold" 
               textAnchor="middle"
             >
-              注意隔日收盤要過上引中線才是真大仙
+              注意隔日收盤要過上引中線並過高
             </text>
           </g>
 
@@ -7094,7 +7094,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           <text 
             x={xEnd - 10} 
             y={yMid - 6} 
-            fill="#38bdf8" 
+            fill="#f59e0b"
             fontSize="9" 
             fontWeight="bold" 
             textAnchor="middle"
