@@ -7075,31 +7075,46 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               strokeDasharray="3,3" 
             />
 
-            {/* 🌟 提醒字樣：在仙人指路那根上影線的正上方顯示警告文字 */}
-            <g transform={`translate(${xTest}, ${yShadowTop - 10})`}>
-              <rect 
-                x="-110" 
-                y="-18" 
-                width="220" 
-                height="20" 
-                fill="#0f172a" 
-                fillOpacity="0.9" 
-                rx="4" 
-                stroke="#38bdf8" 
-                strokeWidth="1" 
-              />
-              <text 
-                x="0" 
-                y="-4" 
-                fill="#ecf1f3" 
-                fontSize="10" 
-                fontWeight="bold" 
-                textAnchor="middle"
-              >
-                注意隔日收盤要過上引中線並過高
-              </text>
-            </g>
+            {/* 🌟 提醒字樣：加上與 K 棒拉開距離的引導虛線、半透明換行框與文字 */}
+<g transform={`translate(${xTest}, ${yShadowTop - 45})`} pointerEvents="none">
+  {/* 從提醒框底部向下延伸到 K 棒最高價的連接虛線 */}
+  <line 
+    x1="0" 
+    y1="22" 
+    x2="0" 
+    y2={Math.abs((yShadowTop - 45) - yShadowTop)} 
+    stroke="#38bdf8" 
+    strokeWidth="1" 
+    strokeDasharray="2,2" 
+    strokeOpacity="0.7"
+  />
 
+  {/* 半透明提醒框本體 (拉高寬度與高度以容納多行文字) */}
+  <rect 
+    x="-65" 
+    y="-4" 
+    width="130" 
+    height="32" 
+    fill="#0f172a" 
+    fillOpacity="0.75" 
+    rx="5" 
+    stroke="#38bdf8" 
+    strokeWidth="1" 
+  />
+
+  {/* 每 6 個字自動換行的多行文字區塊 */}
+  <text 
+    x="0" 
+    y="9" 
+    fill="#ecf1f3" 
+    fontSize="9.5" 
+    fontWeight="bold" 
+    textAnchor="middle"
+  >
+    <tspan x="0" dy="0">注意隔日收盤</tspan>
+    <tspan x="0" dy="11">須站上中線並過高</tspan>
+  </text>
+</g>
             {/* 🌟 右側延伸線末端的價格標籤與數值 */}
             <rect 
               x={xEnd - 50} 
