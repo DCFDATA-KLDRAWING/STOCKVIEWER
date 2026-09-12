@@ -7030,7 +7030,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const testBodyBottom = Math.min(testCandle.open, testCandle.close);
   const testUpperShadow = testCandle.high - testBodyBottom;
 
-  const isLongUpperShadow = testBodySize > 0.001 && testUpperShadow >= testBodySize * 2;
+  const isLongUpperShadow = testBodySize > 0.01 && testUpperShadow >= testBodySize * 2;
 
   if (isLongUpperShadow) {
     // 🌟 安全修正：直接從 K 棒物件本身讀取均線（相容各種常見命名，如 fixedMa5 或 ma5）
