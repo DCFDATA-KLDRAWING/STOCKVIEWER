@@ -7107,17 +7107,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
         {/* 移至靠近 K 棒處的中線價格標籤 (無外框) */}
         <g transform={`translate(${xPriceLabel}, ${yMid - 4})`}>
-          <rect 
-            x="-25" 
-            y="-10" 
-            width="50" 
-            height="15" 
-            fill="#0f172a" 
-            fillOpacity="0.8" 
-            rx="3" 
-            stroke="#38bdf8" 
-            strokeWidth="0.8" 
-          />
           <text 
             x="0" 
             y="1" 
