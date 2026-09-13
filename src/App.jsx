@@ -6999,6 +6999,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             fontSize="9" 
             fontWeight="bold" 
             textAnchor="Middle"
+            opacity="0.65"
           >
             FVG: {fvgPrice.toFixed(1)}
           </text>
@@ -7099,8 +7100,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             fontWeight="bold" 
             textAnchor="middle"
           >
-            <tspan x="0" dy="0">長上影線/十字</tspan>
-            <tspan x="0" dy="11">收&gt;MA5 &amp; MA5&gt;MA20</tspan>
+            <tspan x="0" dy="0">待隔日</tspan>
+            <tspan x="0" dy="11">確認</tspan>
           </text>
         </g>
 
