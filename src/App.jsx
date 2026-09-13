@@ -7009,138 +7009,124 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   return null;
 })}
             {/* 🌟 仙人指路指標自動偵測與延伸中線繪製 */}
+{/* 🌟 支援完美十字線與長上影線的自動偵測 (已加入 MA5 > MA20 與 收盤 > MA5 濾網) */}
 {showXianRenIndicator && data.map((d, i, arr) => {
-  if (i < 1 || !arr[i - 1] || !arr[i]) return null;
-
-  const testCandle = arr[i - 1];   // 前一根 K 棒（仙人指路測試棒）
-  const confirmCandle = arr[i];    // 當前根 K 棒（隔日確認棒）
+  if (!d) return null;
 
   if (
-    typeof testCandle.open !== 'number' || 
-    typeof testCandle.close !== 'number' || 
-    typeof testCandle.high !== 'number' || 
-    typeof confirmCandle.open !== 'number' || 
-    typeof confirmCandle.close !== 'number'
+    typeof d.open !== 'number' || 
+    typeof d.close !== 'number' || 
+    typeof d.high !== 'number' || 
+    typeof d.low !== 'number'
   ) {
     return null;
   }
 
-  // 1. 計算前一根 K 棒的實體大小與上影線長度
-  const testBodySize = Math.abs(testCandle.close - testCandle.open);
-  const testBodyBottom = Math.min(testCandle.open, testCandle.close);
-  const testUpperShadow = testCandle.high - testBodyBottom;
+  // 1. 抓取當天均線數值 (自動相容各種命名)
+  const ma5 = d.fixedMa5 ?? d.ma5;
+  const ma20 = d.fixedMa20 ?? d.ma20;
 
-  const isLongUpperShadow = testBodySize > 0.01 && testUpperShadow >= testBodySize * 2;
+  // 2. 均線過濾條件：收盤價 > 5日均線 且 5日均線 > 20日均線
+  const isMaConditionMet = ma5 !== undefined && ma20 !== undefined &&
+                            d.close > ma5 && ma5 > ma20;
 
-  if (isLongUpperShadow) {
-    // 🌟 安全修正：直接從 K 棒物件本身讀取均線（相容各種常見命名，如 fixedMa5 或 ma5）
-    const ma5 = testCandle.fixedMa5 ?? testCandle.ma5;
-    const ma10 = testCandle.fixedMa10 ?? testCandle.ma10;
-    const ma20 = testCandle.fixedMa20 ?? testCandle.ma20;
-    const testClose = testCandle.close;
+  if (!isMaConditionMet) return null;
 
-    // 🌟 檢查均線是否存在，且測試收盤價必須站在 5、10、20 日均線上方
-    const isAboveAllMAs = ma5 !== undefined && ma10 !== undefined && ma20 !== undefined &&
-      testClose > ma5 && testClose > ma10 && testClose > ma20 &&
-      ma5 <= testClose && ma10 <= testClose && ma20 <= testClose;
+  const bodySize = Math.abs(d.close - d.open);
+  const bodyBottom = Math.min(d.open, d.close);
+  const bodyTop = Math.max(d.open, d.close);
+  
+  const upperShadow = d.high - bodyTop;       
+  const lowerShadow = bodyBottom - d.low;     
 
-    if (isAboveAllMAs) {
-      // 2. 計算仙人指路「上影線的中間值」
-      const shadowMidPrice = testBodyBottom + (testCandle.high - testBodyBottom) / 2;
+  // 3. 型態判斷：一般長上影線或十字線長上影線，且上影線大於下影線
+  const isNormalLongShadow = bodySize >= 0.001 && upperShadow >= bodySize * 2;
+  const isDoziLongShadow = bodySize < 0.001 && upperShadow >= 0.1;
 
-      // 3. 條件 B：下一根 K 棒（確認棒）必須是紅 K，且收盤價要站上該中線之上
-      const isConfirmBreakout = confirmCandle.close > confirmCandle.open && confirmCandle.close >= shadowMidPrice;
+  const isValidPattern = (isNormalLongShadow || isDoziLongShadow) && (upperShadow > lowerShadow);
 
-      if (isConfirmBreakout) {
-        const xTest = getX(i - 1);       
-        const xConfirm = getX(i);        
-        const xEnd = xConfirm + 90;      
-        const yMid = getY(shadowMidPrice); 
-        const yShadowTop = getY(testCandle.high); 
+  if (isValidPattern) {
+    const shadowMidPrice = bodyBottom + (d.high - bodyBottom) / 2;
 
-        if (isNaN(yMid) || isNaN(yShadowTop) || yMid < paddingLeft || yMid > mainHeight - paddingLeft) {
-          return null;
-        }
+    const xPos = getX(i);              
+    const xEnd = xPos + 90;            
+    const yMid = getY(shadowMidPrice);   
+    const yShadowTop = getY(d.high);   
 
-        return (
-          <g key={`xianren-${i}`} pointerEvents="none">
-            {/* 🌟 從測試棒的中線位置，向右畫出長虛線延伸作為後續觀看 */}
-            <line 
-              x1={xTest} 
-              y1={yMid} 
-              x2={xEnd} 
-              y2={yMid} 
-              stroke="#f59e0b" 
-              strokeWidth="1.5" 
-              strokeDasharray="3,3" 
-            />
-
-            {/* 🌟 提醒字樣：加上與 K 棒拉開距離的引導虛線、半透明換行框與文字 */}
-<g transform={`translate(${xTest}, ${yShadowTop - 45})`} pointerEvents="none">
-  {/* 從提醒框底部向下延伸到 K 棒最高價的連接虛線 */}
-  <line 
-    x1="0" 
-    y1="22" 
-    x2="0" 
-    y2={Math.abs((yShadowTop - 45) - yShadowTop)} 
-    stroke="#38bdf8" 
-    strokeWidth="1" 
-    strokeDasharray="2,2" 
-    strokeOpacity="0.7"
-  />
-
-  {/* 半透明提醒框本體 (拉高寬度與高度以容納多行文字) */}
-  <rect 
-    x="-65" 
-    y="-4" 
-    width="130" 
-    height="32" 
-    fill="#0f172a" 
-    fillOpacity="0.75" 
-    rx="5" 
-    stroke="#38bdf8" 
-    strokeWidth="1" 
-  />
-
-  {/* 每 6 個字自動換行的多行文字區塊 */}
-  <text 
-    x="0" 
-    y="9" 
-    fill="#ecf1f3" 
-    fontSize="9.5" 
-    fontWeight="bold" 
-    textAnchor="middle"
-  >
-    <tspan x="0" dy="0">注意隔日收盤</tspan>
-    <tspan x="0" dy="11">須站上中線並過高</tspan>
-  </text>
-</g>
-            {/* 🌟 右側延伸線末端的價格標籤與數值 */}
-            <rect 
-              x={xEnd - 50} 
-              y={yMid - 18} 
-              width="80" 
-              height="16" 
-              fill="#0f172a" 
-              fillOpacity="0.95" 
-              rx="3" 
-              stroke="#38bdf8" 
-              strokeWidth="1" 
-            />
-            <text 
-              x={xEnd - 10} 
-              y={yMid - 6} 
-              fill="#f59e0b"
-              fontSize="9" 
-              fontWeight="bold" 
-              textAnchor="middle"
-            >
-              中線: {shadowMidPrice.toFixed(1)}
-            </text>
-          </g>
-        );
-      }
+    if (isNaN(yMid) || isNaN(yShadowTop) || yMid < paddingLeft || yMid > mainHeight - paddingLeft) {
+      return null;
     }
+
+    return (
+      <g key={`xianren-${i}`} pointerEvents="none">
+        <line 
+          x1={xPos} 
+          y1={yMid} 
+          x2={xEnd} 
+          y2={yMid} 
+          stroke="#f59e0b" 
+          strokeWidth="1.5" 
+          strokeDasharray="3,3" 
+        />
+
+        <g transform={`translate(${xPos}, ${yShadowTop - 45})`}>
+          <line 
+            x1="0" 
+            y1="22" 
+            x2="0" 
+            y2={Math.abs((yShadowTop - 45) - yShadowTop)} 
+            stroke="#38bdf8" 
+            strokeWidth="1" 
+            strokeDasharray="2,2" 
+            strokeOpacity="0.7"
+          />
+          <rect 
+            x="-65" 
+            y="-4" 
+            width="130" 
+            height="32" 
+            fill="#0f172a" 
+            fillOpacity="0.75" 
+            rx="5" 
+            stroke="#38bdf8" 
+            strokeWidth="1" 
+          />
+          <text 
+            x="0" 
+            y="9" 
+            fill="#ecf1f3" 
+            fontSize="9.5" 
+            fontWeight="bold" 
+            textAnchor="middle"
+          >
+            <tspan x="0" dy="0">長上影線/十字</tspan>
+            <tspan x="0" dy="11">收&gt;MA5 &amp; MA5&gt;MA20</tspan>
+          </text>
+        </g>
+
+        <rect 
+          x={xEnd - 50} 
+          y={yMid - 18} 
+          width="80" 
+          height="16" 
+          fill="#0f172a" 
+          fillOpacity="0.95" 
+          rx="3" 
+          stroke="#38bdf8" 
+          strokeWidth="1" 
+        />
+        <text 
+          x={xEnd - 10} 
+          y={yMid - 6} 
+          fill="#f59e0b"
+          fontSize="9" 
+          fontWeight="bold" 
+          textAnchor="middle"
+        >
+          中線: {shadowMidPrice.toFixed(1)}
+        </text>
+      </g>
+    );
   }
   return null;
 })}
