@@ -7010,7 +7010,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   return null;
 })}
             {/* 🌟 仙人指路指標自動偵測與延伸中線繪製 */}
-{/* 🌟 支援完美十字線與長上影線的自動偵測 (已加入 MA5 > MA20 與 收盤 > MA5 濾網) */}
+{/* 🌟 支援完美十字線與長上影線的自動偵測 */}
 {showXianRenIndicator && data.map((d, i, arr) => {
   if (!d) return null;
 
@@ -7040,13 +7040,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const upperShadow = d.high - bodyTop;       
   const lowerShadow = bodyBottom - d.low;     
 
-  // 3. 型態判斷：一般長上影線或十字線長上影線，且上影線大於下影線
+  // 🌟 核心修改：同時支援「一般實體 2 倍以上」以及「實體趨近於零的十字線長上影線」
+  // 1. 一般長上影線：實體大於 0.001 且 上影線 >= 實體 * 2
   const isNormalLongShadow = bodySize >= 0.001 && upperShadow >= bodySize * 2;
+
+  // 2. 十字線長上影線：實體極小（< 0.001，幾乎為 0），但上影線必須有一定的長度（例如 >= 0.1 元，避免極小雜訊）
   const isDoziLongShadow = bodySize < 0.001 && upperShadow >= 0.1;
 
+  // 綜合條件：滿足上述任一種，且上影線必須比下影線長
   const isValidPattern = (isNormalLongShadow || isDoziLongShadow) && (upperShadow > lowerShadow);
 
   if (isValidPattern) {
+    // 計算上影線的中間值（如果是十字線，中線就是從開收盤價到最高價的中間）
     const shadowMidPrice = bodyBottom + (d.high - bodyBottom) / 2;
 
     const xPos = getX(i);              
@@ -7058,8 +7063,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       return null;
     }
 
+    // 讓右側價格標籤靠近該 K 棒 (將 xPriceLabel 設為靠近 xPos)
+    const xPriceLabel = xPos + 25;
+
     return (
       <g key={`xianren-${i}`} pointerEvents="none">
+        {/* 從當前 K 棒的中線位置，向右畫出長虛線延伸 */}
         <line 
           x1={xPos} 
           y1={yMid} 
@@ -7070,62 +7079,56 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           strokeDasharray="3,3" 
         />
 
-        <g transform={`translate(${xPos}, ${yShadowTop - 45})`}>
+        {/* 上方的半透明提醒與引導虛線 (已移除外框，僅留文字與引導線) */}
+        <g transform={`translate(${xPos}, ${yShadowTop - 35})`}>
           <line 
             x1="0" 
-            y1="22" 
+            y1="12" 
             x2="0" 
-            y2={Math.abs((yShadowTop - 45) - yShadowTop)} 
+            y2={Math.abs((yShadowTop - 35) - yShadowTop)} 
             stroke="#38bdf8" 
             strokeWidth="1" 
             strokeDasharray="2,2" 
-            strokeOpacity="0.7"
-          />
-          <rect 
-            x="-65" 
-            y="-4" 
-            width="130" 
-            height="32" 
-            fill="#0f172a" 
-            fillOpacity="0.75" 
-            rx="5" 
-            stroke="#38bdf8" 
-            strokeWidth="1" 
+            strokeOpacity="0.5"
           />
           <text 
             x="0" 
-            y="9" 
+            y="4" 
             fill="#ecf1f3" 
             fontSize="9.5" 
             fontWeight="bold" 
             textAnchor="middle"
+            opacity="0.85"
           >
             <tspan x="0" dy="0">待隔日</tspan>
-            <tspan x="0" dy="11">確認</tspan>
+            <tspan x="0" dy="11">K線確認</tspan>
           </text>
         </g>
 
-        <rect 
-          x={xEnd - 50} 
-          y={yMid - 18} 
-          width="80" 
-          height="16" 
-          fill="#0f172a" 
-          fillOpacity="0.95" 
-          rx="3" 
-          stroke="#38bdf8" 
-          strokeWidth="1" 
-        />
-        <text 
-          x={xEnd - 10} 
-          y={yMid - 6} 
-          fill="#f59e0b"
-          fontSize="9" 
-          fontWeight="bold" 
-          textAnchor="middle"
-        >
-          中線: {shadowMidPrice.toFixed(1)}
-        </text>
+        {/* 移至靠近 K 棒處的中線價格標籤 (無外框) */}
+        <g transform={`translate(${xPriceLabel}, ${yMid - 4})`}>
+          <rect 
+            x="-25" 
+            y="-10" 
+            width="50" 
+            height="15" 
+            fill="#0f172a" 
+            fillOpacity="0.8" 
+            rx="3" 
+            stroke="#38bdf8" 
+            strokeWidth="0.8" 
+          />
+          <text 
+            x="0" 
+            y="1" 
+            fill="#f59e0b"
+            fontSize="9" 
+            fontWeight="bold" 
+            textAnchor="middle"
+          >
+            {shadowMidPrice.toFixed(1)}
+          </text>
+        </g>
       </g>
     );
   }
