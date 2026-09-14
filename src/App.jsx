@@ -2334,7 +2334,7 @@ const App = () => {
   const [panelsOpen, setPanelsOpen] = useState({ config: false }); // ✨ 補回這行：控制面板收合狀態
   // ✨ 狀態開關管理
   const [toggles, setToggles] = useState({
-    showMA: true, showVolume: true, showVolSignal: true, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
+    showMA: true, showVolume: true, showVolSignal: false, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
     showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
     showBBandsCompress: false, // ✨ 新增：布林壓縮區塊 開關
     showTooltipDetail: false, // ✨ 新增：查價詳細資訊勾選鍵（預設關閉）
