@@ -2275,7 +2275,7 @@ const App = () => {
   // 🌟 2. 您的板塊完整清單資料庫
   const subCategoriesData = {
     industry: [
-      { name: "傳產-水泥", dayUrl: "https://cmy.tw/00CinL", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-水泥", dayUrl: "https://cmy.tw/00Ck8i", weekUrl: "https://cmy.tw/00CoVZ" },
       { name: "傳產-食品", dayUrl: "https://cmy.tw/00CRdq", weekUrl: "https://cmy.tw/00CUsF" },
       { name: "傳產-塑膠", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
       { name: "傳產-紡織纖維", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
