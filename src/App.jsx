@@ -5175,15 +5175,15 @@ const handleOpenSectorMomentum = async () => {
             <span className="text-lg">🌊</span> 類股資金動能看板
           </button>
           <div className="flex flex-col gap-2 py-2">
-              <a 
-  href={targetCmUrl} 
-  target="_blank" 
-  rel="noopener noreferrer"
-  className="w-full bg-golden-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0"
->
-  <span className="text-lg">📈</span> 細產業K線圖 
-</a>
-          </div>
+  <a 
+    href={targetCmUrl} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="w-full bg-amber-950/60 border border-amber-500 text-amber-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:bg-amber-900 transition-all flex items-center justify-center gap-2 mt-0"
+  >
+    <span className="text-lg">📈</span> 細產業K線圖 
+  </a>
+</div>
          
           {isAdmin ? (
             <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
