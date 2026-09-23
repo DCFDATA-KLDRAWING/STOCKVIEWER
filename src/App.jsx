@@ -5183,13 +5183,13 @@ const handleOpenSectorMomentum = async () => {
 
             <div className="flex flex-col gap-2 py-2">
               <a 
-                href={targetCmUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs text-center"
-              >
-                <span>📈</span> 細產業K線圖
-              </a>
+  href={targetCmUrl} 
+  target="_blank" 
+  rel="noopener noreferrer"
+  className="w-full bg-blue-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0"
+>
+  <span className="text-lg">📈</span> 細產業K線圖 
+</a>
             </div>
           </div>
         </div>
