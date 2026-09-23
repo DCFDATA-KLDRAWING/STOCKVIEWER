@@ -5464,64 +5464,40 @@ const handleOpenSectorMomentum = async () => {
       )}
       {showCmViewerModal && currentCategoryItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl p-5 shadow-2xl relative flex flex-col h-[85vh]">
-            <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-3 flex-shrink-0">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-2xl p-6 shadow-2xl relative flex flex-col">
+            
+            <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-cyan-400 flex items-center gap-2">
-                  <span>📊 {currentCategoryName} - 板塊即時走勢與分析</span>
+                  <span>📊 {currentCategoryName} - 即時看板</span>
                 </h3>
-                <p className="text-[11px] text-slate-400">可自由切換日線圖或週線圖觀察波段強弱</p>
+                <p className="text-[11px] text-slate-400">連線至 CMoney 盤中即時互動行情</p>
               </div>
-              
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-                <button 
-                  onClick={() => setChartTimeframe('day')}
-                  className={`px-3 py-1 rounded font-bold transition-all ${chartTimeframe === 'day' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                >
-                  日線圖
-                </button>
-                <button 
-                  onClick={() => setChartTimeframe('week')}
-                  className={`px-3 py-1 rounded font-bold transition-all ${chartTimeframe === 'week' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                >
-                  週線圖
-                </button>
-              </div>
-
               <button 
                 onClick={() => setShowCmViewerModal(false)}
-                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-colors ml-2"
+                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden relative flex flex-col items-center justify-center p-2">
-              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                <div className="text-center p-4">
-                  <span className="inline-block px-3 py-1 bg-cyan-950 text-cyan-400 text-xs font-bold rounded-full mb-3 border border-cyan-800">
-                    🟢 {currentCategoryName} ({chartTimeframe === 'day' ? '日線走勢' : '週線走勢'})
-                  </span>
-                  <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-2xl max-w-xl mx-auto">
-
-                    <img 
-                      key={chartTimeframe} /* 👈 加上這行，切換日/週線時才會強制重新整理載入圖片 */
-                      src={chartTimeframe === 'day' ? currentCategoryItem.dayUrl : currentCategoryItem.weekUrl} 
-                      alt={currentCategoryName} 
-                      className="rounded-lg w-full h-auto object-cover max-h-[45vh]"
-                      onError={(e) => { 
-                        // 如果該連結讀取失敗，自動轉成提示文字方塊，避免畫面破圖
-                        e.target.src = "https://placehold.co/600x400/0f172a/38bdf8?text=" + encodeURIComponent(currentCategoryName + " (" + (chartTimeframe === 'day' ? '日線' : '週線') + ")"); 
-                      }}
-                    />
-                    <p className="text-xs text-slate-400 mt-2 font-medium">📈 資料即時更新中</p>
-
-                  </div>
-                </div>
-              </div>
+            <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 flex flex-col items-center text-center gap-4 my-2">
+              <span className="text-4xl animate-pulse">🟢</span>
+              <p className="text-sm text-slate-300 leading-relaxed">
+                您即將前往 <strong className="text-cyan-400">{currentCategoryName}</strong> 的 CMoney 官方即時互動看板，盤中數據將自動即時更新！
+              </p>
+              
+              <a 
+                href={currentCategoryItem.url} /* 這裡會自動帶入您剛剛貼的即時網址 */
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-base mt-2"
+              >
+                <span>🌐</span> 立即開啟 {currentCategoryName} 互動網頁
+              </a>
             </div>
 
-            <div className="mt-3 flex justify-end flex-shrink-0">
+            <div className="mt-4 flex justify-end">
               <button 
                 onClick={() => setShowCmViewerModal(false)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-5 py-2.5 rounded-lg font-bold transition-colors shadow"
@@ -5529,6 +5505,7 @@ const handleOpenSectorMomentum = async () => {
                 關閉並返回 App
               </button>
             </div>
+
           </div>
         </div>
       )}
