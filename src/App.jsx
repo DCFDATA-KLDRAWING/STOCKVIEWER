@@ -5174,25 +5174,17 @@ const handleOpenSectorMomentum = async () => {
           <button onClick={handleOpenSectorMomentum} className="w-full bg-blue-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0">
             <span className="text-lg">🌊</span> 類股資金動能看板
           </button>
-          {/* 右側：精簡後的單一細產業 K 線圖按鈕 (佔 2 格) */}
-        <div className="xl:col-span-2 flex flex-col gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <span className="text-xs font-bold text-cyan-400">📊 板塊即時走勢與強弱分析</span>
-            </div>
-
-            <div className="flex flex-col gap-2 py-2">
+          <div className="flex flex-col gap-2 py-2">
               <a 
   href={targetCmUrl} 
   target="_blank" 
   rel="noopener noreferrer"
-  className="w-full bg-blue-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0"
+  className="w-full bg-golden-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0"
 >
   <span className="text-lg">📈</span> 細產業K線圖 
 </a>
-            </div>
           </div>
-        </div>
+         
           {isAdmin ? (
             <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
               <div className="flex flex-col gap-3">
