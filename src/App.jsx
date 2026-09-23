@@ -2267,12 +2267,7 @@ const App = () => {
   // 🌟 只保留一個簡單的目標網址狀態
   const [showCmViewerModal, setShowCmViewerModal] = useState(false);
   const targetCmUrl = "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C11010&o=1"; // 水泥即時看板網址
-  // 🌟 點擊時接收整包板塊物件 (包含 dayUrl 與 weekUrl)
-  const handleOpenCategoryViewer = (item) => {
-    setCurrentCategoryItem(item);
-    setCurrentCategoryName(item.name);
-    setShowCmViewerModal(true);
-  };
+  
   
   // 2. 主圖均線 MA 參數記憶 (加入 show 獨立開關)
   const [maParams, setMaParams] = useState(() => {
@@ -5193,7 +5188,7 @@ const handleOpenSectorMomentum = async () => {
                 rel="noopener noreferrer"
                 className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs text-center"
               >
-                <span>📈</span> 細產業K線圖 (水泥即時看板)
+                <span>📈</span> 細產業K線圖 (即時看板)
               </a>
             </div>
           </div>
