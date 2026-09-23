@@ -2367,7 +2367,6 @@ const App = () => {
       { name: "裕隆集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" }
     ]
   };
-
   // 🌟 點擊時接收整包板塊物件 (包含 dayUrl 與 weekUrl)
   const handleOpenCategoryViewer = (item) => {
     setCurrentCategoryItem(item);
