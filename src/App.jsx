@@ -2264,114 +2264,13 @@ const App = () => {
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
   
-  // 🌟 1. 新增細產業與概念股板塊專區的狀態 (升級支援日/週線切換)
-  const [selectedCategoryType, setSelectedCategoryType] = useState('industry'); // 'industry' 或 'concept' 或 'group'
+  // 🌟 只保留一個簡單的目標網址狀態
   const [showCmViewerModal, setShowCmViewerModal] = useState(false);
-  const [currentCategoryName, setCurrentCategoryName] = useState('');
-  const [currentCategoryItem, setCurrentCategoryItem] = useState(null); // 記錄當前點擊的完整板塊物件
-  const [chartTimeframe, setChartTimeframe] = useState('day'); // 'day' (日線) 或 'week' (週線)
-
-  
-  // 🌟 2. 您的板塊完整清單資料庫
-  const subCategoriesData = {
-    industry: [
-      { name: "傳產-水泥", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C11010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C11010&o=2" },
-      { name: "傳產-食品", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C12010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C12010&o=2" },
-      { name: "傳產-塑膠", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C13010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C13010&o=2" },
-      { name: "傳產-紡織纖維", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C14010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C14010&o=2" },
-      { name: "傳產-電機", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C15010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C15010&o=2" },
-      { name: "傳產-電線電纜", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C16010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C16010&o=2" },
-      { name: "傳產-化學工業", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C17010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C17010&o=2" },
-      { name: "傳產-生技", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C17810&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C17810&o=2" },
-      { name: "傳產-玻璃陶瓷", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C18010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C18010&o=2" },
-      { name: "傳產-紙業", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C19010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C19010&o=2" },
-      { name: "傳產-鋼鐵", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C20010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C20010&o=2" },
-      { name: "傳產-橡膠", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C21010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C21010&o=2" },
-      { name: "傳產-汽車", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C22010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C22010&o=2" },
-      { name: "傳產-汽車零組件", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C22020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C22020&o=2" },
-      { name: "電子上游-IC-設計", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23010&o=2" },
-      { name: "電子上游-IC-代工", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23020&o=2" },
-      { name: "電子上游-記憶體製造", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23030&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23030&o=2" },
-      { name: "電子上游-記憶體銷售", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23040&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23040&o=2" },
-      { name: "電子上游-IC-製造", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23050&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23050&o=2" },
-      { name: "電子上游-IC-封測", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23060&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23060&o=2" },
-      { name: "電子上游-IC-通路", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23070&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23070&o=2" },
-      { name: "電子上游-IC-其他", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23080&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C23080&o=2" },
-      { name: "電子上游-被動元件", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C24010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C24010&o=2" },
-      { name: "電子上游-LED照明及光元件", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C24020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C24020&o=2" },
-      { name: "電子上游-連接元件", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C24030&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C24030&o=2" },
-      { name: "電子上游-PCB-製造", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C25010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C25010&o=2" },
-      { name: "電子上游-PCB-材料設備", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C25020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C25020&o=2" },
-      { name: "電子中游-LCD-TFT面板", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C26010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C26010&o=2" },
-      { name: "電子中游-LCD-零組件", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C26020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C26020&o=2" },
-      { name: "電子中游-電源供應器", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C27010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C27010&o=2" },
-      { name: "電子中游-主機板", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C28010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C28010&o=2" },
-      { name: "電子中游-光學鏡片", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C29010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C29010&o=2" },
-      { name: "電子中游-通訊設備", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C30010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C30010&o=2" },
-      { name: "電子中游-網通", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C30020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C30020&o=2" },
-      { name: "電子中游-EMS", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C31010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C31010&o=2" },
-      { name: "電子下游-筆記型電腦", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C32010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C32010&o=2" },
-      { name: "電子下游-手機製造", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C32020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C32020&o=2" },
-      { name: "電子下游-太陽能", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C33010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C33010&o=2" },
-      { name: "軟體-系統整合", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C34010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C34010&o=2" },
-      { name: "軟體-遊戲", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C34020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C34020&o=2" },
-      { name: "金融-金控", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35010&o=2" },
-      { name: "金融-銀行", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35020&o=2" },
-      { name: "金融-證券", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35030&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35030&o=2" },
-      { name: "金融-保險", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35040&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C35040&o=2" },
-      { name: "傳產-營建", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C36010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C36010&o=2" },
-      { name: "傳產-航運", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C37010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C37010&o=2" },
-      { name: "傳產-觀光", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C38010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C38010&o=2" },
-      { name: "傳產-百貨", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C39010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C39010&o=2" }
-    ],
-    concept: [
-      { name: "CoWoS概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99010&o=2" },
-      { name: "GB200概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99020&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99020&o=2" },
-      { name: "AI PC概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99030&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99030&o=2" },
-      { name: "低軌衛星概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99040&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99040&o=2" },
-      { name: "矽智財IP概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99050&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99050&o=2" },
-      { name: "機器人概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99060&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99060&o=2" },
-      { name: "電動車概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99070&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99070&o=2" },
-      { name: "Apple概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99080&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99080&o=2" },
-      { name: "水資源概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99090&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99090&o=2" },
-      { name: "綠能環保概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99100&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99100&o=2" },
-      { name: "航太概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99110&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99110&o=2" },
-      { name: "碳權概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99120&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99120&o=2" },
-      { name: "軍工概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99130&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99130&o=2" },
-      { name: "智慧醫療概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99140&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99140&o=2" },
-      { name: "重電概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99150&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99150&o=2" },
-      { name: "BBU概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99160&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99160&o=2" },
-      { name: "光通訊概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99170&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99170&o=2" },
-      { name: "FOPLP扇出型封裝概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99180&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99180&o=2" },
-      { name: "玻璃基板概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99190&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99190&o=2" },
-      { name: "無人機概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99200&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99200&o=2" },
-      { name: "半導體設備概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99210&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99210&o=2" },
-      { name: "HBM概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99220&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99220&o=2" },
-      { name: "ASIC概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99230&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99230&o=2" },
-      { name: "散熱模組概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99240&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99240&o=2" },
-      { name: "ChatGPT概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99250&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99250&o=2" },
-      { name: "蘋概股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99260&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99260&o=2" },
-      { name: "特斯拉概念股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99270&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C99270&o=2" }
-    ],
-    group: [
-      { name: "台積電集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G01010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G01010&o=2" },
-      { name: "鴻海集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G02010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G02010&o=2" },
-      { name: "聯電集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G03010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G03010&o=2" },
-      { name: "華新集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G04010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G04010&o=2" },
-      { name: "台塑集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G05010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G05010&o=2" },
-      { name: "國巨集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G06010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G06010&o=2" },
-      { name: "光寶集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G07010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G07010&o=2" },
-      { name: "中信集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G08010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G08010&o=2" },
-      { name: "遠東集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G09010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G09010&o=2" },
-      { name: "統一集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G10010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G10010&o=2" },
-      { name: "裕隆集團股", dayUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G11010&o=1", weekUrl: "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=G11010&o=2" }
-    ]
-  };
+  const targetCmUrl = "https://www.cmoney.tw/finance/f00072.aspx?b=1&t=C11010&o=1"; // 水泥即時看板網址
   // 🌟 點擊時接收整包板塊物件 (包含 dayUrl 與 weekUrl)
   const handleOpenCategoryViewer = (item) => {
     setCurrentCategoryItem(item);
     setCurrentCategoryName(item.name);
-    setChartTimeframe('day'); // 每次打開預設先顯示日線圖
     setShowCmViewerModal(true);
   };
   
@@ -5280,55 +5179,25 @@ const handleOpenSectorMomentum = async () => {
           <button onClick={handleOpenSectorMomentum} className="w-full bg-blue-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0">
             <span className="text-lg">🌊</span> 類股資金動能看板
           </button>
-          {/* 🌟 【新建立的區塊】細產業與熱門概念股板塊專區 */}
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 border-b border-slate-800 pb-2">
-              <div>
-                <h3 className="text-xs font-bold text-cyan-400">📁 細產業與熱門概念股專區</h3>
-                <p className="text-[10px] text-slate-400">點擊任一板塊可開啟即時走勢與分析視窗</p>
-              </div>
-              
-              {/* 切換標籤 (細產業 / 熱門概念 / 集團股) */}
-              <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[10px]">
-                <button 
-                  onClick={() => setSelectedCategoryType('industry')}
-                  className={`px-2 py-1 rounded font-bold transition-all ${selectedCategoryType === 'industry' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                >
-                  細產業
-                </button>
-                <button 
-                  onClick={() => setSelectedCategoryType('concept')}
-                  className={`px-2 py-1 rounded font-bold transition-all ${selectedCategoryType === 'concept' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                >
-                  熱門概念
-                </button>
-                <button 
-                  onClick={() => setSelectedCategoryType('group')}
-                  className={`px-2 py-1 rounded font-bold transition-all ${selectedCategoryType === 'group' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                >
-                  集團股
-                </button>
-              </div>
+          {/* 右側：精簡後的單一細產業 K 線圖按鈕 (佔 2 格) */}
+        <div className="xl:col-span-2 flex flex-col gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <span className="text-xs font-bold text-cyan-400">📊 板塊即時走勢與強弱分析</span>
             </div>
 
-            {/* 各個板塊的按鈕網格清單 */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-72 overflow-y-auto p-1.5 bg-slate-950/60 rounded-lg border border-slate-800">
-              {subCategoriesData[selectedCategoryType].map((item, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleOpenCategoryViewer(item)} // 👈 傳入名稱與專屬網址
-                  className="text-[11px] px-2 py-2 rounded-lg font-medium bg-slate-800/80 text-slate-200 hover:bg-cyan-600 hover:text-white transition-all text-center truncate border border-slate-700/60 shadow-sm flex items-center justify-center gap-1 group"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 group-hover:bg-amber-300"></span>
-                  <span className="truncate">{item.name}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-2 text-[10px] text-amber-400/90 bg-slate-950 p-2 rounded-lg border border-slate-800">
-              💡 點擊任一板塊（如：<strong>傳產-水泥</strong> 或 <strong>CoWoS概念股</strong>），將自動彈出即時看板視窗，看完關閉即可返回主畫面。
+            <div className="flex flex-col gap-2 py-2">
+              <a 
+                href={targetCmUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs text-center"
+              >
+                <span>📈</span> 細產業K線圖 (水泥即時看板)
+              </a>
             </div>
           </div>
+        </div>
           {isAdmin ? (
             <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
               <div className="flex flex-col gap-3">
@@ -5464,15 +5333,10 @@ const handleOpenSectorMomentum = async () => {
       )}
       {showCmViewerModal && currentCategoryItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-2xl p-6 shadow-2xl relative flex flex-col">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl relative flex flex-col text-center">
             
             <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-cyan-400 flex items-center gap-2">
-                  <span>📊 {currentCategoryName} - 即時看板</span>
-                </h3>
-                <p className="text-[11px] text-slate-400">連線至 CMoney 盤中即時互動行情</p>
-              </div>
+              <h3 className="text-base font-bold text-cyan-400">📊 {currentCategoryName} - 即時看板</h3>
               <button 
                 onClick={() => setShowCmViewerModal(false)}
                 className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors"
@@ -5481,29 +5345,29 @@ const handleOpenSectorMomentum = async () => {
               </button>
             </div>
 
-            <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 flex flex-col items-center text-center gap-4 my-2">
+            <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 flex flex-col items-center gap-4 my-2">
               <span className="text-4xl animate-pulse">🟢</span>
               <p className="text-sm text-slate-300 leading-relaxed">
-                您即將前往 <strong className="text-cyan-400">{currentCategoryName}</strong> 的 CMoney 官方即時互動看板，盤中數據將自動即時更新！
+                點擊下方按鈕將直接開啟 <strong className="text-cyan-400">{currentCategoryName}</strong> 的 CMoney 官方即時互動網頁：
               </p>
               
               <a 
-  href={currentCategoryItem.dayUrl} 
-  target="_blank" 
-  rel="noopener noreferrer"
-  onClick={(e) => e.stopPropagation()} // 阻止事件冒泡，防止被彈跳視窗吃掉
-  className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-base mt-2"
->
-  <span>🌐</span> 立即開啟 {currentCategoryName} 互動網頁
-</a>
+                href={currentCategoryItem.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-base mt-2"
+              >
+                <span>🌐</span> 立即前往即時看板
+              </a>
             </div>
 
             <div className="mt-4 flex justify-end">
               <button 
                 onClick={() => setShowCmViewerModal(false)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-5 py-2.5 rounded-lg font-bold transition-colors shadow"
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-5 py-2.5 rounded-lg font-bold transition-colors shadow w-full"
               >
-                關閉並返回 App
+                關閉視窗
               </button>
             </div>
 
