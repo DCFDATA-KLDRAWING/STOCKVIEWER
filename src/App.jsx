@@ -5316,7 +5316,7 @@ const handleOpenSectorMomentum = async () => {
               {subCategoriesData[selectedCategoryType].map((item, idx) => (
                 <button
                   key={idx}
-                  onClick={() => handleOpenCategoryViewer(item.name, item.url)} // 👈 傳入名稱與專屬網址
+                  onClick={() => handleOpenCategoryViewer(item)} // 👈 傳入名稱與專屬網址
                   className="text-[11px] px-2 py-2 rounded-lg font-medium bg-slate-800/80 text-slate-200 hover:bg-cyan-600 hover:text-white transition-all text-center truncate border border-slate-700/60 shadow-sm flex items-center justify-center gap-1 group"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 group-hover:bg-amber-300"></span>
