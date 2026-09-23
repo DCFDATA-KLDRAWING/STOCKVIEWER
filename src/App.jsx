@@ -5188,7 +5188,7 @@ const handleOpenSectorMomentum = async () => {
                 rel="noopener noreferrer"
                 className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs text-center"
               >
-                <span>📈</span> 細產業K線圖 (即時看板)
+                <span>📈</span> 細產業K線圖
               </a>
             </div>
           </div>
