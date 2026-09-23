@@ -5473,7 +5473,6 @@ const handleOpenSectorMomentum = async () => {
                 <p className="text-[11px] text-slate-400">可自由切換日線圖或週線圖觀察波段強弱</p>
               </div>
               
-              {/* 🌟 日線 / 週線切換開關按鈕 */}
               <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
                 <button 
                   onClick={() => setChartTimeframe('day')}
@@ -5497,7 +5496,6 @@ const handleOpenSectorMomentum = async () => {
               </button>
             </div>
 
-            {/* 嵌入檢視區域 (根據 chartTimeframe 自動切換 dayUrl 或 weekUrl) */}
             <div className="flex-1 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden relative flex flex-col items-center justify-center p-2">
               <div className="w-full h-full flex flex-col items-center justify-center gap-3">
                 <div className="text-center p-4">
@@ -5506,16 +5504,15 @@ const handleOpenSectorMomentum = async () => {
                   </span>
                   <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-2xl max-w-xl mx-auto">
                     <img 
-                      key={chartTimeframe} /* 👈 加上這行，切換日/週線時才會強制重新整理載入圖片 */
+                      key={chartTimeframe} 
                       src={chartTimeframe === 'day' ? currentCategoryItem.dayUrl : currentCategoryItem.weekUrl} 
                       alt={currentCategoryName} 
                       className="rounded-lg w-full h-auto object-cover max-h-[45vh]"
                       onError={(e) => { 
-                        // 如果該連結讀取失敗，自動轉成提示文字方塊，避免畫面破圖
                         e.target.src = "https://placehold.co/600x400/0f172a/38bdf8?text=" + encodeURIComponent(currentCategoryName + " (" + (chartTimeframe === 'day' ? '日線' : '週線') + ")"); 
                       }}
                     />
-                    <p className="text-xs text-slate-400 mt-2 font-medium">📈 資料即時更新中</p>
+                    <p className="text-xs text-slate-400 mt-2 font-medium">📈 {currentCategoryName} 盤中走勢與成分股強弱即時更新中</p>
                   </div>
                 </div>
               </div>
