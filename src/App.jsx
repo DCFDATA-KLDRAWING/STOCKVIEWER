@@ -5502,14 +5502,19 @@ const handleOpenSectorMomentum = async () => {
                   <span className="inline-block px-3 py-1 bg-cyan-950 text-cyan-400 text-xs font-bold rounded-full mb-3 border border-cyan-800">
                     🟢 {currentCategoryName} ({chartTimeframe === 'day' ? '日線走勢' : '週線走勢'})
                   </span>
-                  <div className="bg-slate-900 border border-slate-700 rounded-xl p-2 shadow-2xl max-w-2xl mx-auto w-full h-[50vh]">
-                      <iframe 
-                        key={chartTimeframe} /* 切換日/週線時自動重新整理 */
-                        src={chartTimeframe === 'day' ? currentCategoryItem.dayUrl : currentCategoryItem.weekUrl} 
-                        title={currentCategoryName}
-                        className="rounded-lg w-full h-full border-0 bg-white"
-                      />
-                    </div>
+                  <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl max-w-md mx-auto flex flex-col items-center gap-4 my-auto">
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      因券商伺服器安全防護，即時圖表需至獨立分頁檢視：
+                    </p>
+                    <a 
+                      href={chartTimeframe === 'day' ? currentCategoryItem.dayUrl : currentCategoryItem.weekUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+                    >
+                      <span>📈</span> 點擊查看 {currentCategoryName} ({chartTimeframe === 'day' ? '日線' : '週線'}) 看板
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
