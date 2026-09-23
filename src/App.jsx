@@ -2262,7 +2262,42 @@ const App = () => {
     } catch (e) { return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 } }; }
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
+  
+  // 🌟 1. 新增細產業與概念股板塊專區的狀態
+  const [selectedCategoryType, setSelectedCategoryType] = useState('industry'); // 'industry' 或 'concept' 或 'group'
+  const [showCmViewerModal, setShowCmViewerModal] = useState(false);
+  const [currentCategoryName, setCurrentCategoryName] = useState('');
+  const [cmEmbedUrl, setCmEmbedUrl] = useState('');
 
+  // 🌟 2. 您的板塊完整清單資料庫
+  const subCategoriesData = {
+    industry: [
+      "傳產-水泥", "傳產-食品", "傳產-塑膠", "傳產-紡織纖維", "傳產-電機", "傳產-電線電纜", 
+      "傳產-化學工業", "傳產-生技", "傳產-玻璃陶瓷", "傳產-紙業", "傳產-鋼鐵", "傳產-橡膠", 
+      "傳產-汽車", "傳產-汽車零組件", "電子上游-IC-設計", "電子上游-IC-代工", "電子上游-記憶體製造", 
+      "電子上游-IC-封測", "電子上游-被動元件", "電子中游-LCD-TFT面板", "電子中游-電源供應器", 
+      "電子中游-主機板", "電子中游-光學鏡片", "電子中游-網通", "電子下游-筆記型電腦", 
+      "軟體-系統整合", "軟體-遊戲", "金融-金控", "金融-銀行", "傳產-營建", "傳產-航運", "傳產-觀光", "傳產-百貨"
+    ],
+    concept: [
+      "CoWoS概念股", "GB200概念股", "AI PC概念股", "低軌衛星概念股", "矽智財IP概念股", 
+      "機器人概念股", "電動車概念股", "Apple概念股", "水資源概念股", "綠能環保概念股", 
+      "航太概念股", "碳權概念股", "軍工概念股", "智慧醫療概念股", "重電概念股", "BBU概念股", 
+      "光通訊概念股", "FOPLP扇出型封裝概念股", "玻璃基板概念股", "無人機概念股", "半導體設備概念股",
+      "HBM概念股", "ASIC概念股", "散熱模組概念股", "ChatGPT概念股", "蘋概股", "特斯拉概念股"
+    ],
+    group: [
+      "台積電集團股", "鴻海集團股", "聯電集團股", "華新集團股", "台塑集團股", 
+      "國巨集團股", "光寶集團股", "中信集團股", "遠東集團股", "統一集團股", "裕隆集團股"
+    ]
+  };
+
+  // 🌟 3. 點擊任一板塊後的開窗觸發函式
+  const handleOpenCategoryViewer = (categoryName) => {
+    setCurrentCategoryName(categoryName);
+    setCmEmbedUrl("https://cmy.tw/00CUsF"); // 帶入您的 CMoney 嵌入連結
+    setShowCmViewerModal(true);
+  };
   
   // 2. 主圖均線 MA 參數記憶 (加入 show 獨立開關)
   const [maParams, setMaParams] = useState(() => {
@@ -5169,6 +5204,55 @@ const handleOpenSectorMomentum = async () => {
           <button onClick={handleOpenSectorMomentum} className="w-full bg-blue-900/60 border border-blue-500 text-blue-200 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-0">
             <span className="text-lg">🌊</span> 類股資金動能看板
           </button>
+          {/* 🌟 【新建立的區塊】細產業與熱門概念股板塊專區 */}
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 border-b border-slate-800 pb-2">
+              <div>
+                <h3 className="text-xs font-bold text-cyan-400">📁 細產業與熱門概念股專區</h3>
+                <p className="text-[10px] text-slate-400">點擊任一板塊可開啟即時走勢與分析視窗</p>
+              </div>
+              
+              {/* 切換標籤 (細產業 / 熱門概念 / 集團股) */}
+              <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[10px]">
+                <button 
+                  onClick={() => setSelectedCategoryType('industry')}
+                  className={`px-2 py-1 rounded font-bold transition-all ${selectedCategoryType === 'industry' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  細產業
+                </button>
+                <button 
+                  onClick={() => setSelectedCategoryType('concept')}
+                  className={`px-2 py-1 rounded font-bold transition-all ${selectedCategoryType === 'concept' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  熱門概念
+                </button>
+                <button 
+                  onClick={() => setSelectedCategoryType('group')}
+                  className={`px-2 py-1 rounded font-bold transition-all ${selectedCategoryType === 'group' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  集團股
+                </button>
+              </div>
+            </div>
+
+            {/* 各個板塊的按鈕網格清單 */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-72 overflow-y-auto p-1.5 bg-slate-950/60 rounded-lg border border-slate-800">
+              {subCategoriesData[selectedCategoryType].map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleOpenCategoryViewer(item)}
+                  className="text-[11px] px-2 py-2 rounded-lg font-medium bg-slate-800/80 text-slate-200 hover:bg-cyan-600 hover:text-white transition-all text-center truncate border border-slate-700/60 shadow-sm flex items-center justify-center gap-1 group"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 group-hover:bg-amber-300"></span>
+                  <span className="truncate">{item}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-2 text-[10px] text-amber-400/90 bg-slate-950 p-2 rounded-lg border border-slate-800">
+              💡 點擊任一板塊（如：<strong>傳產-水泥</strong> 或 <strong>CoWoS概念股</strong>），將自動彈出即時看板視窗，看完關閉即可返回主畫面。
+            </div>
+          </div>
           {isAdmin ? (
             <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
               <div className="flex flex-col gap-3">
@@ -5298,6 +5382,55 @@ const handleOpenSectorMomentum = async () => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 🌟 接著貼上：【新建立的 Modal 視窗】點擊板塊後跳出的 CMoney 即時看板檢視器 */}
+      {showCmViewerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl p-5 shadow-2xl relative flex flex-col h-[85vh]">
+            <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-3 flex-shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-cyan-400 flex items-center gap-2">
+                  <span>📊 {currentCategoryName} - 板塊即時走勢與分析</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">同步自最新即時行情資料庫，關閉後將自動返回股寶寶主畫面</p>
+              </div>
+              <button 
+                onClick={() => setShowCmViewerModal(false)}
+                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden relative flex flex-col items-center justify-center p-2">
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                <div className="text-center p-4">
+                  <span className="inline-block px-3 py-1 bg-cyan-950 text-cyan-400 text-xs font-bold rounded-full mb-3 border border-cyan-800">
+                    🟢 已成功連線至 {currentCategoryName} 即時看板
+                  </span>
+                  <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-2xl max-w-xl mx-auto">
+                    <img 
+                      src={cmEmbedUrl} 
+                      alt={currentCategoryName} 
+                      className="rounded-lg w-full h-auto object-cover max-h-[45vh]"
+                      onError={(e) => { e.target.src = "https://placehold.co/600x400/0f172a/38bdf8?text=" + encodeURIComponent(currentCategoryName + " 即時走勢圖"); }}
+                    />
+                    <p className="text-xs text-slate-400 mt-2 font-medium">📈 {currentCategoryName} 盤中走勢與成分股強弱即時更新中</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex justify-end flex-shrink-0">
+              <button 
+                onClick={() => setShowCmViewerModal(false)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-5 py-2.5 rounded-lg font-bold transition-colors shadow"
+              >
+                關閉並返回 App
+              </button>
             </div>
           </div>
         </div>
