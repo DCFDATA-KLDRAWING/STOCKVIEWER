@@ -2271,31 +2271,103 @@ const App = () => {
 
   // 🌟 2. 您的板塊完整清單資料庫
   const subCategoriesData = {
-    industry: [
-      "傳產-水泥", "傳產-食品", "傳產-塑膠", "傳產-紡織纖維", "傳產-電機", "傳產-電線電纜", 
-      "傳產-化學工業", "傳產-生技", "傳產-玻璃陶瓷", "傳產-紙業", "傳產-鋼鐵", "傳產-橡膠", 
-      "傳產-汽車", "傳產-汽車零組件", "電子上游-IC-設計", "電子上游-IC-代工", "電子上游-記憶體製造", 
-      "電子上游-IC-封測", "電子上游-被動元件", "電子中游-LCD-TFT面板", "電子中游-電源供應器", 
-      "電子中游-主機板", "電子中游-光學鏡片", "電子中游-網通", "電子下游-筆記型電腦", 
-      "軟體-系統整合", "軟體-遊戲", "金融-金控", "金融-銀行", "傳產-營建", "傳產-航運", "傳產-觀光", "傳產-百貨"
+    { name: "傳產-水泥", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-食品", url: "https://cmy.tw/00CRdq" },
+      { name: "傳產-塑膠", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-紡織纖維", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-電機", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-電線電纜", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-化學工業", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-生技", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-玻璃陶瓷", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-紙業", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-鋼鐵", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-橡膠", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-汽車", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-汽車零組件", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-設計", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-代工", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-記憶體製造", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-記憶體銷售", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-製造", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-封測", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-通路", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-其他", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-被動元件", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-LED照明及光元件", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-連接元件", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-PCB-製造", url: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-PCB-材料設備", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-LCD-TFT面板", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-LCD-零組件", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-電源供應器", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-主機板", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-光學鏡片", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-通訊設備", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-網通", url: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-EMS", url: "https://cmy.tw/00CUsF" },
+      { name: "電子下游-筆記型電腦", url: "https://cmy.tw/00CUsF" },
+      { name: "電子下游-手機製造", url: "https://cmy.tw/00CUsF" },
+      { name: "電子下游-太陽能", url: "https://cmy.tw/00CUsF" },
+      { name: "軟體-系統整合", url: "https://cmy.tw/00CUsF" },
+      { name: "軟體-遊戲", url: "https://cmy.tw/00CUsF" },
+      { name: "金融-金控", url: "https://cmy.tw/00CUsF" },
+      { name: "金融-銀行", url: "https://cmy.tw/00CUsF" },
+      { name: "金融-證券", url: "https://cmy.tw/00CUsF" },
+      { name: "金融-保險", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-營建", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-航運", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-觀光", url: "https://cmy.tw/00CUsF" },
+      { name: "傳產-百貨", url: "https://cmy.tw/00CUsF" }
     ],
     concept: [
-      "CoWoS概念股", "GB200概念股", "AI PC概念股", "低軌衛星概念股", "矽智財IP概念股", 
-      "機器人概念股", "電動車概念股", "Apple概念股", "水資源概念股", "綠能環保概念股", 
-      "航太概念股", "碳權概念股", "軍工概念股", "智慧醫療概念股", "重電概念股", "BBU概念股", 
-      "光通訊概念股", "FOPLP扇出型封裝概念股", "玻璃基板概念股", "無人機概念股", "半導體設備概念股",
-      "HBM概念股", "ASIC概念股", "散熱模組概念股", "ChatGPT概念股", "蘋概股", "特斯拉概念股"
+      { name: "CoWoS概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "GB200概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "AI PC概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "低軌衛星概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "矽智財IP概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "機器人概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "電動車概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "Apple概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "水資源概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "綠能環保概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "航太概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "碳權概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "軍工概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "智慧醫療概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "重電概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "BBU概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "光通訊概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "FOPLP扇出型封裝概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "玻璃基板概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "無人機概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "半導體設備概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "HBM概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "ASIC概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "散熱模組概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "ChatGPT概念股", url: "https://cmy.tw/00CUsF" },
+      { name: "蘋概股", url: "https://cmy.tw/00CUsF" },
+      { name: "特斯拉概念股", url: "https://cmy.tw/00CUsF" }
     ],
     group: [
-      "台積電集團股", "鴻海集團股", "聯電集團股", "華新集團股", "台塑集團股", 
-      "國巨集團股", "光寶集團股", "中信集團股", "遠東集團股", "統一集團股", "裕隆集團股"
+      { name: "台積電集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "鴻海集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "聯電集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "華新集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "台塑集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "國巨集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "光寶集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "中信集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "遠東集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "統一集團股", url: "https://cmy.tw/00CUsF" },
+      { name: "裕隆集團股", url: "https://cmy.tw/00CUsF" }
     ]
   };
 
-  // 🌟 3. 點擊任一板塊後的開窗觸發函式
-  const handleOpenCategoryViewer = (categoryName) => {
+  // 🌟 點擊時同時接收名稱與對應網址
+  const handleOpenCategoryViewer = (categoryName, categoryUrl) => {
     setCurrentCategoryName(categoryName);
-    setCmEmbedUrl("https://cmy.tw/00CUsF"); // 帶入您的 CMoney 嵌入連結
+    setCmEmbedUrl(categoryUrl); // 帶入該板塊專屬的網址
     setShowCmViewerModal(true);
   };
   
@@ -5240,11 +5312,11 @@ const handleOpenSectorMomentum = async () => {
               {subCategoriesData[selectedCategoryType].map((item, idx) => (
                 <button
                   key={idx}
-                  onClick={() => handleOpenCategoryViewer(item)}
+                  onClick={() => handleOpenCategoryViewer(item.name, item.url)} // 👈 傳入名稱與專屬網址
                   className="text-[11px] px-2 py-2 rounded-lg font-medium bg-slate-800/80 text-slate-200 hover:bg-cyan-600 hover:text-white transition-all text-center truncate border border-slate-700/60 shadow-sm flex items-center justify-center gap-1 group"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 group-hover:bg-amber-300"></span>
-                  <span className="truncate">{item}</span>
+                  <span className="truncate">{item.name}</span>
                 </button>
               ))}
             </div>
