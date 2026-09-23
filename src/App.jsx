@@ -5507,9 +5507,14 @@ const handleOpenSectorMomentum = async () => {
                   </span>
                   <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-2xl max-w-xl mx-auto">
                     <img 
+                      key={chartTimeframe} /* 👈 加上這行，切換日/週線時才會強制重新整理載入圖片 */
                       src={chartTimeframe === 'day' ? currentCategoryItem.dayUrl : currentCategoryItem.weekUrl} 
                       alt={currentCategoryName} 
                       className="rounded-lg w-full h-auto object-cover max-h-[45vh]"
+                      onError={(e) => { 
+                        // 如果該連結讀取失敗，自動轉成提示文字方塊，避免畫面破圖
+                        e.target.src = "https://placehold.co/600x400/0f172a/38bdf8?text=" + encodeURIComponent(currentCategoryName + " (" + (chartTimeframe === 'day' ? '日線' : '週線') + ")"); 
+                      }}
                     />
                     <p className="text-xs text-slate-400 mt-2 font-medium">📈 資料即時更新中</p>
                   </div>
