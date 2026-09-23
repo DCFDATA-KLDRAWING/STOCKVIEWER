@@ -5488,13 +5488,14 @@ const handleOpenSectorMomentum = async () => {
               </p>
               
               <a 
-                href={currentCategoryItem.url} /* 這裡會自動帶入您剛剛貼的即時網址 */
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-base mt-2"
-              >
-                <span>🌐</span> 立即開啟 {currentCategoryName} 互動網頁
-              </a>
+  href={currentCategoryItem.dayUrl} 
+  target="_blank" 
+  rel="noopener noreferrer"
+  onClick={(e) => e.stopPropagation()} // 阻止事件冒泡，防止被彈跳視窗吃掉
+  className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-base mt-2"
+>
+  <span>🌐</span> 立即開啟 {currentCategoryName} 互動網頁
+</a>
             </div>
 
             <div className="mt-4 flex justify-end">
