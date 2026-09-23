@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
+
 // === Firebase 初始化設定 ===
 let app, auth, db, appId;
 try {
@@ -2263,112 +2264,115 @@ const App = () => {
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
   
-  // 🌟 1. 新增細產業與概念股板塊專區的狀態
+  // 🌟 1. 新增細產業與概念股板塊專區的狀態 (升級支援日/週線切換)
   const [selectedCategoryType, setSelectedCategoryType] = useState('industry'); // 'industry' 或 'concept' 或 'group'
   const [showCmViewerModal, setShowCmViewerModal] = useState(false);
   const [currentCategoryName, setCurrentCategoryName] = useState('');
-  const [cmEmbedUrl, setCmEmbedUrl] = useState('');
+  const [currentCategoryItem, setCurrentCategoryItem] = useState(null); // 記錄當前點擊的完整板塊物件
+  const [chartTimeframe, setChartTimeframe] = useState('day'); // 'day' (日線) 或 'week' (週線)
 
+  
   // 🌟 2. 您的板塊完整清單資料庫
   const subCategoriesData = {
     industry: [
-      { name: "傳產-水泥", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-食品", url: "https://cmy.tw/00CRdq" },
-      { name: "傳產-塑膠", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-紡織纖維", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-電機", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-電線電纜", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-化學工業", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-生技", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-玻璃陶瓷", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-紙業", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-鋼鐵", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-橡膠", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-汽車", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-汽車零組件", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-IC-設計", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-IC-代工", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-記憶體製造", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-記憶體銷售", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-IC-製造", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-IC-封測", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-IC-通路", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-IC-其他", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-被動元件", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-LED照明及光元件", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-連接元件", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-PCB-製造", url: "https://cmy.tw/00CUsF" },
-      { name: "電子上游-PCB-材料設備", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-LCD-TFT面板", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-LCD-零組件", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-電源供應器", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-主機板", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-光學鏡片", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-通訊設備", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-網通", url: "https://cmy.tw/00CUsF" },
-      { name: "電子中游-EMS", url: "https://cmy.tw/00CUsF" },
-      { name: "電子下游-筆記型電腦", url: "https://cmy.tw/00CUsF" },
-      { name: "電子下游-手機製造", url: "https://cmy.tw/00CUsF" },
-      { name: "電子下游-太陽能", url: "https://cmy.tw/00CUsF" },
-      { name: "軟體-系統整合", url: "https://cmy.tw/00CUsF" },
-      { name: "軟體-遊戲", url: "https://cmy.tw/00CUsF" },
-      { name: "金融-金控", url: "https://cmy.tw/00CUsF" },
-      { name: "金融-銀行", url: "https://cmy.tw/00CUsF" },
-      { name: "金融-證券", url: "https://cmy.tw/00CUsF" },
-      { name: "金融-保險", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-營建", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-航運", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-觀光", url: "https://cmy.tw/00CUsF" },
-      { name: "傳產-百貨", url: "https://cmy.tw/00CUsF" }
+      { name: "傳產-水泥", dayUrl: "https://cmy.tw/00CinL", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-食品", dayUrl: "https://cmy.tw/00CRdq", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-塑膠", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-紡織纖維", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-電機", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-電線電纜", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-化學工業", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-生技", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-玻璃陶瓷", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-紙業", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-鋼鐵", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-橡膠", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-汽車", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-汽車零組件", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-設計", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-代工", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-記憶體製造", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-記憶體銷售", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-製造", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-封測", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-通路", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-IC-其他", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-被動元件", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-LED照明及光元件", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-連接元件", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-PCB-製造", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子上游-PCB-材料設備", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-LCD-TFT面板", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-LCD-零組件", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-電源供應器", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-主機板", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-光學鏡片", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-通訊設備", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-網通", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子中游-EMS", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子下游-筆記型電腦", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子下游-手機製造", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電子下游-太陽能", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "軟體-系統整合", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "軟體-遊戲", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "金融-金控", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "金融-銀行", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "金融-證券", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "金融-保險", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-營建", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-航運", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-觀光", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "傳產-百貨", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" }
     ],
     concept: [
-      { name: "CoWoS概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "GB200概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "AI PC概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "低軌衛星概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "矽智財IP概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "機器人概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "電動車概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "Apple概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "水資源概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "綠能環保概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "航太概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "碳權概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "軍工概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "智慧醫療概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "重電概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "BBU概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "光通訊概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "FOPLP扇出型封裝概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "玻璃基板概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "無人機概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "半導體設備概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "HBM概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "ASIC概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "散熱模組概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "ChatGPT概念股", url: "https://cmy.tw/00CUsF" },
-      { name: "蘋概股", url: "https://cmy.tw/00CUsF" },
-      { name: "特斯拉概念股", url: "https://cmy.tw/00CUsF" }
+      { name: "CoWoS概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "GB200概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "AI PC概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "低軌衛星概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "矽智財IP概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "機器人概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "電動車概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "Apple概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "水資源概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "綠能環保概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "航太概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "碳權概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "軍工概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "智慧醫療概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "重電概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "BBU概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "光通訊概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "FOPLP扇出型封裝概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "玻璃基板概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "無人機概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "半導體設備概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "HBM概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "ASIC概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "散熱模組概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "ChatGPT概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "蘋概股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "特斯拉概念股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" }
     ],
     group: [
-      { name: "台積電集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "鴻海集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "聯電集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "華新集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "台塑集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "國巨集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "光寶集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "中信集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "遠東集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "統一集團股", url: "https://cmy.tw/00CUsF" },
-      { name: "裕隆集團股", url: "https://cmy.tw/00CUsF" }
+      { name: "台積電集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "鴻海集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "聯電集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "華新集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "台塑集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "國巨集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "光寶集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "中信集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "遠東集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "統一集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" },
+      { name: "裕隆集團股", dayUrl: "https://cmy.tw/00CUsF", weekUrl: "https://cmy.tw/00CUsF" }
     ]
   };
 
-  // 🌟 點擊時同時接收名稱與對應網址
-  const handleOpenCategoryViewer = (categoryName, categoryUrl) => {
-    setCurrentCategoryName(categoryName);
-    setCmEmbedUrl(categoryUrl); // 帶入該板塊專屬的網址
+  // 🌟 點擊時接收整包板塊物件 (包含 dayUrl 與 weekUrl)
+  const handleOpenCategoryViewer = (item) => {
+    setCurrentCategoryItem(item);
+    setCurrentCategoryName(item.name);
+    setChartTimeframe('day'); // 每次打開預設先顯示日線圖
     setShowCmViewerModal(true);
   };
   
@@ -5459,8 +5463,7 @@ const handleOpenSectorMomentum = async () => {
           </div>
         </div>
       )}
-      {/* 🌟 接著貼上：【新建立的 Modal 視窗】點擊板塊後跳出的 CMoney 即時看板檢視器 */}
-      {showCmViewerModal && (
+      {showCmViewerModal && currentCategoryItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl p-5 shadow-2xl relative flex flex-col h-[85vh]">
             <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-3 flex-shrink-0">
@@ -5468,30 +5471,47 @@ const handleOpenSectorMomentum = async () => {
                 <h3 className="text-base font-bold text-cyan-400 flex items-center gap-2">
                   <span>📊 {currentCategoryName} - 板塊即時走勢與分析</span>
                 </h3>
-                <p className="text-[11px] text-slate-400">同步自最新即時行情資料庫，關閉後將自動返回股寶寶主畫面</p>
+                <p className="text-[11px] text-slate-400">可自由切換日線圖或週線圖觀察波段強弱</p>
               </div>
+              
+              {/* 🌟 日線 / 週線切換開關按鈕 */}
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+                <button 
+                  onClick={() => setChartTimeframe('day')}
+                  className={`px-3 py-1 rounded font-bold transition-all ${chartTimeframe === 'day' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  日線圖
+                </button>
+                <button 
+                  onClick={() => setChartTimeframe('week')}
+                  className={`px-3 py-1 rounded font-bold transition-all ${chartTimeframe === 'week' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  週線圖
+                </button>
+              </div>
+
               <button 
                 onClick={() => setShowCmViewerModal(false)}
-                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-colors"
+                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-colors ml-2"
               >
                 ✕
               </button>
             </div>
 
+            {/* 嵌入檢視區域 (根據 chartTimeframe 自動切換 dayUrl 或 weekUrl) */}
             <div className="flex-1 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden relative flex flex-col items-center justify-center p-2">
               <div className="w-full h-full flex flex-col items-center justify-center gap-3">
                 <div className="text-center p-4">
                   <span className="inline-block px-3 py-1 bg-cyan-950 text-cyan-400 text-xs font-bold rounded-full mb-3 border border-cyan-800">
-                    🟢 已成功連線至 {currentCategoryName} 即時看板
+                    🟢 {currentCategoryName} ({chartTimeframe === 'day' ? '日線走勢' : '週線走勢'})
                   </span>
                   <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-2xl max-w-xl mx-auto">
                     <img 
-                      src={cmEmbedUrl} 
+                      src={chartTimeframe === 'day' ? currentCategoryItem.dayUrl : currentCategoryItem.weekUrl} 
                       alt={currentCategoryName} 
                       className="rounded-lg w-full h-auto object-cover max-h-[45vh]"
-                      onError={(e) => { e.target.src = "https://placehold.co/600x400/0f172a/38bdf8?text=" + encodeURIComponent(currentCategoryName + " 即時走勢圖"); }}
                     />
-                    <p className="text-xs text-slate-400 mt-2 font-medium">📈 {currentCategoryName} 盤中走勢與成分股強弱即時更新中</p>
+                    <p className="text-xs text-slate-400 mt-2 font-medium">📈 資料即時更新中</p>
                   </div>
                 </div>
               </div>
