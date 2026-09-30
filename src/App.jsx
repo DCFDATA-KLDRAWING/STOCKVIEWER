@@ -6791,11 +6791,30 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 ))}
               </div>
               <div className="flex justify-between items-center w-full">
-                <div className="flex gap-1">
-                  {[1, 2, 4].map(w => (
-                    <button key={w} onClick={()=>setDrawWidth(w)} className={`px-2 py-0.5 text-xs font-bold rounded border transition-colors ${drawWidth === w ? 'bg-slate-600 border-slate-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>{w}px</button>
-                  ))}
-                </div>
+                {activeTool === 'text' ? (
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">字級:</span>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="60" 
+                      step="1" 
+                      value={textSize} 
+                      onChange={(e) => setTextSize(Number(e.target.value))} 
+                      className="w-full accent-cyan-500 cursor-pointer"
+                    />
+                    <span className="text-[10px] text-slate-300 w-8 text-right font-bold">{textSize}px</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 font-bold">粗細:</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 4].map(w => (
+                        <button key={w} onClick={()=>setDrawWidth(w)} className={`px-2 py-0.5 text-xs font-bold rounded border transition-colors ${drawWidth === w ? 'bg-slate-600 border-slate-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>{w}px</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
