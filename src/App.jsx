@@ -2309,6 +2309,7 @@ const App = () => {
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_VMA_PARAMS', JSON.stringify(vmaParams)); }, [vmaParams]);
 
+  
   // ✨ 新增雲端畫板儲存狀態
   const [savedLayouts, setSavedLayouts] = useState(() => {
     try {
@@ -4732,6 +4733,15 @@ const handleOpenSectorMomentum = async () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showZigZag} onChange={() => handleToggle('showZigZag')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">細折線</span></label>
                   {/* 🌟 新增：粗折線 打勾按鈕 */}
                 <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMacroZigZag} onChange={() => handleToggle('showMacroZigZag')} className="w-3.5 h-3.5 text-cyan-400 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-cyan-300 font-bold">粗折線</span></label>
+                  {/* 👇 新增：放在這裡的播放按鈕 👇 */}
+                  {(toggles.showZigZag || toggles.showMacroZigZag) && (
+                    <button 
+                      onClick={() => window.handlePlayZigzagAnimation && window.handlePlayZigzagAnimation()}
+                      className="ml-2 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all bg-emerald-900/60 text-emerald-300 border border-emerald-500 hover:bg-emerald-800 shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+                    >
+                      ▶ 播放折線
+                    </button>
+                  )}
                   {/* ✨ 新增：SAR 指標開關與參數設定 */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -5699,6 +5709,35 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const dragInfo = useRef({ isDragging: false, startX: 0, startOffset: 0 });
   const [pinchDist, setPinchDist] = useState(null);
 
+  // ================= 🌟 加入的第 1 步 & 第 2 步 🌟 =================
+  // ✨ 動態播放折線的狀態
+  const [isPlayingZigzag, setIsPlayingZigzag] = useState(false);
+  const [zigzagAnimProgress, setZigzagAnimProgress] = useState(1); // 1 代表 100% 全顯
+
+  // ✨ 折線播放引擎
+  useEffect(() => {
+    let reqId;
+    if (isPlayingZigzag) {
+      if (zigzagAnimProgress < 1) {
+        // 0.003 是播放速度，數字越小畫越慢。0.003 大約需 5 秒畫完畫面
+        reqId = requestAnimationFrame(() => {
+          setZigzagAnimProgress(prev => Math.min(1, prev + 0.003));
+        });
+      } else {
+        setIsPlayingZigzag(false); // 播完了就自動停下來
+      }
+    }
+    return () => { if (reqId) cancelAnimationFrame(reqId); }
+  }, [isPlayingZigzag, zigzagAnimProgress]);
+
+  // ✨ 觸發播放的按鈕事件 (我們把它綁在 window 上，這樣外層的 App 也能呼叫)
+  useEffect(() => {
+    window.handlePlayZigzagAnimation = () => {
+      setZigzagAnimProgress(0); 
+      setIsPlayingZigzag(true); 
+    };
+    return () => { delete window.handlePlayZigzagAnimation; }
+  }, []);
   // 切換股票或週期時，強制讓畫面完美對齊最右邊 (最新K棒)
   useEffect(() => {
     setRightOffset(0);
@@ -6919,7 +6958,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           onTouchCancel={handlePointerUp}
         >
           {/* ✨ 修正2：精準對齊遮罩，解除被誤剪掉的「右側黑洞」！ */}
-          <defs><clipPath id="chartClip"><rect x={paddingLeft} y={0} width={width - paddingLeft - paddingRight} height={totalSVGHeight} /></clipPath></defs>
+          <defs>
+           <clipPath id="chartClip">
+             <rect x={paddingLeft} y={0} width={width - paddingLeft - paddingRight} height={totalSVGHeight} />
+           </clipPath>
+           {/* ✨ 給折線專用的「動態播放遮罩」：寬度會隨 zigzagAnimProgress 變化 */}
+           <clipPath id="zigzagClip">
+             <rect x={paddingLeft} y="0" width={(width - paddingLeft - paddingRight) * zigzagAnimProgress} height={totalSVGHeight} />
+           </clipPath>
+         </defs>
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           <text id="chart-title" x={width / 2} y={totalSVGHeight / 5} fill="none" stroke="#475569" strokeWidth="2" fontSize={isFullscreen ? "4vw" : "8vw"} fontWeight="900" opacity="0.5" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" className="tracking-widest watermark-text">
@@ -7219,7 +7266,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.zigzag) return null;
                const { pivots, floatPoint } = lastDay.zigzag;
                return (
-                 <g pointerEvents="none">
+                 // 🌟 這裡加上了 clipPath="url(#zigzagClip)"
+                 <g pointerEvents="none" clipPath="url(#zigzagClip)">
                     {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#facc15" strokeWidth="1.5" fill="none" opacity="0.8" />)}
                     {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#facc15" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />)}
                     {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`zz-pt-${i}`} cx={px} cy={getY(p.price)} r={3.5} fill="#facc15" />; })}
@@ -7231,7 +7279,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.macroZigZag) return null;
                const { pivots, floatPoint } = lastDay.macroZigZag;
                return (
-                 <g pointerEvents="none">
+                 // 🌟 這裡也加上了 clipPath="url(#zigzagClip)"
+                 <g pointerEvents="none" clipPath="url(#zigzagClip)">
                     {/* 🌟 已確立的波段 (實線) */}
                     {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#38bdf8" strokeWidth="3" fill="none" opacity="0.9" />)}
                     {/* 🌟 行進中的波段 (虛線，對準收盤價) */}
