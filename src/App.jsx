@@ -4733,15 +4733,7 @@ const handleOpenSectorMomentum = async () => {
                   <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showZigZag} onChange={() => handleToggle('showZigZag')} className="w-3.5 h-3.5 text-blue-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-blue-400 font-bold">細折線</span></label>
                   {/* 🌟 新增：粗折線 打勾按鈕 */}
                 <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMacroZigZag} onChange={() => handleToggle('showMacroZigZag')} className="w-3.5 h-3.5 text-cyan-400 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-cyan-300 font-bold">粗折線</span></label>
-                  {/* 👇 新增：放在這裡的播放按鈕 👇 */}
-                  {(toggles.showZigZag || toggles.showMacroZigZag) && (
-                    <button 
-                      onClick={() => window.handlePlayZigzagAnimation && window.handlePlayZigzagAnimation()}
-                      className="ml-2 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all bg-emerald-900/60 text-emerald-300 border border-emerald-500 hover:bg-emerald-800 shadow-[0_0_8px_rgba(16,185,129,0.3)]"
-                    >
-                      ▶ 播放折線
-                    </button>
-                  )}
+                  
                   {/* ✨ 新增：SAR 指標開關與參數設定 */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -5709,35 +5701,26 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const dragInfo = useRef({ isDragging: false, startX: 0, startOffset: 0 });
   const [pinchDist, setPinchDist] = useState(null);
 
-  // ================= 🌟 加入的第 1 步 & 第 2 步 🌟 =================
+  // ================= 🌟 替換成這個升級版的播放引擎 🌟 =================
   // ✨ 動態播放折線的狀態
   const [isPlayingZigzag, setIsPlayingZigzag] = useState(false);
   const [zigzagAnimProgress, setZigzagAnimProgress] = useState(1); // 1 代表 100% 全顯
+  const [zigzagSpeed, setZigzagSpeed] = useState(0.0015); // ✨ 新增：控制速度 (0.0015約需10秒畫完)
 
-  // ✨ 折線播放引擎
+  // ✨ 折線播放引擎 (加入速度變數，且支援隨時暫停)
   useEffect(() => {
     let reqId;
     if (isPlayingZigzag) {
       if (zigzagAnimProgress < 1) {
-        // 0.003 是播放速度，數字越小畫越慢。0.003 大約需 5 秒畫完畫面
         reqId = requestAnimationFrame(() => {
-          setZigzagAnimProgress(prev => Math.min(1, prev + 0.003));
+          setZigzagAnimProgress(prev => Math.min(1, prev + zigzagSpeed));
         });
       } else {
-        setIsPlayingZigzag(false); // 播完了就自動停下來
+        setIsPlayingZigzag(false); // 播完了自動停下來
       }
     }
     return () => { if (reqId) cancelAnimationFrame(reqId); }
-  }, [isPlayingZigzag, zigzagAnimProgress]);
-
-  // ✨ 觸發播放的按鈕事件 (我們把它綁在 window 上，這樣外層的 App 也能呼叫)
-  useEffect(() => {
-    window.handlePlayZigzagAnimation = () => {
-      setZigzagAnimProgress(0); 
-      setIsPlayingZigzag(true); 
-    };
-    return () => { delete window.handlePlayZigzagAnimation; }
-  }, []);
+  }, [isPlayingZigzag, zigzagAnimProgress, zigzagSpeed]);
   // 切換股票或週期時，強制讓畫面完美對齊最右邊 (最新K棒)
   useEffect(() => {
     setRightOffset(0);
@@ -6935,6 +6918,57 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
            <button onClick={handleZoomOut} className="w-10 h-10 rounded-full bg-slate-900/50 border border-slate-600/50 text-slate-300 font-bold text-xl shadow-[0_0_15px_rgba(0,0,0,0.3)] backdrop-blur-sm hover:bg-slate-800/90 active:scale-95 flex items-center justify-center transition-all" title="縮小 K 棒">➖</button>
         </div>
 
+        {/* ================= 🌟 這裡加入第二處：浮動播放控制面板 🌟 ================= */}
+        {(toggles.showZigZag || toggles.showMacroZigZag) && (
+          <div className="absolute bottom-[30px] left-1/2 -translate-x-1/2 z-[110] flex items-center gap-4 bg-[#0f172a]/90 border border-slate-600 backdrop-blur-md px-6 py-2.5 rounded-full shadow-[0_0_25px_rgba(0,0,0,0.7)] pointer-events-auto transition-opacity duration-300 opacity-60 hover:opacity-100">
+            
+            {/* 頂部隱藏小進度條 */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-slate-800 rounded-t-full overflow-hidden">
+              <div className="h-full bg-emerald-500 shadow-[0_0_8px_#10b981]" style={{ width: `${zigzagAnimProgress * 100}%` }}></div>
+            </div>
+
+            {/* 播放/暫停 */}
+            <button 
+              onClick={() => {
+                if (zigzagAnimProgress >= 1) setZigzagAnimProgress(0); 
+                setIsPlayingZigzag(!isPlayingZigzag);
+              }}
+              className="text-emerald-400 hover:text-emerald-300 text-2xl hover:scale-110 transition-transform"
+              title={isPlayingZigzag ? "暫停" : "播放"}
+            >
+              {isPlayingZigzag ? '⏸' : '▶️'}
+            </button>
+
+            {/* 停止 */}
+            <button 
+              onClick={() => { setIsPlayingZigzag(false); setZigzagAnimProgress(0); }}
+              className="text-rose-400 hover:text-rose-300 text-xl hover:scale-110 transition-transform"
+              title="回到起點"
+            >
+              ⏹
+            </button>
+
+            <div className="w-px h-5 bg-slate-600 mx-1"></div>
+
+            {/* 速度控制 */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 text-xs font-bold mr-1">速度:</span>
+              {[
+                { label: '極慢', speed: 0.0005 },
+                { label: '慢', speed: 0.0015 },
+                { label: '快', speed: 0.004 }
+              ].map(s => (
+                <button 
+                  key={s.label}
+                  onClick={() => setZigzagSpeed(s.speed)} 
+                  className={`px-2 py-1 rounded text-xs font-bold transition-colors ${zigzagSpeed === s.speed ? 'bg-cyan-900 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'text-slate-400 hover:bg-slate-700'}`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* ✨ 修正：拿掉 touch-pan-y 的強制限制，讓 SVG 內部自由接管滾輪事件 */}
         <div 
           ref={scrollContainerRef}
