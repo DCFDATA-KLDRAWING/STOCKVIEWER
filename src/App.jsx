@@ -6999,14 +6999,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
         >
           {/* ✨ 修正2：精準對齊遮罩，解除被誤剪掉的「右側黑洞」！ */}
           <defs>
-           <clipPath id="chartClip">
-             <rect x={paddingLeft} y={0} width={width - paddingLeft - paddingRight} height={totalSVGHeight} />
-           </clipPath>
-           {/* ✨ 給折線專用的「動態播放遮罩」：寬度會隨 zigzagAnimProgress 變化 */}
-           <clipPath id="zigzagClip">
-             <rect x={paddingLeft} y="0" width={(width - paddingLeft - paddingRight) * zigzagAnimProgress} height={totalSVGHeight} />
-           </clipPath>
-         </defs>
+            <clipPath id="chartClip">
+              <rect x={paddingLeft} y={0} width={width - paddingLeft - paddingRight} height={totalSVGHeight} />
+            </clipPath>
+            {/* ✨ 分離出兩個遮罩：一個給細折線，一個給粗折線 */}
+            <clipPath id="zigzagClip">
+              <rect x={paddingLeft} y={0} width={(width - paddingLeft - paddingRight) * zigzagAnimProgress} height={totalSVGHeight} />
+            </clipPath>
+            <clipPath id="macroZigzagClip">
+              <rect x={paddingLeft} y={0} width={(width - paddingLeft - paddingRight) * macroAnimProgress} height={totalSVGHeight} />
+            </clipPath>
+          </defs>
           <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
           
           <text id="chart-title" x={width / 2} y={totalSVGHeight / 5} fill="none" stroke="#475569" strokeWidth="2" fontSize={isFullscreen ? "4vw" : "8vw"} fontWeight="900" opacity="0.5" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" className="tracking-widest watermark-text">
