@@ -5702,25 +5702,38 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const [pinchDist, setPinchDist] = useState(null);
 
   // ================= 🌟 替換成這個升級版的播放引擎 🌟 =================
-  // ✨ 動態播放折線的狀態
+  // ✨ 動態播放狀態 (細折線)
   const [isPlayingZigzag, setIsPlayingZigzag] = useState(false);
-  const [zigzagAnimProgress, setZigzagAnimProgress] = useState(1); // 1 代表 100% 全顯
-  const [zigzagSpeed, setZigzagSpeed] = useState(0.0015); // ✨ 新增：控制速度 (0.0015約需10秒畫完)
+  const [zigzagAnimProgress, setZigzagAnimProgress] = useState(1);
+  
+  // ✨ 動態播放狀態 (粗折線)
+  const [isPlayingMacro, setIsPlayingMacro] = useState(false);
+  const [macroAnimProgress, setMacroAnimProgress] = useState(1);
 
-  // ✨ 折線播放引擎 (加入速度變數，且支援隨時暫停)
+  // 共用的全局速度
+  const [zigzagSpeed, setZigzagSpeed] = useState(0.0015);
+
+  // ✨ 獨立的細折線播放引擎
   useEffect(() => {
     let reqId;
     if (isPlayingZigzag) {
       if (zigzagAnimProgress < 1) {
-        reqId = requestAnimationFrame(() => {
-          setZigzagAnimProgress(prev => Math.min(1, prev + zigzagSpeed));
-        });
-      } else {
-        setIsPlayingZigzag(false); // 播完了自動停下來
-      }
+        reqId = requestAnimationFrame(() => setZigzagAnimProgress(prev => Math.min(1, prev + zigzagSpeed)));
+      } else { setIsPlayingZigzag(false); }
     }
     return () => { if (reqId) cancelAnimationFrame(reqId); }
   }, [isPlayingZigzag, zigzagAnimProgress, zigzagSpeed]);
+
+  // ✨ 獨立的粗折線播放引擎
+  useEffect(() => {
+    let reqId;
+    if (isPlayingMacro) {
+      if (macroAnimProgress < 1) {
+        reqId = requestAnimationFrame(() => setMacroAnimProgress(prev => Math.min(1, prev + zigzagSpeed)));
+      } else { setIsPlayingMacro(false); }
+    }
+    return () => { if (reqId) cancelAnimationFrame(reqId); }
+  }, [isPlayingMacro, macroAnimProgress, zigzagSpeed]);
   // 切換股票或週期時，強制讓畫面完美對齊最右邊 (最新K棒)
   useEffect(() => {
     setRightOffset(0);
@@ -6918,53 +6931,46 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
            <button onClick={handleZoomOut} className="w-10 h-10 rounded-full bg-slate-900/50 border border-slate-600/50 text-slate-300 font-bold text-xl shadow-[0_0_15px_rgba(0,0,0,0.3)] backdrop-blur-sm hover:bg-slate-800/90 active:scale-95 flex items-center justify-center transition-all" title="縮小 K 棒">➖</button>
         </div>
 
-        {/* ================= 🌟 這裡加入第二處：浮動播放控制面板 🌟 ================= */}
+        {/* ================= 🌟 獨立分開的浮動播放控制面板 🌟 ================= */}
         {(toggles.showZigZag || toggles.showMacroZigZag) && (
-          <div className="absolute bottom-[30px] left-1/2 -translate-x-1/2 z-[110] flex items-center gap-4 bg-[#0f172a]/90 border border-slate-600 backdrop-blur-md px-6 py-2.5 rounded-full shadow-[0_0_25px_rgba(0,0,0,0.7)] pointer-events-auto transition-opacity duration-300 opacity-60 hover:opacity-100">
+          <div className="absolute bottom-[30px] left-1/2 -translate-x-1/2 z-[110] flex flex-col gap-2 bg-[#0f172a]/90 border border-slate-600 backdrop-blur-md px-5 py-3 rounded-2xl shadow-[0_0_25px_rgba(0,0,0,0.7)] pointer-events-auto transition-opacity duration-300 opacity-60 hover:opacity-100 min-w-[250px]">
             
-            {/* 頂部隱藏小進度條 */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-slate-800 rounded-t-full overflow-hidden">
-              <div className="h-full bg-emerald-500 shadow-[0_0_8px_#10b981]" style={{ width: `${zigzagAnimProgress * 100}%` }}></div>
-            </div>
+            {/* 細折線專屬控制列 */}
+            {toggles.showZigZag && (
+              <div className="relative flex items-center justify-between gap-4 pb-1">
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" style={{ width: `${zigzagAnimProgress * 100}%` }}></div>
+                </div>
+                <span className="text-blue-400 font-bold text-sm">細折線</span>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => { if (zigzagAnimProgress >= 1) setZigzagAnimProgress(0); setIsPlayingZigzag(!isPlayingZigzag); }} className="text-blue-400 hover:text-blue-300 text-lg hover:scale-110 transition-transform" title="播放/暫停細折線">{isPlayingZigzag ? '⏸' : '▶️'}</button>
+                  <button onClick={() => { setIsPlayingZigzag(false); setZigzagAnimProgress(0); }} className="text-rose-400 hover:text-rose-300 text-lg hover:scale-110 transition-transform" title="重置細折線">⏹</button>
+                </div>
+              </div>
+            )}
 
-            {/* 播放/暫停 */}
-            <button 
-              onClick={() => {
-                if (zigzagAnimProgress >= 1) setZigzagAnimProgress(0); 
-                setIsPlayingZigzag(!isPlayingZigzag);
-              }}
-              className="text-emerald-400 hover:text-emerald-300 text-2xl hover:scale-110 transition-transform"
-              title={isPlayingZigzag ? "暫停" : "播放"}
-            >
-              {isPlayingZigzag ? '⏸' : '▶️'}
-            </button>
+            {/* 分隔線 (如果兩個都開才顯示) */}
+            {toggles.showZigZag && toggles.showMacroZigZag && <div className="h-px bg-slate-700/50 w-full my-0.5"></div>}
 
-            {/* 停止 */}
-            <button 
-              onClick={() => { setIsPlayingZigzag(false); setZigzagAnimProgress(0); }}
-              className="text-rose-400 hover:text-rose-300 text-xl hover:scale-110 transition-transform"
-              title="回到起點"
-            >
-              ⏹
-            </button>
+            {/* 粗折線專屬控制列 */}
+            {toggles.showMacroZigZag && (
+              <div className="relative flex items-center justify-between gap-4 pb-1">
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" style={{ width: `${macroAnimProgress * 100}%` }}></div>
+                </div>
+                <span className="text-cyan-400 font-bold text-sm">粗折線</span>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => { if (macroAnimProgress >= 1) setMacroAnimProgress(0); setIsPlayingMacro(!isPlayingMacro); }} className="text-cyan-400 hover:text-cyan-300 text-lg hover:scale-110 transition-transform" title="播放/暫停粗折線">{isPlayingMacro ? '⏸' : '▶️'}</button>
+                  <button onClick={() => { setIsPlayingMacro(false); setMacroAnimProgress(0); }} className="text-rose-400 hover:text-rose-300 text-lg hover:scale-110 transition-transform" title="重置粗折線">⏹</button>
+                </div>
+              </div>
+            )}
 
-            <div className="w-px h-5 bg-slate-600 mx-1"></div>
-
-            {/* 速度控制 */}
-            <div className="flex items-center gap-1.5">
+            {/* 共用速度控制 */}
+            <div className="flex items-center justify-center gap-2 mt-1 pt-1.5 border-t border-slate-700/50">
               <span className="text-slate-400 text-xs font-bold mr-1">速度:</span>
-              {[
-                { label: '極慢', speed: 0.0005 },
-                { label: '慢', speed: 0.0015 },
-                { label: '快', speed: 0.004 }
-              ].map(s => (
-                <button 
-                  key={s.label}
-                  onClick={() => setZigzagSpeed(s.speed)} 
-                  className={`px-2 py-1 rounded text-xs font-bold transition-colors ${zigzagSpeed === s.speed ? 'bg-cyan-900 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'text-slate-400 hover:bg-slate-700'}`}
-                >
-                  {s.label}
-                </button>
+              {[{ label: '極慢', speed: 0.0005 }, { label: '慢', speed: 0.0015 }, { label: '快', speed: 0.004 }].map(s => (
+                <button key={s.label} onClick={() => setZigzagSpeed(s.speed)} className={`px-2 py-0.5 rounded text-xs font-bold transition-colors ${zigzagSpeed === s.speed ? 'bg-emerald-900 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'text-slate-400 hover:bg-slate-700'}`}>{s.label}</button>
               ))}
             </div>
           </div>
@@ -7313,8 +7319,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.macroZigZag) return null;
                const { pivots, floatPoint } = lastDay.macroZigZag;
                return (
-                 // 🌟 這裡也加上了 clipPath="url(#zigzagClip)"
-                 <g pointerEvents="none" clipPath="url(#zigzagClip)">
+                 {/* 👇 粗折線：這裡要改成 macroZigzagClip 👇 */}
+                 <g pointerEvents="none" clipPath="url(#macroZigzagClip)">
                     {/* 🌟 已確立的波段 (實線) */}
                     {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#38bdf8" strokeWidth="3" fill="none" opacity="0.9" />)}
                     {/* 🌟 行進中的波段 (虛線，對準收盤價) */}
