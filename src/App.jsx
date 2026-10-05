@@ -7306,7 +7306,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.zigzag) return null;
                const { pivots, floatPoint } = lastDay.zigzag;
                return (
-                 // 🌟 這裡加上了 clipPath="url(#zigzagClip)"
+                 
                  <g pointerEvents="none" clipPath="url(#zigzagClip)">
                     {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#facc15" strokeWidth="1.5" fill="none" opacity="0.8" />)}
                     {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#facc15" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />)}
@@ -7319,7 +7319,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.macroZigZag) return null;
                const { pivots, floatPoint } = lastDay.macroZigZag;
                return (
-                 {/* 👇 粗折線：這裡要改成 macroZigzagClip 👇 */}
+                 
                  <g pointerEvents="none" clipPath="url(#macroZigzagClip)">
                     {/* 🌟 已確立的波段 (實線) */}
                     {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#38bdf8" strokeWidth="3" fill="none" opacity="0.9" />)}
