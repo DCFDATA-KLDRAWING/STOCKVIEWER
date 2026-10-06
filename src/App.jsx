@@ -6503,14 +6503,21 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
              const boxCenterX = rx + rw / 2;
              const boxCenterY = ry + rh / 2;
              
-             // 🧠 Smart Left/Right & Up/Down placement to avoid covering K-lines or right margin controls
-             const isNearRightEdge = boxCenterX > width - paddingRight - 150;
-             const badgeX = isNearRightEdge ? rx - badgeWidth / 2 - 20 : width - paddingRight + 20;
-             let badgeY = boxCenterY;
-             if (badgeY - badgeHeight / 2 < paddingLeft + 10) badgeY = paddingLeft + 10 + badgeHeight / 2;
-             if (badgeY + badgeHeight / 2 > mainHeight - 10) badgeY = mainHeight - 10 - badgeHeight / 2;
+             // 🧠 智慧定位：決定資訊板要放在箱體的左邊還是右邊
+             const isNearRightEdge = rx + rw > width - 200;
+             let badgeX = isNearRightEdge ? rx - badgeWidth / 2 - 15 : rx + rw + badgeWidth / 2 + 15;
+             
+             // 🛡️ 終極防呆防撞保護：強制把面板限制在螢幕可見範圍內，絕對不被裁切！
+             if (badgeX - badgeWidth / 2 < 15) badgeX = 15 + badgeWidth / 2;
+             if (badgeX + badgeWidth / 2 > width - 15) badgeX = width - 15 - badgeWidth / 2;
 
-             const boxEdgeX = isNearRightEdge ? rx : rx + rw;
+             // 🛡️ 上下防撞保護
+             let badgeY = boxCenterY;
+             if (badgeY - badgeHeight / 2 < 20) badgeY = 20 + badgeHeight / 2;
+             if (badgeY + badgeHeight / 2 > mainHeight - 20) badgeY = mainHeight - 20 - badgeHeight / 2;
+
+             // 自動判斷引導線要黏在箱子的左邊還是右邊
+             const boxEdgeX = badgeX < boxCenterX ? rx : rx + rw;
 
              return (
                <g>
@@ -6518,7 +6525,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                  <rect x={rx} y={ry} width={Math.max(rw, 30)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.12} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
                  {/* Dashed line connecting box to the safe badge area */}
-                 <line x1={boxEdgeX} y1={boxCenterY} x2={badgeX + (isNearRightEdge ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
+                 <line x1={boxEdgeX} y1={boxCenterY} x2={badgeX + (badgeX < boxCenterX ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
 
                  {/* Compact info badge positioned safely */}
                  <g transform={`translate(${badgeX}, ${badgeY})`}>
