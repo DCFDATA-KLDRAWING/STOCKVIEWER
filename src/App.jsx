@@ -6933,7 +6933,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
         {/* ================= 🌟 獨立分開的浮動播放控制面板 🌟 ================= */}
         {(toggles.showZigZag || toggles.showMacroZigZag) && (
-          <div className="absolute bottom-[30px] left-1/2 -translate-x-1/2 z-[110] flex flex-col gap-2 bg-[#0f172a]/90 border border-slate-600 backdrop-blur-md px-5 py-3 rounded-2xl shadow-[0_0_25px_rgba(0,0,0,0.7)] pointer-events-auto transition-opacity duration-300 opacity-60 hover:opacity-100 min-w-[250px]">
+          <div className="absolute z-[110] flex flex-col gap-2 bg-[#0f172a]/90 border border-slate-600 backdrop-blur-md px-5 py-3 rounded-2xl shadow-[0_0_25px_rgba(0,0,0,0.7)] pointer-events-auto transition-all duration-300 hover:opacity-100 min-w-[250px] bottom-[30px] left-1/2 -translate-x-1/2 opacity-60 landscape:bottom-[20px] landscape:left-[20px] landscape:translate-x-0 landscape:opacity-30">
             
             {/* 細折線專屬控制列 */}
             {toggles.showZigZag && (
