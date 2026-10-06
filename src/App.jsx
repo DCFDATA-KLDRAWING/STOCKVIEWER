@@ -6687,33 +6687,22 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                { label: 'T2.0', val: rawPts[2].price + diff * 2.0 },
              ];
 
-             // 🎯 計算 T2.0 目標價在畫布上的 Y 座標，讓垂直虛線直接延伸上去
-             const t2Price = rawPts[2].price + diff * 2.0;
-             let targetEndY = typeof getY === 'function' ? getY(t2Price) : C.y - 100;
-             if (targetEndY < paddingLeft) targetEndY = paddingLeft;
-             if (targetEndY > mainHeight) targetEndY = mainHeight;
-
              const badgeWidth = 130;
              const badgeHeight = 85;
+             const boxCenterX = C.x; 
              
-             // 🧠 智慧判斷資訊板要放在 C 點的左邊還是右邊
-             const isNearRightEdge = C.x > width - paddingRight - 150;
-             const badgeX = isNearRightEdge ? C.x - badgeWidth / 2 - 20 : C.x + badgeWidth / 2 + 20;
-             let badgeY = C.y - 40;
-             if (badgeY - badgeHeight / 2 < paddingLeft + 10) badgeY = paddingLeft + 10 + badgeHeight / 2;
-             if (badgeY + badgeHeight / 2 > mainHeight - 10) badgeY = mainHeight - 10 - badgeHeight / 2;
+             let badgeX = boxCenterX;
+             if (badgeX - badgeWidth / 2 < 15) badgeX = 15 + badgeWidth / 2;
+             if (badgeX + badgeWidth / 2 > width - 15) badgeX = width - 15 - badgeWidth / 2;
+
+             const badgeY = mainHeight + 45;
 
              return (
                <g>
-                 {/* 🚀 從 C 點往上延伸到 T2.0 目標價的垂直虛線 */}
-                 <line x1={C.x} y1={C.y} x2={C.x} y2={targetEndY} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" />
+                 <line x1={C.x} y1={C.y} x2={badgeX} y2={badgeY - badgeHeight / 2} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="3,3" opacity="0.7" />
                  
-                 {/* 連接 C 點與浮動目標面板的細虛線 */}
-                 <line x1={C.x} y1={C.y} x2={badgeX + (isNearRightEdge ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="2,2" opacity="0.7" />
-
-                 {/* 整合式精巧目標價資訊板 */}
                  <g transform={`translate(${badgeX}, ${badgeY})`}>
-                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" />
+                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.85" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" />
                     
                     <text x="0" y={-badgeHeight / 2 + 14} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">
                       N字目標價推演
