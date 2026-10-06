@@ -5835,6 +5835,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
   // === 磁吸與畫線狀態 ===
   const [isMagnetOn, setIsMagnetOn] = useState(false);
+  // ✨ 新增這行：教學白板模式 (預設關閉)
+  const [isBlankMode, setIsBlankMode] = useState(false);
   const [activeTool, setActiveTool] = useState('cursor'); 
   const [drawColor, setDrawColor] = useState('#22d3ee'); 
   const [drawWidth, setDrawWidth] = useState(2);
@@ -6896,6 +6898,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               <div className="w-[1px] h-6 bg-slate-700 mx-1 self-center"></div>
 
               <button onClick={() => setIsMagnetOn(!isMagnetOn)} className={`px-2 py-1 text-sm rounded font-bold border flex items-center gap-1 transition-colors ${isMagnetOn ? 'bg-red-900/50 text-red-400 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`} title="開啟後強制吸附K棒最高/最低點">🧲 磁吸 {isMagnetOn ? 'ON' : 'OFF'}</button>
+              {/* ✨ 新增這顆：教學白板按鈕 */}
+                  <button 
+                    onClick={() => setIsBlankMode(!isBlankMode)} 
+                    className={`px-2 py-1 text-sm rounded font-bold border flex items-center gap-1 transition-colors ${isBlankMode ? 'bg-indigo-900/50 text-indigo-400 border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`} 
+                    title="開啟黑板教學模式 (遮蔽K線)"
+                  >
+                    🧑‍🏫 {isBlankMode ? '關閉黑板' : '教學黑板'}
+                  </button>
             </div>
             
             <div className="flex flex-col gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">
@@ -7829,6 +7839,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           })}
 
           <g clipPath="url(#chartClip)">
+            {/* ✨ 教學黑板降臨！完美蓋住 K 線，讓手繪線條浮在最上面 */}
+            {isBlankMode && (
+              <rect 
+                x="0" 
+                y="0" 
+                width={width} 
+                height={totalSVGHeight} 
+                fill="#0f172a" 
+                className="animate-fade-in"
+              />
+            )}
             {drawings.map(d => renderDrawingObject(d))}
             {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && draftPoints.length > 0 && hoverPoint &&
               renderDrawingObject({ type: activeTool, points: activeTool === 'crossline' ? [hoverPoint] : [...draftPoints, hoverPoint], color: drawColor, width: drawWidth, opacity: drawOpacity }, true)
