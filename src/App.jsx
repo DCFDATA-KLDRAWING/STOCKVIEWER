@@ -5841,8 +5841,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const [drawOpacity, setDrawOpacity] = useState(0.5); 
   const [textSize, setTextSize] = useState(16);
   // ✨ 第一步：在這裡加上文字的粗體與邊框狀態記憶
-  const [isTextBold, setIsTextBold] = useState(true);
-  const [isTextStroke, setIsTextStroke] = useState(true);
+  const [isTextBold, setIsTextBold] = useState(false);
+  const [isTextStroke, setIsTextStroke] = useState(false);
   
   const [drawings, setDrawings] = useState([]);
   const [history, setHistory] = useState([[]]);
