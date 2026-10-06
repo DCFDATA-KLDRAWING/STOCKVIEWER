@@ -5843,6 +5843,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   // ✨ 第一步：在這裡加上文字的粗體與邊框狀態記憶
   const [isTextBold, setIsTextBold] = useState(false);
   const [isTextStroke, setIsTextStroke] = useState(false);
+  // ✨ 新增這行：專門記錄邊框顏色 (預設深色)
+  const [textStrokeColor, setTextStrokeColor] = useState('#0f172a');
+  
   
   const [drawings, setDrawings] = useState([]);
   const [history, setHistory] = useState([[]]);
@@ -6165,7 +6168,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       setChartModal({
         type: 'prompt', message: '請輸入要標註的文字：',
         onConfirm: (txt) => {
-          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity, bold: isTextBold, stroke: isTextStroke }]); 
+          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity, bold: isTextBold, stroke: isTextStroke, strokeColor: textStrokeColor }]); 
           setActiveTool('cursor'); setChartModal(null);
         },
         onCancel: () => { setActiveTool('cursor'); setChartModal(null); }
@@ -6620,6 +6623,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
        // ⚠️ 加入 typeof 檢查，防止你還沒加上 useState 就存檔導致畫面白屏
        const useBold = drawObj.bold !== undefined ? drawObj.bold : (typeof isTextBold !== 'undefined' ? isTextBold : true);
        const useStroke = drawObj.stroke !== undefined ? drawObj.stroke : (typeof isTextStroke !== 'undefined' ? isTextStroke : true);
+       // ✨ 新增這行：優先讀取存好的邊框色，沒有就用現在選的
+       const useStrokeColor = drawObj.strokeColor || textStrokeColor;
 
        return ( 
          <g key={idKey}>
@@ -6629,7 +6634,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
              fill={drawObj.color} 
              fontSize={drawObj.size} 
              fontWeight={useBold ? "900" : "normal"}
-             stroke={useStroke ? "#0f172a" : "none"}
+             stroke={useStroke ? useStrokeColor : "none"}             
              strokeWidth={useStroke ? "3.5" : "0"}
              paintOrder="stroke"
              strokeLinejoin="round"
@@ -6925,6 +6930,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                         </button>
                       </div>
                     </div>
+                    {/* ✨ 新增這區塊：當 S 開啟時，才在下方顯示這個邊框顏色選擇器 */}
+                    {isTextStroke && (
+                      <div className="flex items-center gap-2 w-full pl-[34px] animate-fade-in">
+                        {['#0f172a', '#ffffff', '#ef4444', '#eab308'].map(c => (
+                          <button 
+                            key={c} 
+                            onClick={() => setTextStrokeColor(c)} 
+                            className={`w-4 h-4 rounded-full border-2 transition-transform ${textStrokeColor === c ? 'border-cyan-400 scale-125 shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'border-slate-500 opacity-70 hover:opacity-100'}`} 
+                            style={{backgroundColor: c}}
+                            title="更換邊框顏色"
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
