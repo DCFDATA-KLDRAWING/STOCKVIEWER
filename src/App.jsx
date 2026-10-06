@@ -6501,35 +6501,29 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
              const badgeWidth = 140;
              const badgeHeight = 95;
              const boxCenterX = rx + rw / 2;
-             const boxCenterY = ry + rh / 2;
              
-             // 🧠 智慧定位：決定資訊板要放在箱體的左邊還是右邊
-             const isNearRightEdge = rx + rw > width - 200;
-             let badgeX = isNearRightEdge ? rx - badgeWidth / 2 - 15 : rx + rw + badgeWidth / 2 + 15;
+             // 🧠 智慧定位 3.0：聽從您的絕佳建議，將面板對齊箱子，但直接下放到「副圖區」！
+             let badgeX = boxCenterX;
              
-             // 🛡️ 終極防呆防撞保護：強制把面板限制在螢幕可見範圍內，絕對不被裁切！
+             // 🛡️ 左右防撞保護：確保面板絕對不會超出螢幕左右邊緣
              if (badgeX - badgeWidth / 2 < 15) badgeX = 15 + badgeWidth / 2;
              if (badgeX + badgeWidth / 2 > width - 15) badgeX = width - 15 - badgeWidth / 2;
 
-             // 🛡️ 上下防撞保護
-             let badgeY = boxCenterY;
-             if (badgeY - badgeHeight / 2 < 20) badgeY = 20 + badgeHeight / 2;
-             if (badgeY + badgeHeight / 2 > mainHeight - 20) badgeY = mainHeight - 20 - badgeHeight / 2;
-
-             // 自動判斷引導線要黏在箱子的左邊還是右邊
-             const boxEdgeX = badgeX < boxCenterX ? rx : rx + rw;
+             // 🛡️ Y 軸下放：定錨在主圖下方 (主圖與成交量區交界處)，徹底遠離 K 線！
+             const badgeY = mainHeight + 45;
 
              return (
                <g>
                  {/* Transparent box drawn directly over the chart area without blocking visibility */}
                  <rect x={rx} y={ry} width={Math.max(rw, 30)} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill="#3b82f6" fillOpacity={0.12} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" rx="4" />
                  
-                 {/* Dashed line connecting box to the safe badge area */}
-                 <line x1={boxEdgeX} y1={boxCenterY} x2={badgeX + (badgeX < boxCenterX ? badgeWidth / 2 : -badgeWidth / 2)} y2={badgeY} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.8" pointerEvents="none" />
+                 {/* 垂直虛線：從箱子的正下方，直直往下連到副圖區的面板頂部 */}
+                 <line x1={boxCenterX} y1={ry + rh} x2={badgeX} y2={badgeY - badgeHeight / 2} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.6" pointerEvents="none" />
 
-                 {/* Compact info badge positioned safely */}
+                 {/* Compact info badge (儀表板) */}
                  <g transform={`translate(${badgeX}, ${badgeY})`}>
-                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.95" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
+                    {/* 調整透明度為 0.85，讓後方的成交量柱狀圖能隱約透出來 */}
+                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.85" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" pointerEvents="none" />
                     
                     <text x="0" y={-badgeHeight / 2 + 14} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" pointerEvents="none">
                       箱高: {boxHeightPrice.toFixed(1)} (+{pct.toFixed(1)}%)
