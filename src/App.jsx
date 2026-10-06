@@ -5845,6 +5845,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const [isTextStroke, setIsTextStroke] = useState(false);
   // ✨ 新增這行：專門記錄邊框顏色 (預設深色)
   const [textStrokeColor, setTextStrokeColor] = useState('#0f172a');
+  // ✨ 新增這行：控制文字閃爍特效 (預設關閉)
+  const [isTextFlash, setIsTextFlash] = useState(false);
   
   
   const [drawings, setDrawings] = useState([]);
@@ -6168,7 +6170,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       setChartModal({
         type: 'prompt', message: '請輸入要標註的文字：',
         onConfirm: (txt) => {
-          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity, bold: isTextBold, stroke: isTextStroke, strokeColor: textStrokeColor }]); 
+          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity, bold: isTextBold, stroke: isTextStroke, strokeColor: textStrokeColor, flash: isTextFlash }]); 
           setActiveTool('cursor'); setChartModal(null);
         },
         onCancel: () => { setActiveTool('cursor'); setChartModal(null); }
@@ -6625,6 +6627,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
        const useStroke = drawObj.stroke !== undefined ? drawObj.stroke : (typeof isTextStroke !== 'undefined' ? isTextStroke : true);
        // ✨ 新增這行：優先讀取存好的邊框色，沒有就用現在選的
        const useStrokeColor = drawObj.strokeColor || textStrokeColor;
+       const useFlash = drawObj.flash !== undefined ? drawObj.flash : isTextFlash;
 
        return ( 
          <g key={idKey}>
@@ -6641,6 +6644,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
              opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} 
              pointerEvents="none"
            >
+             {useFlash && (
+               <animate 
+                 attributeName="opacity" 
+                 values={`${isDraft ? baseOpacity * 0.6 : baseOpacity}; 0.2; ${isDraft ? baseOpacity * 0.6 : baseOpacity}`} 
+                 dur="1.2s" 
+                 repeatCount="indefinite" 
+               />
+             )}
              {wrappedLines.map((line, i) => (
                <tspan 
                  key={i} 
@@ -6927,6 +6938,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                           style={isTextStroke ? { textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000' } : {}}
                         >
                           S
+                        </button>
+                        <button
+                          onClick={() => setIsTextFlash(!isTextFlash)}
+                          className={`flex-1 py-0.5 text-xs rounded font-bold border transition-colors ${isTextFlash ? 'bg-amber-500 text-white border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}
+                          title="切換閃爍特效"
+                        >
+                          ✨
                         </button>
                       </div>
                     </div>
