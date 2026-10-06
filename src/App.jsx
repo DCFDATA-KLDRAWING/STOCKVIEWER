@@ -6623,11 +6623,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
        // 👇 動態判斷要不要粗體與邊框 👇
        // 邏輯：優先讀取畫好的物件記憶，如果沒有記憶，就聽從目前全域按鈕的狀態
        // ⚠️ 加入 typeof 檢查，防止你還沒加上 useState 就存檔導致畫面白屏
-       const useBold = drawObj.bold !== undefined ? drawObj.bold : (typeof isTextBold !== 'undefined' ? isTextBold : true);
-       const useStroke = drawObj.stroke !== undefined ? drawObj.stroke : (typeof isTextStroke !== 'undefined' ? isTextStroke : true);
-       // ✨ 新增這行：優先讀取存好的邊框色，沒有就用現在選的
-       const useStrokeColor = drawObj.strokeColor || textStrokeColor;
-       const useFlash = drawObj.flash !== undefined ? drawObj.flash : isTextFlash;
+       const useBold = drawObj.bold !== undefined ? drawObj.bold : (isDraft ? (typeof isTextBold !== 'undefined' ? isTextBold : true) : true);
+       const useStroke = drawObj.stroke !== undefined ? drawObj.stroke : (isDraft ? (typeof isTextStroke !== 'undefined' ? isTextStroke : true) : false);
+       const useStrokeColor = drawObj.strokeColor || (isDraft ? textStrokeColor : '#0f172a');
+       
+       // ✨ 關鍵修正：如果是舊字 (沒存到 flash 屬性)，強制設為 false (不閃爍)！
+       const useFlash = drawObj.flash !== undefined ? drawObj.flash : (isDraft ? isTextFlash : false);
 
        return ( 
          <g key={idKey}>
