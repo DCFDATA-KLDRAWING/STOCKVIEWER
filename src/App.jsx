@@ -5840,6 +5840,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const [drawWidth, setDrawWidth] = useState(2);
   const [drawOpacity, setDrawOpacity] = useState(0.5); 
   const [textSize, setTextSize] = useState(16);
+  // ✨ 第一步：在這裡加上文字的粗體與邊框狀態記憶
+  const [isTextBold, setIsTextBold] = useState(true);
+  const [isTextStroke, setIsTextStroke] = useState(true);
   
   const [drawings, setDrawings] = useState([]);
   const [history, setHistory] = useState([[]]);
@@ -6162,7 +6165,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       setChartModal({
         type: 'prompt', message: '請輸入要標註的文字：',
         onConfirm: (txt) => {
-          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity }]); 
+          if (txt && txt.trim()) commitDrawings([...drawings, { id: Date.now(), type: 'text', points: [newPt], text: txt, color: drawColor, size: textSize, opacity: drawOpacity, bold: isTextBold, stroke: isTextStroke }]); 
           setActiveTool('cursor'); setChartModal(null);
         },
         onCancel: () => { setActiveTool('cursor'); setChartModal(null); }
@@ -6586,11 +6589,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
     if (drawObj.type === 'rect') {
        return ( <g key={idKey}>{pts.length === 2 && (() => { const rx = Math.min(pts[0].x, pts[1].x), ry = Math.min(pts[0].y, pts[1].y), rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y); return <rect x={rx} y={ry} width={rw} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill={drawObj.color} fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />; })()}{renderDots()}</g> );
     }
+    if (drawObj.type === 'rect') {
+       return ( <g key={idKey}>{pts.length === 2 && (() => { const rx = Math.min(pts[0].x, pts[1].x), ry = Math.min(pts[0].y, pts[1].y), rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y); return <rect x={rx} y={ry} width={rw} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill={drawObj.color} fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />; })()}{renderDots()}</g> );
+    }
     if (drawObj.type === 'text' && pts.length === 1) {
        // ✨ 智慧文字換行演算法 (中文字算2格，英數字算1格)
-       const rawLines = (drawObj.text || '').split('\n'); // 支援原本輸入的 Enter 換行
+       const rawLines = (drawObj.text || '').split('\n');
        const wrappedLines = [];
-       const maxLineLen = 24; // 🌟 這裡可以調整每行要多寬 (24代表約12個中文字)
+       const maxLineLen = 24; 
        
        rawLines.forEach(line => {
          let currentLine = '';
@@ -6609,14 +6615,31 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
          if (currentLine) wrappedLines.push(currentLine);
        });
 
+       // 👇 動態判斷要不要粗體與邊框 👇
+       // 邏輯：優先讀取畫好的物件記憶，如果沒有記憶，就聽從目前全域按鈕的狀態
+       // ⚠️ 加入 typeof 檢查，防止你還沒加上 useState 就存檔導致畫面白屏
+       const useBold = drawObj.bold !== undefined ? drawObj.bold : (typeof isTextBold !== 'undefined' ? isTextBold : true);
+       const useStroke = drawObj.stroke !== undefined ? drawObj.stroke : (typeof isTextStroke !== 'undefined' ? isTextStroke : true);
+
        return ( 
          <g key={idKey}>
-           <text x={pts[0].x} y={pts[0].y} fill={drawObj.color} fontSize={drawObj.size} fontWeight="bold" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none">
+           <text 
+             x={pts[0].x} 
+             y={pts[0].y} 
+             fill={drawObj.color} 
+             fontSize={drawObj.size} 
+             fontWeight={useBold ? "900" : "normal"}
+             stroke={useStroke ? "#0f172a" : "none"}
+             strokeWidth={useStroke ? "3.5" : "0"}
+             paintOrder="stroke"
+             strokeLinejoin="round"
+             opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} 
+             pointerEvents="none"
+           >
              {wrappedLines.map((line, i) => (
                <tspan 
                  key={i} 
                  x={pts[0].x} 
-                 // 第一行維持原位，第二行開始往下移動 1.3 倍的字體大小
                  dy={i === 0 ? 0 : drawObj.size * 1.3}
                >
                  {line}
@@ -6866,18 +6889,42 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               </div>
               <div className="flex justify-between items-center w-full">
                 {activeTool === 'text' ? (
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">字級:</span>
-                    <input 
-                      type="range" 
-                      min="10" 
-                      max="60" 
-                      step="1" 
-                      value={textSize} 
-                      onChange={(e) => setTextSize(Number(e.target.value))} 
-                      className="w-full accent-cyan-500 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-slate-300 w-8 text-right font-bold">{textSize}px</span>
+                  <div className="flex flex-col gap-2 w-full">
+                    {/* 字級拉桿 */}
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">字級:</span>
+                      <input 
+                        type="range" 
+                        min="10" 
+                        max="60" 
+                        step="1" 
+                        value={textSize} 
+                        onChange={(e) => setTextSize(Number(e.target.value))} 
+                        className="w-full accent-cyan-500 cursor-pointer"
+                      />
+                      <span className="text-[10px] text-slate-300 w-8 text-right font-bold">{textSize}px</span>
+                    </div>
+                    {/* ✨ 加入 B (粗體) 和 S (邊框) 按鈕 */}
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">樣式:</span>
+                      <div className="flex gap-2 flex-1">
+                        <button
+                          onClick={() => setIsTextBold(!isTextBold)}
+                          className={`flex-1 py-0.5 text-xs rounded font-black border transition-colors ${isTextBold ? 'bg-cyan-600 text-white border-cyan-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}
+                          title="切換粗體"
+                        >
+                          B
+                        </button>
+                        <button
+                          onClick={() => setIsTextStroke(!isTextStroke)}
+                          className={`flex-1 py-0.5 text-xs rounded font-bold border transition-colors tracking-widest ${isTextStroke ? 'bg-cyan-600 text-white border-cyan-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}
+                          title="切換邊框"
+                          style={isTextStroke ? { textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000' } : {}}
+                        >
+                          S
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
