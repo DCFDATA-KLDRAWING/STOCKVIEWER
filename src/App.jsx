@@ -6587,7 +6587,46 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
        return ( <g key={idKey}>{pts.length === 2 && (() => { const rx = Math.min(pts[0].x, pts[1].x), ry = Math.min(pts[0].y, pts[1].y), rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y); return <rect x={rx} y={ry} width={rw} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill={drawObj.color} fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />; })()}{renderDots()}</g> );
     }
     if (drawObj.type === 'text' && pts.length === 1) {
-       return ( <g key={idKey}><text x={pts[0].x} y={pts[0].y} fill={drawObj.color} fontSize={drawObj.size} fontWeight="bold" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none">{drawObj.text}</text>{renderDots()}</g> );
+       // ✨ 智慧文字換行演算法 (中文字算2格，英數字算1格)
+       const rawLines = (drawObj.text || '').split('\n'); // 支援原本輸入的 Enter 換行
+       const wrappedLines = [];
+       const maxLineLen = 24; // 🌟 這裡可以調整每行要多寬 (24代表約12個中文字)
+       
+       rawLines.forEach(line => {
+         let currentLine = '';
+         let currentLen = 0;
+         for (let char of line) {
+           const charLen = char.match(/[\u4e00-\u9fa5]/) ? 2 : 1;
+           if (currentLen + charLen > maxLineLen) {
+             wrappedLines.push(currentLine);
+             currentLine = char;
+             currentLen = charLen;
+           } else {
+             currentLine += char;
+             currentLen += charLen;
+           }
+         }
+         if (currentLine) wrappedLines.push(currentLine);
+       });
+
+       return ( 
+         <g key={idKey}>
+           <text x={pts[0].x} y={pts[0].y} fill={drawObj.color} fontSize={drawObj.size} fontWeight="bold" opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none">
+             {wrappedLines.map((line, i) => (
+               <tspan 
+                 key={i} 
+                 x={pts[0].x} 
+                 // 第一行維持原位，第二行開始往下移動 1.3 倍的字體大小
+                 dy={i === 0 ? 0 : drawObj.size * 1.3}
+               >
+                 {line}
+               </tspan>
+             ))}
+           </text>
+           {/* 渲染選取時的控制點 */}
+           {renderDots()}
+         </g> 
+       );
     }
     if (drawObj.type === 'n-shape') {
       const A = pts[0]; const B = pts.length >= 2 ? pts[1] : null; const C = pts.length === 3 ? pts[2] : null;
