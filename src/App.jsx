@@ -6687,6 +6687,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                { label: 'T2.0', val: rawPts[2].price + diff * 2.0 },
              ];
 
+             // 🎯 計算 T2.0 目標價在畫布上的 Y 座標，讓垂直虛線可以往上延伸
+             const t2Price = rawPts[2].price + diff * 2.0;
+             let targetEndY = typeof getY === 'function' ? getY(t2Price) : C.y - 100;
+             if (targetEndY < paddingLeft) targetEndY = paddingLeft;
+             if (targetEndY > mainHeight) targetEndY = mainHeight;
+
              const badgeWidth = 130;
              const badgeHeight = 85;
              const boxCenterX = C.x; 
@@ -6695,12 +6701,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
              if (badgeX - badgeWidth / 2 < 15) badgeX = 15 + badgeWidth / 2;
              if (badgeX + badgeWidth / 2 > width - 15) badgeX = width - 15 - badgeWidth / 2;
 
+             // 🛡️ 下放至副圖區的儀表板高度
              const badgeY = mainHeight + 45;
 
              return (
                <g>
-                 <line x1={C.x} y1={C.y} x2={badgeX} y2={badgeY - badgeHeight / 2} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="3,3" opacity="0.7" />
+                 {/* 🚀 找回那條：從 C 點往上延伸到 T2.0 目標價的垂直虛線 */}
+                 <line x1={C.x} y1={C.y} x2={C.x} y2={targetEndY} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" opacity="0.8" />
                  
+                 {/* 連接 C 點到底部副圖面板的引導虛線 */}
+                 <line x1={C.x} y1={C.y} x2={badgeX} y2={badgeY - badgeHeight / 2} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.6" />
+                 
+                 {/* 整合式精巧目標價資訊板 (下放至底部副圖區) */}
                  <g transform={`translate(${badgeX}, ${badgeY})`}>
                     <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.85" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" />
                     
