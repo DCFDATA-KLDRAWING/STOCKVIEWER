@@ -6485,16 +6485,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             const raw1 = rawPts[0]; const raw2 = rawPts[1];
             if (!p1 || !p2 || !raw1 || !raw2) return null;
 
-            // 1. 計算等幅對稱目標價與螢幕座標
             const diffPrice = raw2.price - raw1.price;
             const targetPrice = raw2.price + diffPrice;
-            const diffY = p2.y - p1.y;
-            const targetY = p2.y + diffY;
-            const timeSpanX = Math.abs(p2.x - p1.x);
-            const targetX = p2.x + timeSpanX;
+            const targetY = p2.y + (p2.y - p1.y);
+            const targetX = p2.x + Math.abs(p2.x - p1.x);
 
-            // 2. 亞當理論核心：計算 P1 到 P2 之間的 K 棒路徑，並對稱翻轉投影到未來
-            const mirrorPolylinePoints = [];
+            // 🌟 正統亞當：抓取這區間內所有的 K 棒，進行完整的「上下翻轉 + 左右翻轉」投影
+            const mirrorCandles = [];
+            const mirrorClosePath = [];
+
             if (raw1.idx !== undefined && raw2.idx !== undefined && data) {
               const startIdx = Math.min(raw1.idx, raw2.idx);
               const endIdx = Math.max(raw1.idx, raw2.idx);
@@ -6502,16 +6501,36 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
               if (totalBars > 0) {
                 for (let k = 0; k <= totalBars; k++) {
-                  const barIdx = startIdx + k;
-                  const item = data[barIdx];
+                  // 從 p2 開始往回對應，投影到未來
+                  const origIdx = endIdx - k;
+                  const item = data[origIdx];
                   if (item) {
-                    const originalX = getX(barIdx);
-                    const originalY = getY(item.close);
-                    
-                    // 以 P2 為對稱軸翻轉（左右對稱、上下等幅翻轉）
-                    const projX = p2.x + (p2.x - originalX);
-                    const projY = p2.y + (p2.y - originalY);
-                    mirrorPolylinePoints.push(`${projX},${projY}`);
+                    // 未來投影的 X 座標：依序向右排開
+                    const projX = p2.x + (k * spacing);
+
+                    // 價格反轉核心公式：以 p2 的價格為軸心上下鏡像
+                    const mirrorClose = raw2.price + (raw2.price - item.close);
+                    const mirrorOpen = raw2.price + (raw2.price - item.open);
+                    const mirrorHigh = raw2.price + (raw2.price - item.low);   // 原本的低點翻上去變成高點
+                    const mirrorLow = raw2.price + (raw2.price - item.high);   // 原本的高點翻下來變成低點
+
+                    const projYClose = getY(mirrorClose);
+                    const projYOpen = getY(mirrorOpen);
+                    const projYHigh = getY(mirrorHigh);
+                    const projYLow = getY(mirrorLow);
+
+                    mirrorClosePath.push(`${projX},${projYClose}`);
+
+                    // 儲存翻轉後的虛擬投影 K 棒
+                    const isUp = mirrorClose >= mirrorOpen;
+                    mirrorCandles.push({
+                      x: projX,
+                      yHigh: projYHigh,
+                      yLow: projYLow,
+                      yTop: Math.min(projYOpen, projYClose),
+                      bodyHeight: Math.max(1.5, Math.abs(projYClose - projYOpen)),
+                      color: isUp ? '#ef4444' : '#22c55e',
+                    });
                   }
                 }
               }
@@ -6519,54 +6538,61 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
             return (
               <g pointerEvents="none">
-                {/* 基準引導虛線 (P1 到 P2) */}
+                {/* 1. 基準選取線 (起點至翻轉樞紐點) */}
                 <line 
                   x1={p1.x} y1={p1.y} 
                   x2={p2.x} y2={p2.y} 
-                  stroke={drawObj.color} 
+                  stroke="#38bdf8" 
                   strokeWidth={1.5} 
                   strokeDasharray="4,4" 
-                  opacity={isDraft ? baseOpacity * 0.6 : baseOpacity * 0.8} 
+                  opacity={isDraft ? baseOpacity * 0.5 : baseOpacity * 0.8} 
                 />
 
-                {/* 亞當映象走勢投影曲線 (180度翻轉軌跡) */}
-                {mirrorPolylinePoints.length > 1 && (
+                {/* 2. 🌟 亞當第二映象：投影未來的鏡像虛擬 K 棒 */}
+                {mirrorCandles.map((mc, idx) => (
+                  <g key={`mc-${idx}`} opacity={isDraft ? baseOpacity * 0.4 : baseOpacity * 0.75}>
+                    {/* 投影上下影線 */}
+                    <line x1={mc.x} y1={mc.yHigh} x2={mc.x} y2={mc.yLow} stroke={mc.color} strokeWidth={1} strokeDasharray="2,2" />
+                    {/* 投影實體 K 棒 */}
+                    <rect 
+                      x={mc.x - (candleWidth / 2)} 
+                      y={mc.yTop} 
+                      width={candleWidth} 
+                      height={mc.bodyHeight} 
+                      fill={mc.color} 
+                      stroke={mc.color}
+                      strokeWidth={0.5}
+                      opacity={0.65}
+                    />
+                  </g>
+                ))}
+
+                {/* 3. 翻轉走勢軌跡連續線 */}
+                {mirrorClosePath.length > 1 && (
                   <polyline
-                    points={mirrorPolylinePoints.join(' ')}
+                    points={mirrorClosePath.join(' ')}
                     fill="none"
-                    stroke={drawObj.color}
-                    strokeWidth={drawObj.width || 2}
-                    strokeDasharray="3,3"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    strokeDasharray="4,3"
                     opacity={isDraft ? baseOpacity * 0.6 : baseOpacity * 0.9}
                   />
                 )}
 
-                {/* 亞當等幅翻轉直線 (P2 到 目標點 P3) */}
+                {/* 4. 等幅測量翻轉目標線 */}
                 <line 
                   x1={p2.x} y1={p2.y} 
                   x2={targetX} y2={targetY} 
-                  stroke={drawObj.color} 
-                  strokeWidth={drawObj.width || 2} 
-                  opacity={isDraft ? baseOpacity * 0.7 : baseOpacity} 
+                  stroke="#f59e0b" 
+                  strokeWidth={2} 
+                  opacity={isDraft ? baseOpacity * 0.5 : baseOpacity * 0.8} 
                 />
+                <circle cx={targetX} cy={targetY} r="5" fill="#ef4444" stroke="#ffffff" strokeWidth="1.5" />
 
-                {/* 目標水準延伸測幅線 */}
-                <line 
-                  x1={p2.x} y1={targetY} 
-                  x2={Math.max(targetX + 40, width)} y2={targetY} 
-                  stroke={drawObj.color} 
-                  strokeWidth={1} 
-                  strokeDasharray="2,2" 
-                  opacity={isDraft ? baseOpacity * 0.3 : baseOpacity * 0.5} 
-                />
-
-                {/* 目標點錨點圓點 */}
-                <circle cx={targetX} cy={targetY} r="4.5" fill="#ef4444" stroke="#ffffff" strokeWidth="1.5" />
-
-                {/* 目標價標籤框 */}
+                {/* 5. 目標價標籤 */}
                 <g transform={`translate(${targetX + 8}, ${targetY - 11})`}>
-                  <rect x="0" y="0" width="110" height="22" fill="#0f172a" fillOpacity="0.9" stroke={drawObj.color} strokeWidth="1" rx="4" />
-                  <text x="8" y="15" fill={drawObj.color} fontSize="11" fontWeight="bold">
+                  <rect x="0" y="0" width="115" height="22" fill="#0f172a" fillOpacity="0.9" stroke="#f59e0b" strokeWidth="1" rx="4" />
+                  <text x="8" y="15" fill="#f59e0b" fontSize="11" fontWeight="bold">
                     🎯 亞當: {targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(2)}
                   </text>
                 </g>
