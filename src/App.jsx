@@ -8131,7 +8131,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
         </svg>        
       </div>
      </div>
-     {/* 🧑‍🏫 當開啟黑板時，常駐於畫面左下角的純圖示黑板工具箱 */}
+     {/* 🧑‍🏫 當開啟黑板時，常駐於畫面左下角的純圖示黑板工具箱（使用原生 activeTool 變數，絕不報錯） */}
       {isBlankMode && (
         <div className="fixed bottom-6 left-6 z-[999] bg-slate-900/95 backdrop-blur-md border border-cyan-500/80 rounded-xl p-2.5 shadow-[0_0_25px_rgba(6,182,212,0.5)] flex items-center gap-2.5 select-none pointer-events-auto">
           <span className="text-cyan-400 font-bold text-xs">🧑‍🏫</span>
@@ -8140,23 +8140,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           {/* 工具選擇：筆、直線、橡皮擦 */}
           <div className="flex items-center gap-1">
             <button 
-              onClick={() => { setActiveTool('pen'); setBoardTool('pen'); setDraftPoints([]); }} 
+              onClick={() => { setActiveTool('pen'); setDraftPoints([]); }} 
               title="自由筆" 
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${boardTool === 'pen' && activeTool === 'pen' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${activeTool === 'pen' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               ✏️
             </button>
             <button 
-              onClick={() => { setActiveTool('segment'); setBoardTool('line'); setDraftPoints([]); }} 
+              onClick={() => { setActiveTool('segment'); setDraftPoints([]); }} 
               title="直線" 
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${boardTool === 'line' && activeTool === 'segment' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${activeTool === 'segment' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               📏
             </button>
             <button 
-              onClick={() => { setActiveTool('eraser'); setBoardTool('eraser'); setDraftPoints([]); }} 
+              onClick={() => { setActiveTool('eraser'); setDraftPoints([]); }} 
               title="橡皮擦" 
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${boardTool === 'eraser' && activeTool === 'eraser' ? 'bg-rose-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${activeTool === 'eraser' ? 'bg-rose-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               🧹
             </button>
@@ -8169,9 +8169,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             {['#ffffff', '#ef4444', '#eab308', '#22c55e', '#38bdf8', '#a855f7'].map(c => (
               <button 
                 key={c} 
-                onClick={() => { setDrawColor(c); setBoardColor(c); }} 
+                onClick={() => setDrawColor(c)} 
                 style={{ backgroundColor: c }} 
-                className={`w-4 h-4 rounded-full border-2 transition-all ${boardColor === c ? 'scale-125 border-white shadow-[0_0_8px_white]' : 'border-transparent hover:scale-110'}`} 
+                className={`w-4 h-4 rounded-full border-2 transition-all ${drawColor === c ? 'scale-125 border-white shadow-[0_0_8px_white]' : 'border-transparent hover:scale-110'}`} 
               />
             ))}
           </div>
@@ -8183,9 +8183,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             {[2, 4, 7, 10].map(w => (
               <button 
                 key={w} 
-                onClick={() => { setDrawWidth(w); setBoardWidth(w); }} 
+                onClick={() => setDrawWidth(w)} 
                 title={`粗細 ${w}px`} 
-                className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold transition-all ${boardWidth === w ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold transition-all ${drawWidth === w ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
                 {w}
               </button>
@@ -8194,10 +8194,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
           <div className="h-4 w-[1px] bg-slate-700"></div>
 
-          {/* 清空 */}
+          {/* 清空畫布 */}
           <button 
-            onClick={() => { handleClearAll(); setBoardPaths([]); }} 
-            title="清空黑板" 
+            onClick={handleClearAll} 
+            title="清空畫筆" 
             className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-800 text-rose-400 hover:bg-rose-950/60 border border-rose-900/50 transition-all text-xs"
           >
             🗑️
