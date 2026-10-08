@@ -7858,44 +7858,43 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             }
           </g>
 
-          {/* ✨ 當開啟黑板時，直接在畫面上出現這個透明/半透明的黑板專屬工具箱 */}
-          {isBlankMode && (
-            <div className="absolute bottom-6 left-6 z-50 bg-slate-900/90 backdrop-blur-md border border-cyan-500/60 rounded-xl p-3 shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center gap-3 select-none">
-              <span className="text-cyan-400 font-bold text-xs">🧑‍🏫 黑板工具</span>
-              <div className="h-4 w-[1px] bg-slate-700"></div>
+          {/* ✨ 當開啟黑板時，只出現精簡圖示的黑板專屬工具箱，不佔空間 */}
+    {isBlankMode && (
+      <div className="absolute bottom-6 left-6 z-50 bg-slate-900/90 backdrop-blur-md border border-cyan-500/60 rounded-xl p-2.5 shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center gap-2.5 select-none">
+        <span className="text-cyan-400 font-bold text-xs">🧑‍🏫</span>
+        <div className="h-4 w-[1px] bg-slate-700"></div>
 
-              {/* 工具選擇：筆、直線、橡皮擦 */}
-              <div className="flex items-center gap-1">
-                <button onClick={() => setBoardTool('pen')} className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${boardTool === 'pen' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>✏️ 自由筆</button>
-                <button onClick={() => setBoardTool('line')} className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${boardTool === 'line' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>📏 直線</button>
-                <button onClick={() => setBoardTool('eraser')} className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${boardTool === 'eraser' ? 'bg-rose-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>🧹 橡皮擦</button>
-              </div>
+        {/* 工具選擇：筆、直線、橡皮擦 (純圖示) */}
+        <div className="flex items-center gap-1">
+          <button onClick={() => setBoardTool('pen')} title="自由筆" className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${boardTool === 'pen' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>✏️</button>
+          <button onClick={() => setBoardTool('line')} title="直線" className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${boardTool === 'line' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>📏</button>
+          <button onClick={() => setBoardTool('eraser')} title="橡皮擦" className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${boardTool === 'eraser' ? 'bg-rose-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>🧹</button>
+        </div>
 
-              <div className="h-4 w-[1px] bg-slate-700"></div>
+        <div className="h-4 w-[1px] bg-slate-700"></div>
 
-              {/* 調色盤：選顏色 */}
-              <div className="flex items-center gap-1.5">
-                {['#ffffff', '#ef4444', '#eab308', '#22c55e', '#38bdf8', '#a855f7'].map(c => (
-                  <button key={c} onClick={() => setBoardColor(c)} style={{ backgroundColor: c }} className={`w-5 h-5 rounded-full border-2 transition-all ${boardColor === c ? 'scale-125 border-white shadow-[0_0_10px_white]' : 'border-transparent hover:scale-110'}`} />
-                ))}
-              </div>
+        {/* 調色盤：選顏色 */}
+        <div className="flex items-center gap-1.5">
+          {['#ffffff', '#ef4444', '#eab308', '#22c55e', '#38bdf8', '#a855f7'].map(c => (
+            <button key={c} onClick={() => setBoardColor(c)} style={{ backgroundColor: c }} className={`w-4 h-4 rounded-full border-2 transition-all ${boardColor === c ? 'scale-125 border-white shadow-[0_0_8px_white]' : 'border-transparent hover:scale-110'}`} />
+          ))}
+        </div>
 
-              <div className="h-4 w-[1px] bg-slate-700"></div>
+        <div className="h-4 w-[1px] bg-slate-700"></div>
 
-              {/* 粗細選擇 */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 text-xs">粗細:</span>
-                {[2, 4, 7, 10].map(w => (
-                  <button key={w} onClick={() => setBoardWidth(w)} className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold transition-all ${boardWidth === w ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{w}</button>
-                ))}
-              </div>
+        {/* 粗細選擇 (改為圖示或簡化數字) */}
+        <div className="flex items-center gap-1">
+          {[2, 4, 7, 10].map(w => (
+            <button key={w} onClick={() => setBoardWidth(w)} title={`粗細 ${w}px`} className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold transition-all ${boardWidth === w ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{w}</button>
+          ))}
+        </div>
 
-              <div className="h-4 w-[1px] bg-slate-700"></div>
+        <div className="h-4 w-[1px] bg-slate-700"></div>
 
-              {/* 清空按鈕 */}
-              <button onClick={() => setBoardPaths([])} className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-rose-400 hover:bg-rose-950/60 border border-rose-900/50 transition-all">🗑️ 清空</button>
-            </div>
-          )}
+        {/* 清空按鈕 */}
+        <button onClick={() => setBoardPaths([])} title="清空黑板" className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-800 text-rose-400 hover:bg-rose-950/60 border border-rose-900/50 transition-all text-xs">🗑️</button>
+      </div>
+    )}
 
           {/* 查價線 */}
           {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && (() => {
