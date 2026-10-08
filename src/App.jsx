@@ -5884,7 +5884,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
     if (!data || data.length === 0) return;
     
     // 🌟 在計算可見範圍時，同步加上 rightMarginBars 的偏移量 (這裡我們直接拿上面宣告的數字 15 來用)
-    const rightMarginBars = 5; 
+    const rightMarginBars = 30; 
     const startIdx = Math.max(0, Math.floor(data.length - displayCount - rightOffset + rightMarginBars));
     const endIdx = Math.min(data.length - 1, Math.ceil(data.length - 1 - rightOffset + rightMarginBars));
 
@@ -6016,7 +6016,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const candleWidth = Math.max(0.5, spacing * 0.85);
 
   // 🌟 新增：右側預留的空白 K 棒數量 (供未來畫線預測用)
-  const rightMarginBars = 5; 
+  const rightMarginBars = 30; 
 
   const getX = (idx) => {
      // idx 是一開始資料陣列的絕對位置 (0 ~ data.length-1)
