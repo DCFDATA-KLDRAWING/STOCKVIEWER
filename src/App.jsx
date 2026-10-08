@@ -6177,7 +6177,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
         },
         onCancel: () => { setActiveTool('cursor'); setChartModal(null); }
       });
-    } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'crossline', 'measure', 'pen'].includes(activeTool)) {
+    } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'adam', 'crossline', 'measure', 'pen'].includes(activeTool)) {
       setDraftPoints([newPt]); setIsDrawingDrag(true);
     } else if (activeTool === 'n-shape' || activeTool === 'wave') {
       if (draftPoints.length === 0) { setDraftPoints([newPt]); setIsDrawingDrag(true); } else if (draftPoints.length >= 1) setIsDrawingDrag(true);
@@ -6283,7 +6283,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       if (activeTool === 'pen') {
         if (draftPoints.length > 1) commitDrawings([...drawings, { id: Date.now(), type: 'pen', points: draftPoints, color: drawColor, width: drawWidth, opacity: drawOpacity }]);
         setDraftPoints([]); setIsDrawingDrag(false);
-      } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'measure'].includes(activeTool)) {
+      } else if (['segment', 'arrow', 'trend', 'rect', 'fibo', 'measure', 'adam'].includes(activeTool)) {
         if (!isSamePoint(draftPoints[0], hoverPoint)) commitDrawings([...drawings, { id: Date.now(), type: activeTool, points: [draftPoints[0], hoverPoint], color: drawColor, width: drawWidth, opacity: drawOpacity }]);
         setDraftPoints([]); setIsDrawingDrag(false);
       } else if (activeTool === 'crossline') {
@@ -6476,6 +6476,106 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           {renderDots()}
         </g>
       )
+    }
+    if (drawObj.type === 'adam') {
+      return (
+        <g key={idKey}>
+          {pts.length === 2 && (() => {
+            const p1 = pts[0]; const p2 = pts[1]; 
+            const raw1 = rawPts[0]; const raw2 = rawPts[1];
+            if (!p1 || !p2 || !raw1 || !raw2) return null;
+
+            // 1. 計算等幅對稱目標價與螢幕座標
+            const diffPrice = raw2.price - raw1.price;
+            const targetPrice = raw2.price + diffPrice;
+            const diffY = p2.y - p1.y;
+            const targetY = p2.y + diffY;
+            const timeSpanX = Math.abs(p2.x - p1.x);
+            const targetX = p2.x + timeSpanX;
+
+            // 2. 亞當理論核心：計算 P1 到 P2 之間的 K 棒路徑，並對稱翻轉投影到未來
+            const mirrorPolylinePoints = [];
+            if (raw1.idx !== undefined && raw2.idx !== undefined && data) {
+              const startIdx = Math.min(raw1.idx, raw2.idx);
+              const endIdx = Math.max(raw1.idx, raw2.idx);
+              const totalBars = endIdx - startIdx;
+
+              if (totalBars > 0) {
+                for (let k = 0; k <= totalBars; k++) {
+                  const barIdx = startIdx + k;
+                  const item = data[barIdx];
+                  if (item) {
+                    const originalX = getX(barIdx);
+                    const originalY = getY(item.close);
+                    
+                    // 以 P2 為對稱軸翻轉（左右對稱、上下等幅翻轉）
+                    const projX = p2.x + (p2.x - originalX);
+                    const projY = p2.y + (p2.y - originalY);
+                    mirrorPolylinePoints.push(`${projX},${projY}`);
+                  }
+                }
+              }
+            }
+
+            return (
+              <g pointerEvents="none">
+                {/* 基準引導虛線 (P1 到 P2) */}
+                <line 
+                  x1={p1.x} y1={p1.y} 
+                  x2={p2.x} y2={p2.y} 
+                  stroke={drawObj.color} 
+                  strokeWidth={1.5} 
+                  strokeDasharray="4,4" 
+                  opacity={isDraft ? baseOpacity * 0.6 : baseOpacity * 0.8} 
+                />
+
+                {/* 亞當映象走勢投影曲線 (180度翻轉軌跡) */}
+                {mirrorPolylinePoints.length > 1 && (
+                  <polyline
+                    points={mirrorPolylinePoints.join(' ')}
+                    fill="none"
+                    stroke={drawObj.color}
+                    strokeWidth={drawObj.width || 2}
+                    strokeDasharray="3,3"
+                    opacity={isDraft ? baseOpacity * 0.6 : baseOpacity * 0.9}
+                  />
+                )}
+
+                {/* 亞當等幅翻轉直線 (P2 到 目標點 P3) */}
+                <line 
+                  x1={p2.x} y1={p2.y} 
+                  x2={targetX} y2={targetY} 
+                  stroke={drawObj.color} 
+                  strokeWidth={drawObj.width || 2} 
+                  opacity={isDraft ? baseOpacity * 0.7 : baseOpacity} 
+                />
+
+                {/* 目標水準延伸測幅線 */}
+                <line 
+                  x1={p2.x} y1={targetY} 
+                  x2={Math.max(targetX + 40, width)} y2={targetY} 
+                  stroke={drawObj.color} 
+                  strokeWidth={1} 
+                  strokeDasharray="2,2" 
+                  opacity={isDraft ? baseOpacity * 0.3 : baseOpacity * 0.5} 
+                />
+
+                {/* 目標點錨點圓點 */}
+                <circle cx={targetX} cy={targetY} r="4.5" fill="#ef4444" stroke="#ffffff" strokeWidth="1.5" />
+
+                {/* 目標價標籤框 */}
+                <g transform={`translate(${targetX + 8}, ${targetY - 11})`}>
+                  <rect x="0" y="0" width="110" height="22" fill="#0f172a" fillOpacity="0.9" stroke={drawObj.color} strokeWidth="1" rx="4" />
+                  <text x="8" y="15" fill={drawObj.color} fontSize="11" fontWeight="bold">
+                    🎯 亞當: {targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(2)}
+                  </text>
+                </g>
+              </g>
+            );
+          })()}
+          {renderDots()}
+        </g>
+      );
     }
     if (drawObj.type === 'measure') {
        return (
@@ -6875,6 +6975,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               <button onClick={()=>setActiveTool('trend')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'trend' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>↗️ 趨勢</button>
               <button onClick={()=>setActiveTool('wave')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'wave' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🌊 波段</button>
               <button onClick={()=>setActiveTool('fibo')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'fibo' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>📐 斐波</button>
+              <button onClick={()=>setActiveTool('adam')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'adam' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🔄 亞當</button>
               <button onClick={()=>setActiveTool('measure')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'measure' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>📏 測量</button>
               <button onClick={()=>setActiveTool('crossline')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'crossline' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>➕ 十字</button>
               <button onClick={()=>setActiveTool('rect')} className={`px-2 py-1 text-sm rounded font-bold border transition-colors ${activeTool === 'rect' ? 'bg-cyan-700 text-white border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'}`}>🔲 矩形</button>
