@@ -6481,38 +6481,66 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       return (
         <g key={idKey}>
           {pts.length === 2 && (() => {
-            const p1 = pts[0]; const p2 = pts[1]; 
-            const raw1 = rawPts[0]; const raw2 = rawPts[1];
-            if (!p1 || !p2 || !raw1 || !raw2) return null;
+            const p1 = pts[0]; const p2 = pts[1];
+            const raw1 = rawPts?.[0] || {}; const raw2 = rawPts?.[1] || {};
+            if (!p1 || !p2) return null;
 
-            const diffPrice = raw2.price - raw1.price;
-            const targetPrice = raw2.price + diffPrice;
-            const targetY = p2.y + (p2.y - p1.y);
-            const targetX = p2.x + Math.abs(p2.x - p1.x);
+            // 1. 價格推算 (優先使用 rawPts 的 price，若無則用 getY 逆推)
+            const price1 = (raw1.price !== undefined && raw1.price !== null) ? raw1.price : (data && data[0] ? data[0].close : 100);
+            const price2 = (raw2.price !== undefined && raw2.price !== null) ? raw2.price : price1;
+            const diffPrice = price2 - price1;
+            const targetPrice = price2 + diffPrice;
 
-            // 🌟 正統亞當：抓取這區間內所有的 K 棒，進行完整的「上下翻轉 + 左右翻轉」投影
+            const diffY = p2.y - p1.y;
+            const targetY = p2.y + diffY;
+            const timeSpanX = Math.abs(p2.x - p1.x);
+            const targetX = p2.x + timeSpanX;
+
+            // 2. 🌟 核心防呆：如果 rawPts 沒有 idx，直接用 x 座標在 data 中找出最接近的 K 棒 index！
+            let idx1 = raw1.idx;
+            let idx2 = raw2.idx;
+
+            if (idx1 === undefined || idx2 === undefined) {
+              if (data && data.length > 0) {
+                let minDiff1 = Infinity, minDiff2 = Infinity;
+                data.forEach((_, i) => {
+                  const gx = getX(i);
+                  const d1 = Math.abs(gx - p1.x);
+                  const d2 = Math.abs(gx - p2.x);
+                  if (d1 < minDiff1) { minDiff1 = d1; idx1 = i; }
+                  if (d2 < minDiff2) { minDiff2 = d2; idx2 = i; }
+                });
+              }
+            }
+
+            // 3. 🌟 抓取這段區間的所有 K 棒，進行真正的「上下翻轉 + 左右對稱複製」
             const mirrorCandles = [];
             const mirrorClosePath = [];
+            const cWidth = typeof candleWidth !== 'undefined' ? candleWidth : 6;
+            const barSpacing = typeof spacing !== 'undefined' ? spacing : (timeSpanX / Math.max(1, Math.abs(idx2 - idx1)));
 
-            if (raw1.idx !== undefined && raw2.idx !== undefined && data) {
-              const startIdx = Math.min(raw1.idx, raw2.idx);
-              const endIdx = Math.max(raw1.idx, raw2.idx);
+            if (data && idx1 !== undefined && idx2 !== undefined) {
+              const startIdx = Math.min(idx1, idx2);
+              const endIdx = Math.max(idx1, idx2);
               const totalBars = endIdx - startIdx;
 
               if (totalBars > 0) {
+                // 抓出中心軸點的真實收盤價格
+                const pivotClose = data[endIdx]?.close || price2;
+
                 for (let k = 0; k <= totalBars; k++) {
-                  // 從 p2 開始往回對應，投影到未來
+                  // 從 endIdx 往回取（形成左右鏡像順序），向未來延伸
                   const origIdx = endIdx - k;
                   const item = data[origIdx];
                   if (item) {
-                    // 未來投影的 X 座標：依序向右排開
-                    const projX = p2.x + (k * spacing);
+                    // 未來投影 X 軸座標
+                    const projX = p2.x + (k * barSpacing);
 
-                    // 價格反轉核心公式：以 p2 的價格為軸心上下鏡像
-                    const mirrorClose = raw2.price + (raw2.price - item.close);
-                    const mirrorOpen = raw2.price + (raw2.price - item.open);
-                    const mirrorHigh = raw2.price + (raw2.price - item.low);   // 原本的低點翻上去變成高點
-                    const mirrorLow = raw2.price + (raw2.price - item.high);   // 原本的高點翻下來變成低點
+                    // 亞當核心公式：上下價格完全以軸點樞紐翻轉 180 度
+                    const mirrorClose = pivotClose + (pivotClose - item.close);
+                    const mirrorOpen = pivotClose + (pivotClose - item.open);
+                    const mirrorHigh = pivotClose + (pivotClose - item.low); // 原低點翻上去變高點
+                    const mirrorLow = pivotClose + (pivotClose - item.high); // 原高點翻下來變低點
 
                     const projYClose = getY(mirrorClose);
                     const projYOpen = getY(mirrorOpen);
@@ -6521,14 +6549,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
                     mirrorClosePath.push(`${projX},${projYClose}`);
 
-                    // 儲存翻轉後的虛擬投影 K 棒
                     const isUp = mirrorClose >= mirrorOpen;
                     mirrorCandles.push({
                       x: projX,
                       yHigh: projYHigh,
                       yLow: projYLow,
                       yTop: Math.min(projYOpen, projYClose),
-                      bodyHeight: Math.max(1.5, Math.abs(projYClose - projYOpen)),
+                      bodyHeight: Math.max(2, Math.abs(projYClose - projYOpen)),
                       color: isUp ? '#ef4444' : '#22c55e',
                     });
                   }
@@ -6538,7 +6565,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
             return (
               <g pointerEvents="none">
-                {/* 1. 基準選取線 (起點至翻轉樞紐點) */}
+                {/* 1. 基準選取虛線 */}
                 <line 
                   x1={p1.x} y1={p1.y} 
                   x2={p2.x} y2={p2.y} 
@@ -6548,34 +6575,34 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                   opacity={isDraft ? baseOpacity * 0.5 : baseOpacity * 0.8} 
                 />
 
-                {/* 2. 🌟 亞當第二映象：投影未來的鏡像虛擬 K 棒 */}
+                {/* 2. 🌟 翻轉投影的亞當虛擬 K 棒群 (上下翻轉、左右順序鏡像) */}
                 {mirrorCandles.map((mc, idx) => (
-                  <g key={`mc-${idx}`} opacity={isDraft ? baseOpacity * 0.4 : baseOpacity * 0.75}>
-                    {/* 投影上下影線 */}
-                    <line x1={mc.x} y1={mc.yHigh} x2={mc.x} y2={mc.yLow} stroke={mc.color} strokeWidth={1} strokeDasharray="2,2" />
-                    {/* 投影實體 K 棒 */}
+                  <g key={`adam-c-${idx}`} opacity={isDraft ? baseOpacity * 0.5 : baseOpacity * 0.85}>
+                    {/* 上下影線 */}
+                    <line x1={mc.x} y1={mc.yHigh} x2={mc.x} y2={mc.yLow} stroke={mc.color} strokeWidth={1.5} strokeDasharray="2,2" />
+                    {/* 實體 K 棒 */}
                     <rect 
-                      x={mc.x - (candleWidth / 2)} 
+                      x={mc.x - (cWidth / 2)} 
                       y={mc.yTop} 
-                      width={candleWidth} 
+                      width={cWidth} 
                       height={mc.bodyHeight} 
                       fill={mc.color} 
                       stroke={mc.color}
-                      strokeWidth={0.5}
-                      opacity={0.65}
+                      strokeWidth={1}
+                      fillOpacity={0.45}
                     />
                   </g>
                 ))}
 
-                {/* 3. 翻轉走勢軌跡連續線 */}
+                {/* 3. 翻轉後的走勢路徑連續金黃色曲線 */}
                 {mirrorClosePath.length > 1 && (
                   <polyline
                     points={mirrorClosePath.join(' ')}
                     fill="none"
                     stroke="#f59e0b"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     strokeDasharray="4,3"
-                    opacity={isDraft ? baseOpacity * 0.6 : baseOpacity * 0.9}
+                    opacity={isDraft ? baseOpacity * 0.7 : baseOpacity}
                   />
                 )}
 
@@ -6589,7 +6616,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 />
                 <circle cx={targetX} cy={targetY} r="5" fill="#ef4444" stroke="#ffffff" strokeWidth="1.5" />
 
-                {/* 5. 目標價標籤 */}
+                {/* 5. 亞當目標價標籤 */}
                 <g transform={`translate(${targetX + 8}, ${targetY - 11})`}>
                   <rect x="0" y="0" width="115" height="22" fill="#0f172a" fillOpacity="0.9" stroke="#f59e0b" strokeWidth="1" rx="4" />
                   <text x="8" y="15" fill="#f59e0b" fontSize="11" fontWeight="bold">
