@@ -6485,18 +6485,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             const raw1 = rawPts?.[0] || {}; const raw2 = rawPts?.[1] || {};
             if (!p1 || !p2) return null;
 
-            // 1. 價格推算
-            const price1 = (raw1.price !== undefined && raw1.price !== null) ? raw1.price : (data && data[0] ? data[0].close : 100);
-            const price2 = (raw2.price !== undefined && raw2.price !== null) ? raw2.price : price1;
-            const diffPrice = price2 - price1;
-            const targetPrice = price2 + diffPrice;
-
-            const diffY = p2.y - p1.y;
-            const targetY = p2.y + diffY;
-            const timeSpanX = Math.abs(p2.x - p1.x);
-            const targetX = p2.x + timeSpanX;
-
-            // 2. 自動尋找對應的 K 棒索引
+            // 1. 自動尋找對應的 K 棒索引
             let idx1 = raw1.idx;
             let idx2 = raw2.idx;
 
@@ -6513,15 +6502,15 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               }
             }
 
-            // 3. 抓取區間並計算模型 A 的翻亞當虛擬 K 棒
             const mirrorCandles = [];
             const mirrorClosePath = [];
             const cWidth = typeof candleWidth !== 'undefined' ? candleWidth : 6;
-            const barSpacing = typeof spacing !== 'undefined' ? spacing : (timeSpanX / Math.max(1, Math.abs(idx2 - idx1)));
+            const barSpacing = typeof spacing !== 'undefined' ? spacing : 10;
 
             let minMirrorY = Infinity;
             let maxMirrorY = -Infinity;
-            let maxProjX = targetX;
+            let pivotX = p2.x;
+            let maxProjX = p2.x;
 
             if (data && idx1 !== undefined && idx2 !== undefined) {
               const startIdx = Math.min(idx1, idx2);
@@ -6529,36 +6518,41 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               const totalBars = endIdx - startIdx;
 
               if (totalBars > 0) {
-                const pivotClose = data[endIdx]?.close || price2;
+                // 🌟 正統亞當：以第 2 點這根「關鍵 K 棒」本身為基準中軸！
+                const pivotItem = data[endIdx];
+                pivotX = getX(endIdx);
+                
+                // 樞紐價格中心：取關鍵 K 棒的高低中點或收盤價作為對稱中心
+                const pivotCenterPrice = (pivotItem.high + pivotItem.low) / 2;
 
                 for (let k = 0; k <= totalBars; k++) {
-                  const origIdx = endIdx - k;
+                  const origIdx = endIdx - k; // 從關鍵 K 棒往回取
                   const item = data[origIdx];
                   if (item) {
-                    const projX = p2.x + (k * barSpacing);
+                    // 🌟 時間軸：k=0 時剛好在 pivotX 上相疊；k>0 依序往右展開
+                    const projX = pivotX + (k * barSpacing);
                     if (projX > maxProjX) maxProjX = projX;
 
-                    // 價格上下對稱翻轉
-                    const mirrorClose = pivotClose + (pivotClose - item.close);
-                    const mirrorOpen = pivotClose + (pivotClose - item.open);
-                    const mirrorHigh = pivotClose + (pivotClose - item.low);
-                    const mirrorLow = pivotClose + (pivotClose - item.high);
+                    // 🌟 價格軸：以關鍵 K 棒的中心價作等幅對稱翻轉
+                    const mirrorClose = pivotCenterPrice + (pivotCenterPrice - item.close);
+                    const mirrorOpen = pivotCenterPrice + (pivotCenterPrice - item.open);
+                    const mirrorHigh = pivotCenterPrice + (pivotCenterPrice - item.low);
+                    const mirrorLow = pivotCenterPrice + (pivotCenterPrice - item.high);
 
                     const projYClose = getY(mirrorClose);
                     const projYOpen = getY(mirrorOpen);
                     const projYHigh = getY(mirrorHigh);
                     const projYLow = getY(mirrorLow);
 
-                    // 統計投影範圍高度（供背景遮罩使用）
                     if (projYHigh < minMirrorY) minMirrorY = projYHigh;
                     if (projYLow > maxMirrorY) maxMirrorY = projYLow;
 
                     mirrorClosePath.push(`${projX},${projYClose}`);
 
-                    // 🌟 模型 A：原本是紅 K 就維持紅 K，原本是綠 K 就維持綠 K！
+                    // 模型 A：紅綠維持原漲跌色彩，k=0 為關鍵相疊棒
                     const origIsUp = item.close >= item.open;
                     const candleColor = origIsUp ? '#ef4444' : '#22c55e';
-                    const strokeBorderColor = origIsUp ? '#fca5a5' : '#86efac'; // 醒目的淺亮邊框
+                    const strokeBorderColor = k === 0 ? '#38bdf8' : (origIsUp ? '#fca5a5' : '#86efac'); // 關鍵重疊棒給予亮藍外框
 
                     mirrorCandles.push({
                       x: projX,
@@ -6568,23 +6562,23 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                       bodyHeight: Math.max(2, Math.abs(projYClose - projYOpen)),
                       color: candleColor,
                       borderColor: strokeBorderColor,
-                      isUp: origIsUp,
+                      isPivot: k === 0, // 標記是否為關鍵中軸相疊棒
                     });
                   }
                 }
               }
             }
 
-            // 計算半透明黑底遮罩的寬高
-            const bgMaskX = p2.x;
-            const bgMaskWidth = Math.max(40, (maxProjX - p2.x) + cWidth * 2);
-            const maskTop = Math.max(0, minMirrorY - 25);
-            const maskBottom = Math.min(mainHeight, maxMirrorY + 25);
-            const bgMaskHeight = Math.max(50, maskBottom - maskTop);
+            // 計算半透明黑底遮罩
+            const bgMaskX = pivotX - (cWidth / 2) - 4;
+            const bgMaskWidth = Math.max(40, (maxProjX - pivotX) + cWidth * 2 + 8);
+            const maskTop = Math.max(0, minMirrorY - 18);
+            const maskBottom = Math.min(mainHeight, maxMirrorY + 18);
+            const bgMaskHeight = Math.max(40, maskBottom - maskTop);
 
             return (
               <g pointerEvents="none">
-                {/* 🌟 1. 半透明黑底對照背板（覆蓋住未來的歷史真實 K 棒，方便清晰對比鏡像） */}
+                {/* 1. 半透明黑底對照背板（從關鍵重疊 K 棒開始往右覆蓋） */}
                 {mirrorCandles.length > 0 && isFinite(minMirrorY) && isFinite(maxMirrorY) && (
                   <g>
                     <rect
@@ -6593,7 +6587,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                       width={bgMaskWidth}
                       height={bgMaskHeight}
                       fill="#020617"
-                      fillOpacity="0.82"
+                      fillOpacity="0.85"
                       rx="6"
                       stroke="#f59e0b"
                       strokeWidth="1"
@@ -6602,18 +6596,18 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                     />
                     <text
                       x={bgMaskX + 8}
-                      y={maskTop + 14}
+                      y={maskTop + 13}
                       fill="#94a3b8"
-                      fontSize="9.5"
+                      fontSize="9"
                       fontWeight="bold"
-                      opacity="0.8"
+                      opacity="0.75"
                     >
-                      亞當鏡射對照區
+                      亞當鏡射對照區 (中軸相疊)
                     </text>
                   </g>
                 )}
 
-                {/* 2. 基準選取虛線 (起點至翻轉樞紐點) */}
+                {/* 2. 選取波段基準虛線 */}
                 <line 
                   x1={p1.x} y1={p1.y} 
                   x2={p2.x} y2={p2.y} 
@@ -6623,28 +6617,25 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                   opacity={isDraft ? baseOpacity * 0.5 : baseOpacity * 0.8} 
                 />
 
-                {/* 🌟 3. 翻轉投影虛擬 K 棒群（模型 A：紅綠正確、自帶精緻雙層邊框） */}
+                {/* 3. 亞當虛擬 K 棒群（第 1 根直接與關鍵 K 棒相疊） */}
                 {mirrorCandles.map((mc, idx) => (
                   <g key={`adam-c-${idx}`}>
-                    {/* 上下影線（帶微發光亮邊） */}
-                    <line x1={mc.x} y1={mc.yHigh} x2={mc.x} y2={mc.yLow} stroke={mc.color} strokeWidth={2} opacity="0.9" />
-                    
-                    {/* 實體 K 棒（自帶醒目亮色外邊框與半透明填色，層次感分明） */}
+                    <line x1={mc.x} y1={mc.yHigh} x2={mc.x} y2={mc.yLow} stroke={mc.color} strokeWidth={mc.isPivot ? 2.5 : 2} opacity={mc.isPivot ? 1 : 0.85} />
                     <rect 
                       x={mc.x - (cWidth / 2)} 
                       y={mc.yTop} 
                       width={cWidth} 
                       height={mc.bodyHeight} 
                       fill={mc.color} 
-                      fillOpacity="0.85"
+                      fillOpacity={mc.isPivot ? 0.95 : 0.8}
                       stroke={mc.borderColor}
-                      strokeWidth={1.2}
+                      strokeWidth={mc.isPivot ? 2 : 1.2}
                       rx="1"
                     />
                   </g>
                 ))}
 
-                {/* 4. 翻轉走勢連續導引金黃色虛線 */}
+                {/* 4. 走勢導引連續虛線 */}
                 {mirrorClosePath.length > 1 && (
                   <polyline
                     points={mirrorClosePath.join(' ')}
@@ -6655,24 +6646,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                     opacity={isDraft ? baseOpacity * 0.6 : 0.9}
                   />
                 )}
-
-                {/* 5. 等幅測量翻轉目標線 */}
-                <line 
-                  x1={p2.x} y1={p2.y} 
-                  x2={targetX} y2={targetY} 
-                  stroke="#f59e0b" 
-                  strokeWidth={2} 
-                  opacity={isDraft ? baseOpacity * 0.5 : baseOpacity * 0.8} 
-                />
-                <circle cx={targetX} cy={targetY} r="5" fill="#ef4444" stroke="#ffffff" strokeWidth="1.5" />
-
-                {/* 6. 目標價標籤 */}
-                <g transform={`translate(${targetX + 8}, ${targetY - 11})`}>
-                  <rect x="0" y="0" width="115" height="22" fill="#0f172a" fillOpacity="0.95" stroke="#f59e0b" strokeWidth="1.2" rx="4" />
-                  <text x="8" y="15" fill="#f59e0b" fontSize="11" fontWeight="bold">
-                    🎯 亞當: {targetPrice > 1000 ? Math.round(targetPrice) : targetPrice.toFixed(2)}
-                  </text>
-                </g>
               </g>
             );
           })()}
