@@ -6848,64 +6848,126 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
        );
     }
     if (drawObj.type === 'n-shape') {
-      const A = pts[0]; const B = pts.length >= 2 ? pts[1] : null; const C = pts.length === 3 ? pts[2] : null;
+      const A = pts[0]; 
+      const B = pts.length >= 2 ? pts[1] : null; 
+      const C = pts.length === 3 ? pts[2] : null;
+
       return (
-        <g key={idKey} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none">
+        <g key={idKey} opacity={isDraft ? baseOpacity * 0.7 : baseOpacity} pointerEvents="none">
           {renderDots()}
-          {B && <line x1={A.x} y1={A.y} x2={B.x} y2={B.y} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" />}
-          {B && C && <line x1={B.x} y1={B.y} x2={C.x} y2={C.y} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" />}
+
+          {/* 1. N 字前兩折虛線 (A -> B, B -> C) */}
+          {B && (
+            <line 
+              x1={A.x} y1={A.y} 
+              x2={B.x} y2={B.y} 
+              stroke={drawObj.color || '#ef4444'} 
+              strokeWidth={drawObj.width || 1.5} 
+              strokeDasharray="4,4" 
+            />
+          )}
+          {B && C && (
+            <line 
+              x1={B.x} y1={B.y} 
+              x2={C.x} y2={C.y} 
+              stroke={drawObj.color || '#ef4444'} 
+              strokeWidth={drawObj.width || 1.5} 
+              strokeDasharray="4,4" 
+            />
+          )}
+
+          {/* 2. 🌟 費波那契擴展水平線與色塊（以 C 點為 0，向上/向下展開） */}
           {B && C && (() => {
-             const diff = rawPts[1].price - rawPts[0].price; 
-             const targets = [
-               { label: 'T1.0', val: rawPts[2].price + diff * 1.0 },
-               { label: 'T1.5', val: rawPts[2].price + diff * 1.5 },
-               { label: 'T1.618', val: rawPts[2].price + diff * 1.618 },
-               { label: 'T2.0', val: rawPts[2].price + diff * 2.0 },
-             ];
+            const rawA = rawPts[0];
+            const rawB = rawPts[1];
+            const rawC = rawPts[2];
+            if (!rawA || !rawB || !rawC) return null;
 
-             // 🎯 計算 T2.0 目標價在畫布上的 Y 座標，讓垂直虛線可以往上延伸
-             const t2Price = rawPts[2].price + diff * 2.0;
-             let targetEndY = typeof getY === 'function' ? getY(t2Price) : C.y - 100;
-             if (targetEndY < paddingLeft) targetEndY = paddingLeft;
-             if (targetEndY > mainHeight) targetEndY = mainHeight;
+            // 原始波段高度差 (A 到 B)
+            const diffPrice = rawB.price - rawA.price;
 
-             const badgeWidth = 130;
-             const badgeHeight = 85;
-             const boxCenterX = C.x; 
-             
-             let badgeX = boxCenterX;
-             if (badgeX - badgeWidth / 2 < 15) badgeX = 15 + badgeWidth / 2;
-             if (badgeX + badgeWidth / 2 > width - 15) badgeX = width - 15 - badgeWidth / 2;
+            // 費波那契擴展層級設定（比例、顏色、背景色塊）
+            const levels = [
+              { lvl: 0,     color: '#94a3b8', bg: '#94a3b8' },
+              { lvl: 0.236, color: '#f87171', bg: '#ef4444' }, // 紅
+              { lvl: 0.382, color: '#fbbf24', bg: '#f59e0b' }, // 橘黃
+              { lvl: 0.5,   color: '#4ade80', bg: '#22c55e' }, // 綠
+              { lvl: 0.618, color: '#2dd4bf', bg: '#14b8a6' }, // 青綠
+              { lvl: 0.786, color: '#f87171', bg: '#f43f5e' }, // 關鍵測幅紅
+              { lvl: 1.0,   color: '#94a3b8', bg: '#64748b' }, // 等幅 N
+              { lvl: 1.618, color: '#60a5fa', bg: '#3b82f6' }, // 黃金擴展藍
+              { lvl: 2.0,   color: '#a78bfa', bg: '#8b5cf6' }, // 雙倍擴展紫
+            ];
 
-             // 🛡️ 下放至副圖區的儀表板高度
-             const badgeY = mainHeight + 45;
+            // 計算各層在畫布上的價格與 Y 座標（以 C 點為 0 軸向外擴展）
+            const levelPoints = levels.map(item => {
+              const targetPrice = rawC.price + diffPrice * item.lvl;
+              const y = typeof getY === 'function' ? getY(targetPrice) : C.y - (item.lvl * 50);
+              return { ...item, targetPrice, y };
+            });
 
-             return (
-               <g>
-                 {/* 🚀 找回那條：從 C 點往上延伸到 T2.0 目標價的垂直虛線 */}
-                 <line x1={C.x} y1={C.y} x2={C.x} y2={targetEndY} stroke={drawObj.color} strokeWidth={drawObj.width} strokeDasharray="4,4" opacity="0.8" />
-                 
-                 {/* 連接 C 點到底部副圖面板的引導虛線 */}
-                 <line x1={C.x} y1={C.y} x2={badgeX} y2={badgeY - badgeHeight / 2} stroke={drawObj.color} strokeWidth="1" strokeDasharray="3,3" opacity="0.6" />
-                 
-                 {/* 整合式精巧目標價資訊板 (下放至底部副圖區) */}
-                 <g transform={`translate(${badgeX}, ${badgeY})`}>
-                    <rect x={-badgeWidth / 2} y={-badgeHeight / 2} width={badgeWidth} height={badgeHeight} fill="#0f172a" fillOpacity="0.85" rx="6" stroke={drawObj.color} strokeWidth="1" strokeOpacity="0.8" />
-                    
-                    <text x="0" y={-badgeHeight / 2 + 14} fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">
-                      N字目標價推演
-                    </text>
-                    <line x1={-badgeWidth / 2 + 8} y1={-badgeHeight / 2 + 19} x2={badgeWidth / 2 - 8} y2={-badgeHeight / 2 + 19} stroke="#334155" strokeWidth="1" />
-                    
-                    {targets.map((t, idx) => (
-                      <text key={t.label} x="0" y={-badgeHeight / 2 + 32 + idx * 13} fontSize="10" fontWeight="bold" textAnchor="middle">
-                        <tspan fill="#94a3b8">{t.label}: </tspan>
-                        <tspan fill="#f59e0b">{t.val.toFixed(1)}</tspan>
+            // 右邊界延伸至圖表邊界
+            const rightX = Math.max(C.x + 100, width - paddingRight);
+
+            return (
+              <g>
+                {/* 🌈 彩色層級半透明背景區塊（同 TradingView 經典樣式） */}
+                {levelPoints.slice(0, -1).map((curr, idx) => {
+                  const next = levelPoints[idx + 1];
+                  const yTop = Math.min(curr.y, next.y);
+                  const h = Math.abs(curr.y - next.y);
+                  if (yTop > mainHeight || yTop + h < 0) return null;
+
+                  return (
+                    <rect
+                      key={`fib-band-${idx}`}
+                      x={C.x}
+                      y={yTop}
+                      width={Math.max(0, rightX - C.x)}
+                      height={h}
+                      fill={next.bg}
+                      fillOpacity={0.12}
+                    />
+                  );
+                })}
+
+                {/* 📏 水平延伸擴展線與標籤 */}
+                {levelPoints.map((item) => {
+                  if (item.y < -30 || item.y > mainHeight + 30) return null;
+
+                  return (
+                    <g key={`fib-lvl-${item.lvl}`}>
+                      {/* 向右延伸水平線 */}
+                      <line
+                        x1={C.x}
+                        y1={item.y}
+                        x2={rightX}
+                        y2={item.y}
+                        stroke={item.color}
+                        strokeWidth={item.lvl === 0 || item.lvl === 1.0 || item.lvl === 0.786 ? 1.5 : 1}
+                        strokeDasharray={item.lvl === 0 ? 'none' : '3,3'}
+                        opacity={0.85}
+                      />
+
+                      {/* 右端比例與價格標籤 (如 0.786 (80.86)) */}
+                      <text
+                        x={rightX - 6}
+                        y={item.y - 4}
+                        fill={item.color}
+                        fontSize="11"
+                        fontWeight="bold"
+                        textAnchor="end"
+                      >
+                        {item.lvl} ({item.targetPrice > 1000 ? Math.round(item.targetPrice) : item.targetPrice.toFixed(2)})
                       </text>
-                    ))}
-                 </g>
-               </g>
-             );
+                    </g>
+                  );
+                })}
+
+                {/* 軸心起始指示點 (C點 0 軸標記) */}
+                <circle cx={C.x} cy={C.y} r="3.5" fill="#38bdf8" />
+              </g>
+            );
           })()}
         </g>
       );
