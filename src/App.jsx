@@ -6848,168 +6848,185 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
        );
     }
     if (drawObj.type === 'n-shape') {
-      const A = pts[0]; 
-      const B = pts.length >= 2 ? pts[1] : null; 
-      const C = pts.length === 3 ? pts[2] : null;
+  const A = pts[0]; 
+  const B = pts.length >= 2 ? pts[1] : null; 
+  const C = pts.length === 3 ? pts[2] : null;
 
-      return (
-        <g key={idKey} opacity={isDraft ? baseOpacity * 0.7 : baseOpacity} pointerEvents="none">
-          {renderDots()}
+  return (
+    <g key={idKey} opacity={isDraft ? baseOpacity * 0.7 : baseOpacity} pointerEvents="none">
+      {renderDots()}
 
-          {/* 1. N 字前兩折虛線 (A -> B, B -> C) */}
-          {B && (
-            <line 
-              x1={A.x} y1={A.y} 
-              x2={B.x} y2={B.y} 
-              stroke={drawObj.color || '#ef4444'} 
-              strokeWidth={drawObj.width || 1.5} 
-              strokeDasharray="4,4" 
-            />
-          )}
-          {B && C && (
-            <line 
-              x1={B.x} y1={B.y} 
-              x2={C.x} y2={C.y} 
-              stroke={drawObj.color || '#ef4444'} 
-              strokeWidth={drawObj.width || 1.5} 
-              strokeDasharray="4,4" 
-            />
-          )}
+      {/* 1. N 字前兩折虛線 (A -> B, B -> C) */}
+      {B && (
+        <line 
+          x1={A.x} y1={A.y} 
+          x2={B.x} y2={B.y} 
+          stroke={drawObj.color || '#ef4444'} 
+          strokeWidth={drawObj.width || 1.5} 
+          strokeDasharray="4,4" 
+        />
+      )}
+      {B && C && (
+        <line 
+          x1={B.x} y1={B.y} 
+          x2={C.x} y2={C.y} 
+          stroke={drawObj.color || '#ef4444'} 
+          strokeWidth={drawObj.width || 1.5} 
+          strokeDasharray="4,4" 
+        />
+      )}
 
-          {/* 2. 🌟 費波那契擴展水平線、色塊與副圖成交量區目標板 */}
-          {B && C && (() => {
-            const rawA = rawPts[0];
-            const rawB = rawPts[1];
-            const rawC = rawPts[2];
-            if (!rawA || !rawB || !rawC) return null;
+      {/* 2. 🌟 費波那契擴展水平線、色塊與主圖右側空白處「直式目標板」 */}
+      {B && C && (() => {
+        const rawA = rawPts[0];
+        const rawB = rawPts[1];
+        const rawC = rawPts[2];
+        if (!rawA || !rawB || !rawC) return null;
 
-            // 原始波段高度差 (A 到 B)
-            const diffPrice = rawB.price - rawA.price;
+        // 原始波段高度差 (A 到 B)
+        const diffPrice = rawB.price - rawA.price;
 
-            // 費波那契擴展層級設定
-            const levels = [
-              { lvl: 0,     color: '#94a3b8', bg: '#94a3b8' },
-              { lvl: 0.382, color: '#fbbf24', bg: '#f59e0b' },
-              { lvl: 0.5,   color: '#4ade80', bg: '#22c55e' },
-              { lvl: 0.618, color: '#2dd4bf', bg: '#14b8a6' },
-              { lvl: 0.786, color: '#f87171', bg: '#f43f5e' }, // 關鍵測幅
-              { lvl: 1.0,   color: '#e2e8f0', bg: '#64748b' }, // 等幅 N
-              { lvl: 1.618, color: '#60a5fa', bg: '#3b82f6' }, // 黃金擴展
-              { lvl: 2.0,   color: '#c084fc', bg: '#8b5cf6' }, // 雙倍目標
-            ];
+        // 費波那契擴展層級設定
+        const levels = [
+          { lvl: 0,     color: '#94a3b8', bg: '#94a3b8' },
+          { lvl: 0.382, color: '#fbbf24', bg: '#f59e0b' },
+          { lvl: 0.5,   color: '#4ade80', bg: '#22c55e' },
+          { lvl: 0.618, color: '#2dd4bf', bg: '#14b8a6' },
+          { lvl: 0.786, color: '#f87171', bg: '#f43f5e' }, // 關鍵測幅
+          { lvl: 1.0,   color: '#e2e8f0', bg: '#64748b' }, // 等幅 N
+          { lvl: 1.618, color: '#60a5fa', bg: '#3b82f6' }, // 黃金擴展
+          { lvl: 2.0,   color: '#c084fc', bg: '#8b5cf6' }, // 雙倍目標
+        ];
 
-            // 計算各層在畫布上的價格與 Y 座標
-            const levelPoints = levels.map(item => {
-              const targetPrice = rawC.price + diffPrice * item.lvl;
-              const y = typeof getY === 'function' ? getY(targetPrice) : C.y - (item.lvl * 50);
-              return { ...item, targetPrice, y };
-            });
+        // 計算各層在畫布上的價格與 Y 座標
+        const levelPoints = levels.map(item => {
+          const targetPrice = rawC.price + diffPrice * item.lvl;
+          const y = typeof getY === 'function' ? getY(targetPrice) : C.y - (item.lvl * 50);
+          return { ...item, targetPrice, y };
+        });
 
-            // 右邊界延伸至圖表邊界
-            const rightX = Math.max(C.x + 80, width - paddingRight);
+        // 右邊界延伸至圖表右側邊緣
+        const rightX = Math.max(C.x + 80, width - paddingRight);
 
-            // 📊 成交量區專用迷你數值板座標定位
-            // 若主圖高度 mainHeight 存在，將迷你板置於成交量區域上方緊貼處或右上方
-            const volAreaY = typeof mainHeight === 'number' ? mainHeight + 6 : C.y + 40;
-            const badgeBoxWidth = 320;
-            const badgeBoxX = Math.max(10, width - paddingRight - badgeBoxWidth);
+        // 🌟 直式數值板自動定位：放置在右側空白區（避開走勢與K棒）
+        const cardWidth = 105;
+        const cardHeight = 140;
+        // 優先放在右側邊緣空白處，距離價格軸 10px
+        const cardX = Math.max(10, width - paddingRight - cardWidth - 10);
+        // 垂直置中或貼齊主圖中央偏上，保證不超出頂部與底部
+        const cardY = Math.max(12, Math.min(mainHeight - cardHeight - 12, (mainHeight - cardHeight) / 2));
 
-            // 篩選最核心的 5 個向上目標顯示於成交量區
-            const keyTargets = levelPoints.filter(l => [0.618, 0.786, 1.0, 1.618, 2.0].includes(l.lvl));
+        // 直式卡片顯示關鍵擴展層級（由高到低排列，方便對照向上延伸）
+        const displayLevels = [
+          { label: '2.000', lvl: 2.0,   color: '#c084fc' },
+          { label: '1.618', lvl: 1.618, color: '#60a5fa' },
+          { label: '1.000', lvl: 1.0,   color: '#e2e8f0' },
+          { label: '0.786', lvl: 0.786, color: '#f87171' },
+          { label: '0.618', lvl: 0.618, color: '#2dd4bf' },
+        ].map(d => {
+          const matched = levelPoints.find(l => l.lvl === d.lvl);
+          return { ...d, targetPrice: matched ? matched.targetPrice : rawC.price + diffPrice * d.lvl };
+        });
 
-            return (
-              <g>
-                {/* 🌈 主圖：彩色層級半透明背景區塊 */}
-                {levelPoints.slice(0, -1).map((curr, idx) => {
-                  const next = levelPoints[idx + 1];
-                  const yTop = Math.min(curr.y, next.y);
-                  const h = Math.abs(curr.y - next.y);
-                  if (yTop > mainHeight || yTop + h < 0) return null;
+        return (
+          <g>
+            {/* 🌈 主圖：彩色層級半透明背景區塊 */}
+            {levelPoints.slice(0, -1).map((curr, idx) => {
+              const next = levelPoints[idx + 1];
+              const yTop = Math.min(curr.y, next.y);
+              const h = Math.abs(curr.y - next.y);
+              if (yTop > mainHeight || yTop + h < 0) return null;
 
-                  return (
-                    <rect
-                      key={`fib-band-${idx}`}
-                      x={C.x}
-                      y={yTop}
-                      width={Math.max(0, rightX - C.x)}
-                      height={h}
-                      fill={next.bg}
-                      fillOpacity={0.12}
-                    />
-                  );
-                })}
+              return (
+                <rect
+                  key={`fib-band-${idx}`}
+                  x={C.x}
+                  y={yTop}
+                  width={Math.max(0, rightX - C.x)}
+                  height={h}
+                  fill={next.bg}
+                  fillOpacity={0.12}
+                />
+              );
+            })}
 
-                {/* 📏 主圖：水平延伸擴展線與右側標籤 */}
-                {levelPoints.map((item) => {
-                  // 超出主圖頂部或底部的線條不渲染，避免遮住上方工具列
-                  if (item.y < 0 || item.y > mainHeight) return null;
+            {/* 📏 主圖：水平延伸擴展線與右側標籤 */}
+            {levelPoints.map((item) => {
+              if (item.y < 0 || item.y > mainHeight) return null;
 
-                  return (
-                    <g key={`fib-lvl-${item.lvl}`}>
-                      <line
-                        x1={C.x}
-                        y1={item.y}
-                        x2={rightX}
-                        y2={item.y}
-                        stroke={item.color}
-                        strokeWidth={item.lvl === 0 || item.lvl === 1.0 || item.lvl === 0.786 ? 1.5 : 1}
-                        strokeDasharray={item.lvl === 0 ? 'none' : '3,3'}
-                        opacity={0.85}
-                      />
-                      <text
-                        x={rightX - 6}
-                        y={item.y - 4}
-                        fill={item.color}
-                        fontSize="11"
-                        fontWeight="bold"
-                        textAnchor="end"
-                      >
-                        {item.lvl} ({item.targetPrice > 1000 ? Math.round(item.targetPrice) : item.targetPrice.toFixed(2)})
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* 軸心起始指示點 (C點 0 軸) */}
-                <circle cx={C.x} cy={C.y} r="3.5" fill="#38bdf8" />
-
-                {/* 🌟 3. 成交量區域專屬：精巧水平目標速查列（橫向螢幕不怕頂部被切） */}
-                <g transform={`translate(${badgeBoxX}, ${volAreaY})`}>
-                  {/* 底色透明霧黑膠囊底板 */}
-                  <rect
-                    x="0"
-                    y="0"
-                    width={badgeBoxWidth}
-                    height="20"
-                    fill="#090d16"
-                    fillOpacity="0.88"
-                    rx="4"
-                    stroke="#334155"
-                    strokeWidth="1"
+              return (
+                <g key={`fib-lvl-${item.lvl}`}>
+                  <line
+                    x1={C.x}
+                    y1={item.y}
+                    x2={rightX}
+                    y2={item.y}
+                    stroke={item.color}
+                    strokeWidth={item.lvl === 0 || item.lvl === 1.0 || item.lvl === 0.786 ? 1.5 : 1}
+                    strokeDasharray={item.lvl === 0 ? 'none' : '3,3'}
+                    opacity={0.85}
                   />
-                  <text x="7" y="14" fill="#38bdf8" fontSize="10" fontWeight="bold">
-                    N擴展:
+                  <text
+                    x={rightX - 6}
+                    y={item.y - 4}
+                    fill={item.color}
+                    fontSize="11"
+                    fontWeight="bold"
+                    textAnchor="end"
+                  >
+                    {item.lvl} ({item.targetPrice > 1000 ? Math.round(item.targetPrice) : item.targetPrice.toFixed(2)})
                   </text>
-
-                  {/* 緊湊排版關鍵水位：0.618 / 0.786 / 1.0 / 1.618 / 2.0 */}
-                  {keyTargets.map((kt, kIdx) => {
-                    const priceText = kt.targetPrice > 1000 ? Math.round(kt.targetPrice) : kt.targetPrice.toFixed(1);
-                    return (
-                      <g key={kt.lvl} transform={`translate(${52 + kIdx * 53}, 14)`}>
-                        <text fontSize="9.5" fontWeight="bold">
-                          <tspan fill="#94a3b8">{kt.lvl}:</tspan>
-                          <tspan fill={kt.color}> {priceText}</tspan>
-                        </text>
-                      </g>
-                    );
-                  })}
                 </g>
-              </g>
-            );
-          })()}
-        </g>
-      );
-    }
+              );
+            })}
+
+            {/* 軸心起始指示點 (C點 0 軸) */}
+            <circle cx={C.x} cy={C.y} r="3.5" fill="#38bdf8" />
+
+            {/* 🌟 3. 主圖右側空白處「直式微型目標板」 */}
+            <g transform={`translate(${cardX}, ${cardY})`}>
+              {/* 半透明毛玻璃暗色卡片底板 */}
+              <rect
+                x="0"
+                y="0"
+                width={cardWidth}
+                height={cardHeight}
+                fill="#0f172a"
+                fillOpacity="0.9"
+                rx="6"
+                stroke="#334155"
+                strokeWidth="1"
+              />
+              {/* 卡片頂部小標題 */}
+              <text x={cardWidth / 2} y="16" fill="#38bdf8" fontSize="10.5" fontWeight="bold" textAnchor="middle">
+                N 擴展目標
+              </text>
+              <line x1="8" y1="22" x2={cardWidth - 8} y2="22" stroke="#334155" strokeWidth="1" />
+
+              {/* 由高到低整齊排列直式數值 */}
+              {displayLevels.map((dl, idx) => {
+                const priceFormatted = dl.targetPrice > 1000 ? Math.round(dl.targetPrice) : dl.targetPrice.toFixed(2);
+                const rowY = 38 + idx * 21;
+                return (
+                  <g key={dl.label} transform={`translate(0, ${rowY})`}>
+                    {/* 比例標籤 */}
+                    <text x="10" y="0" fill={dl.color} fontSize="10" fontWeight="bold">
+                      {dl.label}
+                    </text>
+                    {/* 目標價格 */}
+                    <text x={cardWidth - 10} y="0" fill="#f8fafc" fontSize="10.5" fontWeight="bold" textAnchor="end">
+                      {priceFormatted}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          </g>
+        );
+      })()}
+    </g>
+  );
+}
     if (drawObj.type === 'wave') {
       return (
         <g key={idKey} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none">
