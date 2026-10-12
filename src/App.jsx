@@ -6876,7 +6876,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
         />
       )}
 
-      {/* 2. 費波那契擴展水平線、色塊與「成交量左側獨立直式目標板」 */}
+      {/* 2. 費波那契擴展水平線、色塊與「多面板自動並排目標板」 */}
       {B && C && (() => {
         const rawA = rawPts[0];
         const rawB = rawPts[1];
@@ -6904,13 +6904,24 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
         const rightX = Math.max(C.x + 80, width - paddingRight);
 
-        // 直式卡片尺寸
+        // 🌟 1. 識別當前 N 型是第幾個，用來計算卡片位移與編號
+        // 若外部有傳入 drawings 陣列，找出這是第幾個 n-shape；若無則預設為 0
+        const nList = (typeof drawings !== 'undefined' && Array.isArray(drawings))
+          ? drawings.filter(d => d.type === 'n-shape')
+          : [];
+        const nIndex = Math.max(0, nList.findIndex(d => d.id === drawObj.id || d === drawObj));
+        const badgeNumber = nIndex >= 0 ? nIndex + 1 : 1;
+
+        // 🌟 2. 卡片尺寸與自動橫向偏移（多個 N 型時自動向右並排）
         const cardWidth = 98;
         const cardHeight = 126;
-
-        // 定位在成交量區左側
-        const cardX = (typeof paddingLeft === 'number' ? paddingLeft : 10) + 8;
+        const cardGap = 8; // 面板之間的間隔
+        const baseLeft = (typeof paddingLeft === 'number' ? paddingLeft : 10) + 8;
+        const cardX = baseLeft + (nIndex * (cardWidth + cardGap));
         const cardY = (typeof mainHeight === 'number' ? mainHeight : C.y + 30) + 6;
+
+        // 🌟 3. 面板主題色連動該 N 型自身線條顏色
+        const themeColor = drawObj.color || '#38bdf8';
 
         const displayLevels = [
           { label: '2.000', lvl: 2.0,   color: '#c084fc' },
@@ -6976,9 +6987,9 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             })}
 
             {/* C點 0 軸標記 */}
-            <circle cx={C.x} cy={C.y} r="3.5" fill="#38bdf8" />
+            <circle cx={C.x} cy={C.y} r="3.5" fill={themeColor} />
 
-            {/* 成交量左側獨立直式目標面板 */}
+            {/* 🌟 成交量左側獨立直式目標面板（自動橫向並排 + 標記序號 + 邊框連動同色） */}
             <g transform={`translate(${cardX}, ${cardY})`}>
               <rect
                 x="0"
@@ -6986,13 +6997,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 width={cardWidth}
                 height={cardHeight}
                 fill="#0b1120"
-                fillOpacity="0.92"
+                fillOpacity="0.94"
                 rx="6"
-                stroke="#38bdf8"
-                strokeWidth="1.2"
+                stroke={themeColor}
+                strokeWidth="1.4"
               />
-              <text x={cardWidth / 2} y="15" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">
-                🎯 N擴展目標
+              {/* 頂部標題標示：例如 #1 N擴展、#2 N擴展 */}
+              <text x={cardWidth / 2} y="15" fill={themeColor} fontSize="10" fontWeight="bold" textAnchor="middle">
+                🎯 #{badgeNumber} N擴展
               </text>
               <line x1="6" y1="21" x2={cardWidth - 6} y2="21" stroke="#1e293b" strokeWidth="1" />
 
