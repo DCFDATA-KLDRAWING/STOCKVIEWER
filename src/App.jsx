@@ -6876,7 +6876,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             />
           )}
 
-          {/* 2. 🌟 費波那契擴展水平線與色塊（以 C 點為 0，向上/向下展開） */}
+          {/* 2. 🌟 費波那契擴展水平線、色塊與副圖成交量區目標板 */}
           {B && C && (() => {
             const rawA = rawPts[0];
             const rawB = rawPts[1];
@@ -6886,20 +6886,19 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             // 原始波段高度差 (A 到 B)
             const diffPrice = rawB.price - rawA.price;
 
-            // 費波那契擴展層級設定（比例、顏色、背景色塊）
+            // 費波那契擴展層級設定
             const levels = [
               { lvl: 0,     color: '#94a3b8', bg: '#94a3b8' },
-              { lvl: 0.236, color: '#f87171', bg: '#ef4444' }, // 紅
-              { lvl: 0.382, color: '#fbbf24', bg: '#f59e0b' }, // 橘黃
-              { lvl: 0.5,   color: '#4ade80', bg: '#22c55e' }, // 綠
-              { lvl: 0.618, color: '#2dd4bf', bg: '#14b8a6' }, // 青綠
-              { lvl: 0.786, color: '#f87171', bg: '#f43f5e' }, // 關鍵測幅紅
-              { lvl: 1.0,   color: '#94a3b8', bg: '#64748b' }, // 等幅 N
-              { lvl: 1.618, color: '#60a5fa', bg: '#3b82f6' }, // 黃金擴展藍
-              { lvl: 2.0,   color: '#a78bfa', bg: '#8b5cf6' }, // 雙倍擴展紫
+              { lvl: 0.382, color: '#fbbf24', bg: '#f59e0b' },
+              { lvl: 0.5,   color: '#4ade80', bg: '#22c55e' },
+              { lvl: 0.618, color: '#2dd4bf', bg: '#14b8a6' },
+              { lvl: 0.786, color: '#f87171', bg: '#f43f5e' }, // 關鍵測幅
+              { lvl: 1.0,   color: '#e2e8f0', bg: '#64748b' }, // 等幅 N
+              { lvl: 1.618, color: '#60a5fa', bg: '#3b82f6' }, // 黃金擴展
+              { lvl: 2.0,   color: '#c084fc', bg: '#8b5cf6' }, // 雙倍目標
             ];
 
-            // 計算各層在畫布上的價格與 Y 座標（以 C 點為 0 軸向外擴展）
+            // 計算各層在畫布上的價格與 Y 座標
             const levelPoints = levels.map(item => {
               const targetPrice = rawC.price + diffPrice * item.lvl;
               const y = typeof getY === 'function' ? getY(targetPrice) : C.y - (item.lvl * 50);
@@ -6907,11 +6906,20 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
             });
 
             // 右邊界延伸至圖表邊界
-            const rightX = Math.max(C.x + 100, width - paddingRight);
+            const rightX = Math.max(C.x + 80, width - paddingRight);
+
+            // 📊 成交量區專用迷你數值板座標定位
+            // 若主圖高度 mainHeight 存在，將迷你板置於成交量區域上方緊貼處或右上方
+            const volAreaY = typeof mainHeight === 'number' ? mainHeight + 6 : C.y + 40;
+            const badgeBoxWidth = 320;
+            const badgeBoxX = Math.max(10, width - paddingRight - badgeBoxWidth);
+
+            // 篩選最核心的 5 個向上目標顯示於成交量區
+            const keyTargets = levelPoints.filter(l => [0.618, 0.786, 1.0, 1.618, 2.0].includes(l.lvl));
 
             return (
               <g>
-                {/* 🌈 彩色層級半透明背景區塊（同 TradingView 經典樣式） */}
+                {/* 🌈 主圖：彩色層級半透明背景區塊 */}
                 {levelPoints.slice(0, -1).map((curr, idx) => {
                   const next = levelPoints[idx + 1];
                   const yTop = Math.min(curr.y, next.y);
@@ -6931,13 +6939,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                   );
                 })}
 
-                {/* 📏 水平延伸擴展線與標籤 */}
+                {/* 📏 主圖：水平延伸擴展線與右側標籤 */}
                 {levelPoints.map((item) => {
-                  if (item.y < -30 || item.y > mainHeight + 30) return null;
+                  // 超出主圖頂部或底部的線條不渲染，避免遮住上方工具列
+                  if (item.y < 0 || item.y > mainHeight) return null;
 
                   return (
                     <g key={`fib-lvl-${item.lvl}`}>
-                      {/* 向右延伸水平線 */}
                       <line
                         x1={C.x}
                         y1={item.y}
@@ -6948,8 +6956,6 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                         strokeDasharray={item.lvl === 0 ? 'none' : '3,3'}
                         opacity={0.85}
                       />
-
-                      {/* 右端比例與價格標籤 (如 0.786 (80.86)) */}
                       <text
                         x={rightX - 6}
                         y={item.y - 4}
@@ -6964,8 +6970,40 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                   );
                 })}
 
-                {/* 軸心起始指示點 (C點 0 軸標記) */}
+                {/* 軸心起始指示點 (C點 0 軸) */}
                 <circle cx={C.x} cy={C.y} r="3.5" fill="#38bdf8" />
+
+                {/* 🌟 3. 成交量區域專屬：精巧水平目標速查列（橫向螢幕不怕頂部被切） */}
+                <g transform={`translate(${badgeBoxX}, ${volAreaY})`}>
+                  {/* 底色透明霧黑膠囊底板 */}
+                  <rect
+                    x="0"
+                    y="0"
+                    width={badgeBoxWidth}
+                    height="20"
+                    fill="#090d16"
+                    fillOpacity="0.88"
+                    rx="4"
+                    stroke="#334155"
+                    strokeWidth="1"
+                  />
+                  <text x="7" y="14" fill="#38bdf8" fontSize="10" fontWeight="bold">
+                    N擴展:
+                  </text>
+
+                  {/* 緊湊排版關鍵水位：0.618 / 0.786 / 1.0 / 1.618 / 2.0 */}
+                  {keyTargets.map((kt, kIdx) => {
+                    const priceText = kt.targetPrice > 1000 ? Math.round(kt.targetPrice) : kt.targetPrice.toFixed(1);
+                    return (
+                      <g key={kt.lvl} transform={`translate(${52 + kIdx * 53}, 14)`}>
+                        <text fontSize="9.5" fontWeight="bold">
+                          <tspan fill="#94a3b8">{kt.lvl}:</tspan>
+                          <tspan fill={kt.color}> {priceText}</tspan>
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
               </g>
             );
           })()}
