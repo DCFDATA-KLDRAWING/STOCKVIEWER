@@ -6848,8 +6848,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
        );
     }
     if (drawObj.type === 'n-shape') {
-  const A = pts[0]; 
-  const B = pts.length >= 2 ? pts[1] : null; 
+  const A = pts[0];
+  const B = pts.length >= 2 ? pts[1] : null;
   const C = pts.length === 3 ? pts[2] : null;
 
   return (
@@ -6858,65 +6858,60 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
       {/* 1. N 字前兩折虛線 (A -> B, B -> C) */}
       {B && (
-        <line 
-          x1={A.x} y1={A.y} 
-          x2={B.x} y2={B.y} 
-          stroke={drawObj.color || '#ef4444'} 
-          strokeWidth={drawObj.width || 1.5} 
-          strokeDasharray="4,4" 
+        <line
+          x1={A.x} y1={A.y}
+          x2={B.x} y2={B.y}
+          stroke={drawObj.color || '#ef4444'}
+          strokeWidth={drawObj.width || 1.5}
+          strokeDasharray="4,4"
         />
       )}
       {B && C && (
-        <line 
-          x1={B.x} y1={B.y} 
-          x2={C.x} y2={C.y} 
-          stroke={drawObj.color || '#ef4444'} 
-          strokeWidth={drawObj.width || 1.5} 
-          strokeDasharray="4,4" 
+        <line
+          x1={B.x} y1={B.y}
+          x2={C.x} y2={C.y}
+          stroke={drawObj.color || '#ef4444'}
+          strokeWidth={drawObj.width || 1.5}
+          strokeDasharray="4,4"
         />
       )}
 
-      {/* 2. 🌟 費波那契擴展水平線、色塊與主圖右側空白處「直式目標板」 */}
+      {/* 2. 費波那契擴展水平線、色塊與「成交量左側獨立直式目標板」 */}
       {B && C && (() => {
         const rawA = rawPts[0];
         const rawB = rawPts[1];
         const rawC = rawPts[2];
         if (!rawA || !rawB || !rawC) return null;
 
-        // 原始波段高度差 (A 到 B)
         const diffPrice = rawB.price - rawA.price;
 
-        // 費波那契擴展層級設定
         const levels = [
           { lvl: 0,     color: '#94a3b8', bg: '#94a3b8' },
           { lvl: 0.382, color: '#fbbf24', bg: '#f59e0b' },
           { lvl: 0.5,   color: '#4ade80', bg: '#22c55e' },
           { lvl: 0.618, color: '#2dd4bf', bg: '#14b8a6' },
-          { lvl: 0.786, color: '#f87171', bg: '#f43f5e' }, // 關鍵測幅
-          { lvl: 1.0,   color: '#e2e8f0', bg: '#64748b' }, // 等幅 N
-          { lvl: 1.618, color: '#60a5fa', bg: '#3b82f6' }, // 黃金擴展
-          { lvl: 2.0,   color: '#c084fc', bg: '#8b5cf6' }, // 雙倍目標
+          { lvl: 0.786, color: '#f87171', bg: '#f43f5e' },
+          { lvl: 1.0,   color: '#e2e8f0', bg: '#64748b' },
+          { lvl: 1.618, color: '#60a5fa', bg: '#3b82f6' },
+          { lvl: 2.0,   color: '#c084fc', bg: '#8b5cf6' },
         ];
 
-        // 計算各層在畫布上的價格與 Y 座標
         const levelPoints = levels.map(item => {
           const targetPrice = rawC.price + diffPrice * item.lvl;
           const y = typeof getY === 'function' ? getY(targetPrice) : C.y - (item.lvl * 50);
           return { ...item, targetPrice, y };
         });
 
-        // 右邊界延伸至圖表右側邊緣
         const rightX = Math.max(C.x + 80, width - paddingRight);
 
-        // 🌟 直式數值板自動定位：放置在右側空白區（避開走勢與K棒）
-        const cardWidth = 105;
-        const cardHeight = 140;
-        // 優先放在右側邊緣空白處，距離價格軸 10px
-        const cardX = Math.max(10, width - paddingRight - cardWidth - 10);
-        // 垂直置中或貼齊主圖中央偏上，保證不超出頂部與底部
-        const cardY = Math.max(12, Math.min(mainHeight - cardHeight - 12, (mainHeight - cardHeight) / 2));
+        // 直式卡片尺寸
+        const cardWidth = 98;
+        const cardHeight = 126;
 
-        // 直式卡片顯示關鍵擴展層級（由高到低排列，方便對照向上延伸）
+        // 定位在成交量區左側
+        const cardX = (typeof paddingLeft === 'number' ? paddingLeft : 10) + 8;
+        const cardY = (typeof mainHeight === 'number' ? mainHeight : C.y + 30) + 6;
+
         const displayLevels = [
           { label: '2.000', lvl: 2.0,   color: '#c084fc' },
           { label: '1.618', lvl: 1.618, color: '#60a5fa' },
@@ -6930,7 +6925,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
         return (
           <g>
-            {/* 🌈 主圖：彩色層級半透明背景區塊 */}
+            {/* 主圖彩色層級半透明背景 */}
             {levelPoints.slice(0, -1).map((curr, idx) => {
               const next = levelPoints[idx + 1];
               const yTop = Math.min(curr.y, next.y);
@@ -6950,7 +6945,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               );
             })}
 
-            {/* 📏 主圖：水平延伸擴展線與右側標籤 */}
+            {/* 主圖水平延伸擴展線與標籤 */}
             {levelPoints.map((item) => {
               if (item.y < 0 || item.y > mainHeight) return null;
 
@@ -6980,41 +6975,36 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
               );
             })}
 
-            {/* 軸心起始指示點 (C點 0 軸) */}
+            {/* C點 0 軸標記 */}
             <circle cx={C.x} cy={C.y} r="3.5" fill="#38bdf8" />
 
-            {/* 🌟 3. 主圖右側空白處「直式微型目標板」 */}
+            {/* 成交量左側獨立直式目標面板 */}
             <g transform={`translate(${cardX}, ${cardY})`}>
-              {/* 半透明毛玻璃暗色卡片底板 */}
               <rect
                 x="0"
                 y="0"
                 width={cardWidth}
                 height={cardHeight}
-                fill="#0f172a"
-                fillOpacity="0.9"
+                fill="#0b1120"
+                fillOpacity="0.92"
                 rx="6"
-                stroke="#334155"
-                strokeWidth="1"
+                stroke="#38bdf8"
+                strokeWidth="1.2"
               />
-              {/* 卡片頂部小標題 */}
-              <text x={cardWidth / 2} y="16" fill="#38bdf8" fontSize="10.5" fontWeight="bold" textAnchor="middle">
-                N 擴展目標
+              <text x={cardWidth / 2} y="15" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">
+                🎯 N擴展目標
               </text>
-              <line x1="8" y1="22" x2={cardWidth - 8} y2="22" stroke="#334155" strokeWidth="1" />
+              <line x1="6" y1="21" x2={cardWidth - 6} y2="21" stroke="#1e293b" strokeWidth="1" />
 
-              {/* 由高到低整齊排列直式數值 */}
               {displayLevels.map((dl, idx) => {
-                const priceFormatted = dl.targetPrice > 1000 ? Math.round(dl.targetPrice) : dl.targetPrice.toFixed(2);
-                const rowY = 38 + idx * 21;
+                const priceFormatted = dl.targetPrice > 1000 ? Math.round(dl.targetPrice) : dl.targetPrice.toFixed(1);
+                const rowY = 36 + idx * 19;
                 return (
                   <g key={dl.label} transform={`translate(0, ${rowY})`}>
-                    {/* 比例標籤 */}
-                    <text x="10" y="0" fill={dl.color} fontSize="10" fontWeight="bold">
+                    <text x="8" y="0" fill={dl.color} fontSize="9.5" fontWeight="bold">
                       {dl.label}
                     </text>
-                    {/* 目標價格 */}
-                    <text x={cardWidth - 10} y="0" fill="#f8fafc" fontSize="10.5" fontWeight="bold" textAnchor="end">
+                    <text x={cardWidth - 8} y="0" fill="#f8fafc" fontSize="10" fontWeight="bold" textAnchor="end">
                       {priceFormatted}
                     </text>
                   </g>
