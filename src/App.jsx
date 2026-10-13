@@ -7860,6 +7860,83 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 </g>
               );
             })}
+            {/* 🌟 螢幕當前可視範圍之最高價與最低價標籤 (TradingView 高低點風格) */}
+            {(() => {
+              if (!data || data.length === 0) return null;
+
+              // 1. 自動計算畫面目前看到的 K 棒起始與結束索引
+              const sIdx = Math.max(0, Math.floor(data.length - displayCount - rightOffset + (typeof rightMarginBars !== 'undefined' ? rightMarginBars : 0)));
+              const eIdx = Math.min(data.length - 1, Math.ceil(data.length - 1 - rightOffset + (typeof rightMarginBars !== 'undefined' ? rightMarginBars : 0)));
+
+              if (sIdx > eIdx) return null;
+
+              let maxItem = data[sIdx];
+              let minItem = data[sIdx];
+              let maxActualIdx = sIdx;
+              let minActualIdx = sIdx;
+
+              for (let i = sIdx; i <= eIdx; i++) {
+                const item = data[i];
+                if (!item) continue;
+                if (item.high > maxItem.high) {
+                  maxItem = item;
+                  maxActualIdx = i;
+                }
+                if (item.low < minItem.low) {
+                  minItem = item;
+                  minActualIdx = i;
+                }
+              }
+
+              const maxX = getX(maxActualIdx);
+              const maxY = getY(maxItem.high);
+              const minX = getX(minActualIdx);
+              const minY = getY(minItem.low);
+
+              // 超出螢幕左右邊界時不畫，避免破圖
+              const isMaxVisible = maxX >= paddingLeft && maxX <= width - paddingRight;
+              const isMinVisible = minX >= paddingLeft && minX <= width - paddingRight;
+
+              return (
+                <g pointerEvents="none">
+                  {/* 🔴 最高價標籤（顯示在最高影線上方，紅底膠囊 / 俐落文字） */}
+                  {isMaxVisible && (
+                    <g transform={`translate(${maxX}, ${maxY - 8})`}>
+                      <line x1="0" y1="0" x2="0" y2="6" stroke="#ef4444" strokeWidth="1.5" />
+                      <text
+                        x="0"
+                        y="-4"
+                        fill="#ef4444"
+                        fontSize="11"
+                        fontWeight="bold"
+                        textAnchor="middle"
+                        filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.8))"
+                      >
+                        ▼ {maxItem.high > 1000 ? Math.round(maxItem.high) : maxItem.high.toFixed(2)}
+                      </text>
+                    </g>
+                  )}
+
+                  {/* 🟢 最低價標籤（顯示在最低影線下方，綠底膠囊 / 俐落文字） */}
+                  {isMinVisible && (
+                    <g transform={`translate(${minX}, ${minY + 8})`}>
+                      <line x1="0" y1="0" x2="0" y2="-6" stroke="#22c55e" strokeWidth="1.5" />
+                      <text
+                        x="0"
+                        y="14"
+                        fill="#22c55e"
+                        fontSize="11"
+                        fontWeight="bold"
+                        textAnchor="middle"
+                        filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.8))"
+                      >
+                        ▲ {minItem.low > 1000 ? Math.round(minItem.low) : minItem.low.toFixed(2)}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })()}
           </g>
 
           <g transform={`translate(0, ${mainHeight})`} clipPath="url(#chartClip)">
