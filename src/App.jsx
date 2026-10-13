@@ -7860,7 +7860,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                 </g>
               );
             })}
-            {/* 🌟 螢幕當前可視範圍之最高價與最低價標籤 (TradingView 高低點風格) */}
+            {/* 🌟 螢幕當前可視範圍之最高價與最低價標籤（純淨白色無箭頭版） */}
             {(() => {
               if (!data || data.length === 0) return null;
 
@@ -7899,40 +7899,36 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
               return (
                 <g pointerEvents="none">
-                  {/* 🔴 最高價標籤（顯示在最高影線上方，紅底膠囊 / 俐落文字） */}
+                  {/* ⚪ 最高價標籤（無箭頭，半透明柔和白色） */}
                   {isMaxVisible && (
-                    <g transform={`translate(${maxX}, ${maxY - 8})`}>
-                      <line x1="0" y1="0" x2="0" y2="6" stroke="#ef4444" strokeWidth="1.5" />
-                      <text
-                        x="0"
-                        y="-4"
-                        fill="#ef4444"
-                        fontSize="11"
-                        fontWeight="bold"
-                        textAnchor="middle"
-                        filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.8))"
-                      >
-                        ▼ {maxItem.high > 1000 ? Math.round(maxItem.high) : maxItem.high.toFixed(2)}
-                      </text>
-                    </g>
+                    <text
+                      x={maxX}
+                      y={maxY - 6}
+                      fill="#ffffff"
+                      opacity="0.85"
+                      fontSize="11"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.8))"
+                    >
+                      {maxItem.high > 1000 ? Math.round(maxItem.high) : maxItem.high.toFixed(2)}
+                    </text>
                   )}
 
-                  {/* 🟢 最低價標籤（顯示在最低影線下方，綠底膠囊 / 俐落文字） */}
+                  {/* ⚪ 最低價標籤（無箭頭，半透明柔和白色） */}
                   {isMinVisible && (
-                    <g transform={`translate(${minX}, ${minY + 8})`}>
-                      <line x1="0" y1="0" x2="0" y2="-6" stroke="#22c55e" strokeWidth="1.5" />
-                      <text
-                        x="0"
-                        y="14"
-                        fill="#22c55e"
-                        fontSize="11"
-                        fontWeight="bold"
-                        textAnchor="middle"
-                        filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.8))"
-                      >
-                        ▲ {minItem.low > 1000 ? Math.round(minItem.low) : minItem.low.toFixed(2)}
-                      </text>
-                    </g>
+                    <text
+                      x={minX}
+                      y={minY + 14}
+                      fill="#ffffff"
+                      opacity="0.85"
+                      fontSize="11"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.8))"
+                    >
+                      {minItem.low > 1000 ? Math.round(minItem.low) : minItem.low.toFixed(2)}
+                    </text>
                   )}
                 </g>
               );
