@@ -8507,74 +8507,74 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
         </svg>        
       </div>
      </div>
-     {/* 🧑‍🏫 當開啟黑板時，常駐於畫面左下角的純圖示黑板工具箱（使用原生 activeTool 變數，絕不報錯） */}
+      {/* 🧑‍🏫 當開啟黑板時的工具箱（支援手機防切、左右滑動與自適應寬度） */}
       {isBlankMode && (
-        <div className="fixed bottom-6 left-6 z-[999] bg-slate-900/95 backdrop-blur-md border border-cyan-500/80 rounded-xl p-2.5 shadow-[0_0_25px_rgba(6,182,212,0.5)] flex items-center gap-2.5 select-none pointer-events-auto">
-          <span className="text-cyan-400 font-bold text-xs">🧑‍🏫</span>
-          <div className="h-4 w-[1px] bg-slate-700"></div>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[999] max-w-[calc(100vw-20px)] bg-slate-900/95 backdrop-blur-md border border-cyan-500/80 rounded-xl p-2 shadow-[0_0_25px_rgba(6,182,212,0.5)] flex items-center gap-1.5 select-none pointer-events-auto overflow-x-auto [&::-webkit-scrollbar]:hidden shrink-0">
+          <span className="text-cyan-400 font-bold text-xs shrink-0">🧑‍🏫</span>
+          <div className="h-4 w-[1px] bg-slate-700 shrink-0"></div>
 
           {/* 工具選擇：筆、直線、橡皮擦 */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <button 
               onClick={() => { setActiveTool('pen'); setDraftPoints([]); }} 
               title="自由筆" 
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${activeTool === 'pen' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${activeTool === 'pen' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               ✏️
             </button>
             <button 
               onClick={() => { setActiveTool('segment'); setDraftPoints([]); }} 
               title="直線" 
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${activeTool === 'segment' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${activeTool === 'segment' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               📏
             </button>
             <button 
               onClick={() => { setActiveTool('eraser'); setDraftPoints([]); }} 
               title="橡皮擦" 
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${activeTool === 'eraser' ? 'bg-rose-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${activeTool === 'eraser' ? 'bg-rose-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               🧹
             </button>
           </div>
 
-          <div className="h-4 w-[1px] bg-slate-700"></div>
+          <div className="h-4 w-[1px] bg-slate-700 shrink-0"></div>
 
           {/* 調色盤 */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 shrink-0">
             {['#ffffff', '#ef4444', '#eab308', '#22c55e', '#38bdf8', '#a855f7'].map(c => (
               <button 
                 key={c} 
                 onClick={() => setDrawColor(c)} 
                 style={{ backgroundColor: c }} 
-                className={`w-4 h-4 rounded-full border-2 transition-all ${drawColor === c ? 'scale-125 border-white shadow-[0_0_8px_white]' : 'border-transparent hover:scale-110'}`} 
+                className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${drawColor === c ? 'scale-125 border-white shadow-[0_0_8px_white]' : 'border-transparent hover:scale-110'}`} 
               />
             ))}
           </div>
 
-          <div className="h-4 w-[1px] bg-slate-700"></div>
+          <div className="h-4 w-[1px] bg-slate-700 shrink-0"></div>
 
           {/* 粗細 */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             {[2, 4, 7, 10].map(w => (
               <button 
                 key={w} 
                 onClick={() => setDrawWidth(w)} 
                 title={`粗細 ${w}px`} 
-                className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold transition-all ${drawWidth === w ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold transition-all ${drawWidth === w ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
                 {w}
               </button>
             ))}
           </div>
 
-          <div className="h-4 w-[1px] bg-slate-700"></div>
+          <div className="h-4 w-[1px] bg-slate-700 shrink-0"></div>
 
           {/* 清空畫布 */}
           <button 
             onClick={handleClearAll} 
             title="清空畫筆" 
-            className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-800 text-rose-400 hover:bg-rose-950/60 border border-rose-900/50 transition-all text-xs"
+            className="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-800 text-rose-400 hover:bg-rose-950/60 border border-rose-900/50 transition-all text-xs shrink-0"
           >
             🗑️
           </button>
