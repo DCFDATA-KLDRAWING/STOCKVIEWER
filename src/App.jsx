@@ -7273,8 +7273,10 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
                  </div>
              ))}
            </div>
+           {/* 暫時註解 畫板與存圖按鈕，釋放橫向空間
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">📁 畫板</button>
            <button onClick={handleDownloadImage} className="justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">📸 存圖</button>
+           */}
            <button
   onClick={() => setIsChecklistOpen(true)}
   className="justify-center bg-emerald-900/60 border border-emerald-500/80 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center gap-1.5"
