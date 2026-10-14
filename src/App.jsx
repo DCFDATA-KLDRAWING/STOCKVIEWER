@@ -6152,6 +6152,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
     }
 
     if (activeTool === 'cursor') {
+        // 🌟 手機查價時：鎖定畫面禁止拖曳平移
+        const isTouch = Boolean(e.touches && e.touches.length > 0);
+        if (isTouch && toggles.showCrosshair !== false) {
+            dragInfo.current = { isDragging: false };
+            if (typeof handlePointerMove === 'function') handlePointerMove(e);
+            return;
+        }
+
         dragInfo.current = {
             isDragging: true,
             startX: e.touches ? e.touches[0].clientX : e.clientX,
