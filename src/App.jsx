@@ -7267,17 +7267,43 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
            <span className="text-slate-300 text-[11px] font-bold w-5 text-right">{displayCount}</span>
          </div>
 
-          <div className="flex items-center gap-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 shrink-0">
-             <span className="text-[10px] font-bold text-slate-400">切口/供需圖：</span>
-             {['line1', 'line2'].map(key => (
-                 <div key={key} className="flex items-center gap-1 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/60">
-                   <input type="checkbox" checked={gapLevels[key].active} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} className="accent-pink-500 cursor-pointer w-3 h-3" />
-                   <span onClick={() => { setActivePqTarget(key); setPqModalOpen(true); }} className="text-[10px] text-pink-300 font-bold cursor-pointer hover:text-purple-400 hover:underline">{key === 'line1' ? 'L1📊' : 'L2📊'}</span>
-                   <select value={gapLevels[key].priceType} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], priceType: e.target.value}})} className="bg-slate-900 text-[10px] text-white p-0.5 rounded cursor-pointer border border-slate-700"><option value="open">開</option><option value="high">高</option><option value="low">低</option><option value="close">收</option></select>
-                   <input type="date" value={gapLevels[key].date || ''} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], date: e.target.value}})} className="bg-slate-900 text-[10px] text-white p-0.5 rounded w-24 cursor-pointer border border-slate-700" />
-                 </div>
-             ))}
-           </div>
+         {/* 切口與供需圖核心區塊（完整保留 L1/L2 供需圖彈窗點擊） */}
+           <div className="shrink-0 flex items-center gap-1.5 bg-slate-800/80 px-2 py-0.5 rounded-lg border border-slate-700">
+             <span className="text-[10px] font-bold text-slate-400">切口/供需:</span>
+             {['line1', 'line2'].map(key => (
+                 <div key={key} className="flex items-center gap-1 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/60">
+                   <input 
+                     type="checkbox" 
+                     checked={gapLevels[key].active} 
+                     onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} 
+                     className="accent-pink-500 cursor-pointer w-3 h-3" 
+                   />
+                   {/* 🌟 點擊觸發供需圖彈窗（完整保留原本邏輯） */}
+                   <span 
+                     onClick={() => { setActivePqTarget(key); setPqModalOpen(true); }} 
+                     className="text-[10px] text-pink-300 font-bold cursor-pointer hover:text-purple-400 hover:underline"
+                   >
+                     {key === 'line1' ? 'L1📊' : 'L2📊'}
+                   </span>
+                   <select 
+                     value={gapLevels[key].priceType} 
+                     onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], priceType: e.target.value}})} 
+                     className="bg-slate-900 text-[10px] text-white p-0.5 rounded cursor-pointer border border-slate-700 outline-none"
+                   >
+                     <option value="open">開</option>
+                     <option value="high">高</option>
+                     <option value="low">低</option>
+                     <option value="close">收</option>
+                   </select>
+                   <input 
+                     type="date" 
+                     value={gapLevels[key].date || ''} 
+                     onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], date: e.target.value}})} 
+                     className="bg-slate-900 text-[10px] text-white p-0.5 rounded w-20 cursor-pointer border border-slate-700 outline-none" 
+                   />
+                 </div>
+             ))}
+           </div>
 
            {/* 暫時註解 畫板與存圖按鈕，釋放橫向空間 */}
            {/*
