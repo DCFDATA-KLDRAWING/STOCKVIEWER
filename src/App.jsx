@@ -7294,7 +7294,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
              className="shrink-0 justify-center bg-emerald-900/70 border border-emerald-500/80 text-emerald-300 px-2.5 py-1 rounded-lg text-xs font-bold shadow-[0_0_10px_rgba(16,185,129,0.3)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center gap-1"
              title="檢查當前 K 棒是否滿足自訂買入條件"
            >
-             <span>🎯</span> 買入條件
+             <span>🎯</span> 買訊偵測
            </button>
 
            {rankingList && rankingList.length > 0 && (
