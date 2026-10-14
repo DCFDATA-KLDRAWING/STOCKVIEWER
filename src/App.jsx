@@ -7351,7 +7351,12 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
       {/* 緊急結束畫線按鈕 */}
       {activeTool !== 'cursor' && (
-        <button onClick={() => { setActiveTool('cursor'); setDraftPoints([]); }} className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-cyan-800/90 border border-cyan-400 text-cyan-100 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.6)] font-bold backdrop-blur-md hover:bg-cyan-700 transition-all flex items-center gap-2 pointer-events-auto">🖱️ 結束畫線 (返回游標)</button>
+        <button 
+          onClick={() => { setActiveTool('cursor'); setDraftPoints([]); }} 
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[120] bg-slate-900/60 border border-cyan-700/50 text-cyan-200 px-3 py-1 rounded-full shadow-md font-bold text-xs backdrop-blur-sm opacity-50 hover:opacity-100 hover:bg-cyan-900/80 transition-all flex items-center gap-1 pointer-events-auto"
+        >
+          ✕ 結束畫線
+        </button>
       )}
 
       {/* ✨ 6. 【引擎輸出層】加入 touch-pan-y 確保可以上下滾動網頁，但攔截水平滑動 */}
@@ -7412,9 +7417,11 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           ref={scrollContainerRef}
           className={`${isFullscreen ? "flex-1" : ""} flex-1 min-w-0 p-2 pt-1 relative h-full flex flex-col overflow-hidden`}
         >  
+          {/* 暫時隱藏上方提示塊，避免橫向時遮擋主圖 K 線
           {activeTool !== 'cursor' && activeTool !== 'edit' && activeTool !== 'eraser' && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 text-cyan-300 font-bold bg-slate-800/80 backdrop-blur-sm border border-cyan-800 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.2)] text-sm pointer-events-none z-10">✏️ 作圖模式：拖曳放開即畫完</div>
-          )}      
+          )}
+          */}      
 
         <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} 
           className={`select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} 
