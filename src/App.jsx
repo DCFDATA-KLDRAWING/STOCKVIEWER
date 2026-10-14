@@ -7267,7 +7267,17 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
            <span className="text-slate-300 text-[11px] font-bold w-5 text-right">{displayCount}</span>
          </div>
 
-         {/* 切口與供需圖核心區塊（完整保留 L1/L2 供需圖彈窗點擊） */}
+         {/* 2. 右側功能按鈕容器 */}
+         <div className="flex items-center gap-1.5 sm:gap-2 z-10 shrink-0">
+           {/* 🌟 記得保留全螢幕與查價按鈕 */}
+           <button onClick={toggleFullscreen} className="shrink-0 justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">
+             {isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}
+           </button>
+           <button onClick={onToggleCrosshair} className={`shrink-0 justify-center px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center border ${toggles.showCrosshair !== false ? 'bg-pink-900/80 border-pink-500 text-pink-200 shadow-[0_0_8px_rgba(236,72,153,0.4)]' : 'bg-slate-800/80 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-pink-300'}`}>
+             {toggles.showCrosshair !== false ? '🎯 關查價' : '🎯 開查價'}
+           </button>
+
+           {/* 🌟 切口與供需圖核心區塊（完整保留 L1/L2 供需圖彈窗點擊） */}
            <div className="shrink-0 flex items-center gap-1.5 bg-slate-800/80 px-2 py-0.5 rounded-lg border border-slate-700">
              <span className="text-[10px] font-bold text-slate-400">切口/供需:</span>
              {['line1', 'line2'].map(key => (
@@ -7307,8 +7317,8 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
            {/* 暫時註解 畫板與存圖按鈕，釋放橫向空間 */}
            {/*
-           <button onClick={() => setIsLayoutModalOpen(true)} className="shrink-0 justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">📁 畫板</button>
-           <button onClick={handleDownloadImage} className="shrink-0 justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">📸 存圖</button>
+           <button onClick={() => setIsLayoutModalOpen(true)} className="...">📁 畫板</button>
+           <button onClick={handleDownloadImage} className="...">📸 存圖</button>
            */}
 
            <button
