@@ -2079,7 +2079,6 @@ const getFullName = (input) => {
 };
 
 // === 客製化無敵彈窗 ===
-// === 客製化無敵彈窗 ===
 const CustomModal = ({ modal }) => {
   if (!modal) return null;
   return (
@@ -6316,7 +6315,137 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
       }
     }
   };
+  
+  // 🎯 1. 買入條件檢核器狀態管理
+  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+  const [conditions, setConditions] = useState([
+    { id: 'c_ma20', name: '站在 20MA (月線) 上方', type: 'ma', period: 20, enabled: true },
+    { id: 'c_ma60', name: '站在 60MA (季線) 上方', type: 'ma', period: 60, enabled: true },
+    { id: 'c_ma100', name: '站在 100MA 上方', type: 'ma', period: 100, enabled: false },
+    { id: 'c_vma5', name: '成交量 >= 5日均量', type: 'vol_vma', enabled: true },
+    { id: 'c_vol1000', name: '成交量 >= 1000 張', type: 'vol_min', minVol: 1000, enabled: true },
+    { id: 'c_break_line', name: '實體紅K突破手繪切線 (站上50%以上)', type: 'break_line', thresholdPct: 50, enabled: true },
+    { id: 'c_tianji', name: '近期 (5日內) 出現天機模型 (1~5)', type: 'tianji', days: 5, models: [1, 2, 3, 4, 5], enabled: true },
+  ]);
+  const [newCondType, setNewCondType] = useState('ma');
+  const [newCondParam, setNewCondParam] = useState(240);
 
+  // 🧠 2. 買入條件動態判斷計算函式
+  const evaluateBuyConditions = (targetBarIdx) => {
+    if (!data || data.length === 0) return { results: [], totalEnabled: 0, passCount: 0 };
+
+    const idx = targetBarIdx ?? (crosshair && crosshair.idx !== undefined ? crosshair.idx : data.length - 1);
+    const bar = data[idx];
+    if (!bar) return { results: [], totalEnabled: 0, passCount: 0 };
+
+    // 抓取畫布上的最新一條手繪趨勢切線 (trend 或 segment)
+    const activeLines = drawings ? drawings.filter(d => d.type === 'trend' || d.type === 'segment') : [];
+    const latestLine = activeLines.length > 0 ? activeLines[activeLines.length - 1] : null;
+
+    let linePriceAtBar = null;
+    if (latestLine && latestLine.points && latestLine.points.length >= 2) {
+      const p1 = latestLine.points[0];
+      const p2 = latestLine.points[1];
+      const idx1 = data.length - 1 - (p1.idxFromEnd ?? 0);
+      const idx2 = data.length - 1 - (p2.idxFromEnd ?? 0);
+      if (idx1 !== idx2) {
+        const slope = (p2.price - p1.price) / (idx2 - idx1);
+        linePriceAtBar = p1.price + slope * (idx - idx1);
+      }
+    }
+
+    const results = conditions.map(c => {
+      if (!c.enabled) return { ...c, pass: null, reason: '未啟用' };
+
+      let pass = false;
+      let reason = '';
+
+      switch (c.type) {
+        case 'ma': {
+          const maVal = bar[`ma${c.period}`] ?? bar[`fixedMa${c.period}`];
+          if (maVal !== undefined && maVal !== null) {
+            pass = bar.close >= maVal;
+            reason = `收盤 ${bar.close.toFixed(2)} ${pass ? '≥' : '<'} MA${c.period} (${maVal.toFixed(2)})`;
+          } else {
+            reason = `無 MA${c.period} 數據`;
+          }
+          break;
+        }
+
+        case 'vol_vma': {
+          const vma5 = bar.vma1 ?? bar.vma5;
+          if (vma5 !== undefined && vma5 !== null) {
+            pass = bar.volume >= vma5;
+            reason = `量 ${bar.volume} ${pass ? '≥' : '<'} 5日均量 (${Math.round(vma5)})`;
+          } else {
+            reason = '無均量數據';
+          }
+          break;
+        }
+
+        case 'vol_min': {
+          pass = bar.volume >= (c.minVol || 1000);
+          reason = `量 ${bar.volume} ${pass ? '≥' : '<'} ${c.minVol || 1000} 張`;
+          break;
+        }
+
+        case 'break_line': {
+          if (linePriceAtBar === null) {
+            pass = false;
+            reason = '畫布上未找到趨勢切線';
+          } else {
+            const bodyBottom = Math.min(bar.open, bar.close);
+            const bodyTop = Math.max(bar.open, bar.close);
+            const isRed = bar.close >= bar.open;
+
+            if (!isRed) {
+              pass = false;
+              reason = `黑K未站上 (切線價: ${linePriceAtBar.toFixed(2)})`;
+            } else if (bodyBottom >= linePriceAtBar) {
+              pass = true;
+              reason = `全實體完全站上切線 (${linePriceAtBar.toFixed(2)})`;
+            } else if (bodyTop <= linePriceAtBar) {
+              pass = false;
+              reason = `實體完全在切線下方 (${linePriceAtBar.toFixed(2)})`;
+            } else {
+              const bodyHeight = bodyTop - bodyBottom;
+              const abovePart = bodyTop - linePriceAtBar;
+              const pct = (abovePart / bodyHeight) * 100;
+              const targetPct = c.thresholdPct || 50;
+              pass = pct >= targetPct;
+              reason = `實體突破 ${pct.toFixed(0)}% (${pass ? '≥' : '<'} 目標 ${targetPct}%)`;
+            }
+          }
+          break;
+        }
+
+        case 'tianji': {
+          const checkDays = c.days || 5;
+          const startSearch = Math.max(0, idx - checkDays + 1);
+          let foundModel = null;
+          for (let k = idx; k >= startSearch; k--) {
+            const dItem = data[k];
+            if (dItem && (dItem.tianjiModel || dItem.customMarks)) {
+              foundModel = dItem.tianjiModel || (dItem.customMarks && dItem.customMarks[0]);
+              if (foundModel) break;
+            }
+          }
+          pass = !!foundModel;
+          reason = pass ? `發現「${foundModel}」` : `近 ${checkDays} 日內無指定天機模型`;
+          break;
+        }
+
+        default:
+          reason = '未知條件';
+      }
+
+      return { ...c, pass, reason };
+    });
+
+    const activeConds = results.filter(r => r.enabled);
+    const passCount = activeConds.filter(r => r.pass).length;
+    return { results, totalEnabled: activeConds.length, passCount, targetBar: bar };
+  };
   const handleDownloadImage = () => {
     setCrosshair(null); setHoverPoint(null);
     setTimeout(() => {
@@ -7146,6 +7275,13 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
            </div>
            <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">📁 畫板</button>
            <button onClick={handleDownloadImage} className="justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">📸 存圖</button>
+           <button
+  onClick={() => setIsChecklistOpen(true)}
+  className="justify-center bg-emerald-900/60 border border-emerald-500/80 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center gap-1.5"
+  title="檢查當前 K 棒是否滿足自訂買入條件"
+>
+  <span>🎯</span> 買入條件檢核
+</button>
            {rankingList && rankingList.length > 0 && <button onClick={onOpenRanking} className="justify-center bg-pink-900/50 border border-pink-700 text-pink-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(236,72,153,0.2)] hover:bg-pink-800 whitespace-nowrap transition-all flex items-center">🏆 漲幅排行</button>}
            {watchlist && onToggleWatchlist && (
              <button onClick={(e) => { e.stopPropagation(); onToggleWatchlist(realSymbol, stockName); }} className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all border ${watchlist.some(s => s.symbol === realSymbol) ? 'bg-amber-900/40 text-amber-300 border-amber-700/50 hover:bg-amber-800/60' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'}`}>
@@ -7356,7 +7492,151 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
           </div>
         </div>
       )}
+      
+      {/* 🎯 買入條件偵測與管理儀表板 */}
+      {isChecklistOpen && (() => {
+        const { results, totalEnabled, passCount, targetBar } = evaluateBuyConditions();
+        const scorePct = totalEnabled > 0 ? Math.round((passCount / totalEnabled) * 100) : 0;
+        const allPass = totalEnabled > 0 && passCount === totalEnabled;
 
+        return (
+          <div className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 pointer-events-auto">
+            <div className="bg-[#0f172a] border border-emerald-600/80 shadow-[0_0_35px_rgba(16,185,129,0.35)] rounded-2xl w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+              
+              {/* 頂部標題與目前檢查目標 */}
+              <div className="p-4 border-b border-slate-700 bg-slate-900/80 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                    <span>🎯</span> 買入戰術條件偵測器
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    檢核基準 K 線：<span className="text-cyan-300 font-bold">{targetBar?.date || '最新K棒'}</span> (收: {targetBar?.close})
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsChecklistOpen(false)}
+                  className="text-slate-400 hover:text-white bg-slate-800 px-3 py-1 rounded-lg text-sm font-bold"
+                >
+                  ✕ 關閉
+                </button>
+              </div>
+
+              {/* 即時得分大儀表 */}
+              <div className="p-3 bg-slate-950/50 border-b border-slate-800 flex items-center justify-between px-5">
+                <div className="flex items-center gap-3">
+                  <div className={`text-2xl font-black ${allPass ? 'text-emerald-400' : scorePct >= 60 ? 'text-amber-400' : 'text-rose-400'}`}>
+                    {scorePct}%
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    <div>達成率：<span className="font-bold text-white">{passCount} / {totalEnabled}</span> 項條件</div>
+                    <div className="text-[10px] text-slate-500">{allPass ? '✨ 完美共振，強烈多頭訊號！' : '⚠️ 尚有條件未達標，請嚴守紀律'}</div>
+                  </div>
+                </div>
+                {allPass && (
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 text-xs px-3 py-1 rounded-full font-bold animate-pulse">
+                    🔥 條件全數吻合
+                  </span>
+                )}
+              </div>
+
+              {/* 條件列表（支援勾選、刪除） */}
+              <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-2.5">
+                {results.map((c, idx) => (
+                  <div
+                    key={c.id}
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-colors ${
+                      !c.enabled ? 'bg-slate-900/40 border-slate-800 opacity-50' : c.pass ? 'bg-emerald-950/20 border-emerald-700/60' : 'bg-rose-950/20 border-rose-800/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      {/* 開關勾選 */}
+                      <input
+                        type="checkbox"
+                        checked={c.enabled}
+                        onChange={(e) => {
+                          const updated = [...conditions];
+                          updated[idx].enabled = e.target.checked;
+                          setConditions(updated);
+                        }}
+                        className="accent-emerald-500 w-4 h-4 cursor-pointer"
+                        title="啟用 / 停用此條件"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-200">{c.name}</span>
+                        {c.enabled && (
+                          <span className={`text-xs mt-0.5 font-mono ${c.pass ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {c.reason}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {c.enabled && (
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${c.pass ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+                          {c.pass ? '✓ 符合' : '✗ 未達'}
+                        </span>
+                      )}
+                      {/* 刪除按鈕 */}
+                      <button
+                        onClick={() => setConditions(conditions.filter(item => item.id !== c.id))}
+                        className="text-slate-500 hover:text-rose-400 text-sm px-1.5 py-0.5 rounded"
+                        title="刪除條件"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 底部新增自訂條件列 */}
+              <div className="p-3 border-t border-slate-800 bg-slate-900/90 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-400 font-bold">➕ 增設條件:</span>
+                <select
+                  value={newCondType}
+                  onChange={(e) => setNewCondType(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded p-1.5 outline-none font-bold"
+                >
+                  <option value="ma">均線之上 (MA)</option>
+                  <option value="vol_min">最低成交量 (張)</option>
+                  <option value="break_line">破切線突破比例 (%)</option>
+                  <option value="tianji">天機模型偵測</option>
+                </select>
+
+                <input
+                  type="number"
+                  value={newCondParam}
+                  onChange={(e) => setNewCondParam(Number(e.target.value))}
+                  placeholder="參數值"
+                  className="w-20 bg-slate-800 border border-slate-700 text-xs text-cyan-300 p-1.5 rounded outline-none font-bold"
+                />
+
+                <button
+                  onClick={() => {
+                    let newCond = null;
+                    const id = 'custom_' + Date.now();
+                    if (newCondType === 'ma') {
+                      newCond = { id, name: `站在 ${newCondParam}MA 上方`, type: 'ma', period: newCondParam, enabled: true };
+                    } else if (newCondType === 'vol_min') {
+                      newCond = { id, name: `成交量 >= ${newCondParam} 張`, type: 'vol_min', minVol: newCondParam, enabled: true };
+                    } else if (newCondType === 'break_line') {
+                      newCond = { id, name: `實體紅K破切 >= ${newCondParam}%`, type: 'break_line', thresholdPct: newCondParam, enabled: true };
+                    } else if (newCondType === 'tianji') {
+                      newCond = { id, name: `近 ${newCondParam} 日內具備天機模型`, type: 'tianji', days: newCondParam, models: [1,2,3,4,5], enabled: true };
+                    }
+                    if (newCond) setConditions([...conditions, newCond]);
+                  }}
+                  className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold shadow transition-all ml-auto"
+                >
+                  新增
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
       {/* 緊急結束畫線按鈕 */}
       {activeTool !== 'cursor' && (
         <button 
