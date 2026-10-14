@@ -7251,46 +7251,65 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
         </>
       )}
 
-      {/* 次級功能列 */}
-      <div className="flex items-center justify-between px-2 sm:px-3 py-2 shrink-0 border-b border-cyan-900/50 bg-slate-900/60 relative z-20 shadow-sm overflow-x-auto [&::-webkit-scrollbar]:hidden w-full">
-         <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-600 shrink-0 shadow-inner mr-auto">
-           <span className="text-cyan-400 text-xs font-bold whitespace-nowrap">🔎 視角</span>
-           <input type="range" min="30" max="230" step="10" value={displayCount} onChange={(e) => setDisplayCount(Number(e.target.value))} className="w-20 sm:w-32 accent-cyan-500 cursor-pointer" />
-           <span className="text-slate-300 text-xs font-bold w-6">{displayCount}</span>
+      {/* 次級功能列：支援電腦滾輪水平滾動 + 顯示微型導引條，保證能看到右側 */}
+      <div 
+        onWheel={(e) => {
+          if (e.deltaY !== 0) {
+            e.currentTarget.scrollLeft += e.deltaY;
+          }
+        }}
+        className="flex items-center justify-between gap-2 px-2 sm:px-3 py-1.5 shrink-0 border-b border-cyan-900/50 bg-slate-900/80 relative z-20 shadow-sm overflow-x-auto w-full select-none [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-cyan-700/60 hover:[&::-webkit-scrollbar-thumb]:bg-cyan-500"
+      >
+         {/* 1. 視角滑桿（緊湊化） */}
+         <div className="flex items-center gap-1 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-600 shrink-0 shadow-inner">
+           <span className="text-cyan-400 text-[11px] font-bold whitespace-nowrap">🔎</span>
+           <input type="range" min="30" max="230" step="10" value={displayCount} onChange={(e) => setDisplayCount(Number(e.target.value))} className="w-16 sm:w-20 accent-cyan-500 cursor-pointer h-1.5" />
+           <span className="text-slate-300 text-[11px] font-bold w-5 text-right">{displayCount}</span>
          </div>
-         <div className="flex gap-1.5 sm:gap-2 z-10 shrink-0">
-           <button onClick={toggleFullscreen} className="justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.2)] hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">{isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}</button>
-           <button onClick={onToggleCrosshair} className={`justify-center px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center border ${toggles.showCrosshair !== false ? 'bg-pink-900/80 border-pink-500 text-pink-200 shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'bg-slate-800/80 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-pink-300'}`}>{toggles.showCrosshair !== false ? '🎯 關查價' : '🎯 開查價'}</button>
+
+         <div className="flex items-center gap-1.5 sm:gap-2 z-10 shrink-0">
+           <button onClick={toggleFullscreen} className="shrink-0 justify-center bg-slate-800/80 border border-slate-600 text-cyan-400 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-slate-700 whitespace-nowrap transition-all flex items-center">{isFullscreen ? '↙️ 退出' : '🔲 翻轉/全螢幕'}</button>
+           <button onClick={onToggleCrosshair} className={`shrink-0 justify-center px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center border ${toggles.showCrosshair !== false ? 'bg-pink-900/80 border-pink-500 text-pink-200 shadow-[0_0_8px_rgba(236,72,153,0.4)]' : 'bg-slate-800/80 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-pink-300'}`}>{toggles.showCrosshair !== false ? '🎯 關查價' : '🎯 開查價'}</button>
            
-           <div className="flex items-center gap-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 shrink-0">
-             <span className="text-[10px] font-bold text-slate-400">切口/供需圖：</span>
+           <div className="shrink-0 flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.5 rounded-lg border border-slate-700">
+             <span className="text-[10px] font-bold text-slate-400">📊切口:</span>
              {['line1', 'line2'].map(key => (
-                 <div key={key} className="flex items-center gap-1 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/60">
+                 <div key={key} className="flex items-center gap-0.5 bg-slate-900/60 px-1 py-0.5 rounded border border-slate-700/60">
                    <input type="checkbox" checked={gapLevels[key].active} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], active: e.target.checked}})} className="accent-pink-500 cursor-pointer w-3 h-3" />
-                   <span onClick={() => { setActivePqTarget(key); setPqModalOpen(true); }} className="text-[10px] text-pink-300 font-bold cursor-pointer hover:text-purple-400 hover:underline">{key === 'line1' ? 'L1📊' : 'L2📊'}</span>
+                   <span onClick={() => { setActivePqTarget(key); setPqModalOpen(true); }} className="text-[10px] text-pink-300 font-bold cursor-pointer hover:text-purple-400 hover:underline">{key === 'line1' ? 'L1' : 'L2'}</span>
                    <select value={gapLevels[key].priceType} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], priceType: e.target.value}})} className="bg-slate-900 text-[10px] text-white p-0.5 rounded cursor-pointer border border-slate-700"><option value="open">開</option><option value="high">高</option><option value="low">低</option><option value="close">收</option></select>
-                   <input type="date" value={gapLevels[key].date || ''} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], date: e.target.value}})} className="bg-slate-900 text-[10px] text-white p-0.5 rounded w-24 cursor-pointer border border-slate-700" />
+                   <input type="date" value={gapLevels[key].date || ''} onChange={e => setGapLevels({...gapLevels, [key]: {...gapLevels[key], date: e.target.value}})} className="bg-slate-900 text-[10px] text-white p-0.5 rounded w-20 cursor-pointer border border-slate-700" />
                  </div>
              ))}
            </div>
-           {/* 暫時註解 畫板與存圖按鈕，釋放橫向空間
-           <button onClick={() => setIsLayoutModalOpen(true)} className="justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">📁 畫板</button>
-           <button onClick={handleDownloadImage} className="justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">📸 存圖</button>
+
+           {/* 暫時註解 畫板與存圖按鈕，釋放橫向空間 */}
+           {/*
+           <button onClick={() => setIsLayoutModalOpen(true)} className="shrink-0 justify-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-indigo-800 whitespace-nowrap transition-all flex items-center">📁 畫板</button>
+           <button onClick={handleDownloadImage} className="shrink-0 justify-center bg-cyan-900/50 border border-cyan-700 text-cyan-300 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-cyan-800 whitespace-nowrap transition-all flex items-center">📸 存圖</button>
            */}
+
            <button
-  onClick={() => setIsChecklistOpen(true)}
-  className="justify-center bg-emerald-900/60 border border-emerald-500/80 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center gap-1.5"
-  title="檢查當前 K 棒是否滿足自訂買入條件"
->
-  <span>🎯</span> 買入條件檢核
-</button>
-           {rankingList && rankingList.length > 0 && <button onClick={onOpenRanking} className="justify-center bg-pink-900/50 border border-pink-700 text-pink-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(236,72,153,0.2)] hover:bg-pink-800 whitespace-nowrap transition-all flex items-center">🏆 漲幅排行</button>}
+             onClick={() => setIsChecklistOpen(true)}
+             className="shrink-0 justify-center bg-emerald-900/70 border border-emerald-500/80 text-emerald-300 px-2.5 py-1 rounded-lg text-xs font-bold shadow-[0_0_10px_rgba(16,185,129,0.3)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center gap-1"
+             title="檢查當前 K 棒是否滿足自訂買入條件"
+           >
+             <span>🎯</span> 買入條件
+           </button>
+
+           {rankingList && rankingList.length > 0 && (
+             <button onClick={onOpenRanking} className="shrink-0 justify-center bg-pink-900/60 border border-pink-700 text-pink-300 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold shadow-[0_0_8px_rgba(236,72,153,0.2)] hover:bg-pink-800 whitespace-nowrap transition-all flex items-center">
+               🏆 排行
+             </button>
+           )}
+
            {watchlist && onToggleWatchlist && (
-             <button onClick={(e) => { e.stopPropagation(); onToggleWatchlist(realSymbol, stockName); }} className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all border ${watchlist.some(s => s.symbol === realSymbol) ? 'bg-amber-900/40 text-amber-300 border-amber-700/50 hover:bg-amber-800/60' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'}`}>
-               <span>{watchlist.some(s => s.symbol === realSymbol) ? '🌟' : '⭐'}</span><span className="hidden sm:inline">{watchlist.some(s => s.symbol === realSymbol) ? '已在自選' : '加入自選'}</span>
+             <button onClick={(e) => { e.stopPropagation(); onToggleWatchlist(realSymbol, stockName); }} className={`shrink-0 flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg transition-all border ${watchlist.some(s => s.symbol === realSymbol) ? 'bg-amber-900/40 text-amber-300 border-amber-700/50 hover:bg-amber-800/60' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'}`}>
+               <span>{watchlist.some(s => s.symbol === realSymbol) ? '🌟' : '⭐'}</span>
+               <span className="hidden sm:inline">{watchlist.some(s => s.symbol === realSymbol) ? '已在自選' : '加入自選'}</span>
              </button>
            )} 
-         </div>         
+         </div>          
       </div>
 
       {/* 工具箱 */}
