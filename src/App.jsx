@@ -6330,6 +6330,452 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
   const [newCondType, setNewCondType] = useState('ma');
   const [newCondParam, setNewCondParam] = useState(240);
 
+  /* STREAMING_CHUNK:Declaring Tianji pattern recognition helper algorithms */
+/**
+ * 🎯 天機量化分析系統 - 形態辨識核心模組 (Tianji Pattern Recognizer)
+ * 涵蓋模型 1 ~ 模型 4 的波段量化、均線斜率、大量防守點與洗籌末端買點辨識
+ */
+
+/**
+ * 尋找歷史 K 線的區域極值波段轉折點 (ZigZag Swing Points)
+ */
+const findLocalExtremes = (data, startIdx, endIdx, window = 2) => {
+  const extremes = [];
+  const s = Math.max(window, startIdx);
+  const e = Math.min(data.length - 1 - window, endIdx);
+
+  for (let i = s; i <= e; i++) {
+    const cur = data[i];
+    let isHigh = true;
+    let isLow = true;
+
+    for (let w = 1; w <= window; w++) {
+      if (data[i - w].high > cur.high || data[i + w].high > cur.high) isHigh = false;
+      if (data[i - w].low < cur.low || data[i + w].low < cur.low) isLow = false;
+    }
+
+    if (isHigh) {
+      extremes.push({ idx: i, type: 'peak', price: cur.high, date: cur.date, volume: cur.volume });
+    } else if (isLow) {
+      extremes.push({ idx: i, type: 'trough', price: cur.low, date: cur.date, volume: cur.volume });
+    }
+  }
+
+  // 緊鄰同性質極值去重（連續多個 peak 保留最高者，連續多個 trough 保留最低者）
+  const filtered = [];
+  for (const pt of extremes) {
+    if (filtered.length === 0) {
+      filtered.push(pt);
+      continue;
+    }
+    const last = filtered[filtered.length - 1];
+    if (last.type === pt.type) {
+      if (pt.type === 'peak' && pt.price > last.price) {
+        filtered[filtered.length - 1] = pt;
+      } else if (pt.type === 'trough' && pt.price < last.price) {
+        filtered[filtered.length - 1] = pt;
+      }
+    } else {
+      filtered.push(pt);
+    }
+  }
+
+  return filtered;
+};
+
+/**
+ * 提取通用基礎條件：
+ * 1. 週 20MA (日線對應約 100MA) 支撐與斜率
+ * 2. 左側吸籌波段的最大量與次大量防守價位
+ */
+const extractBaseMetrics = (data, currentIdx) => {
+  const bar = data[currentIdx];
+  if (!bar) return null;
+
+  // 1. 週 20MA 檢測 (日線取 100MA 或 fixedMa100)
+  const w20ma = bar.fixedMa100 ?? bar.ma100 ?? bar.ma5 ?? bar.close;
+  const prevW20ma = (data[Math.max(0, currentIdx - 5)]?.fixedMa100 ?? data[Math.max(0, currentIdx - 5)]?.ma100) || w20ma;
+  const isAboveW20MA = bar.close >= w20ma * 0.98; // 容許極限 2% 影線測試
+  const isW20MASlopeUp = w20ma >= prevW20ma * 0.998; // 斜率翻揚或走平
+
+  // 2. 左側吸籌區搜尋 (向前抓 15~80 根 K 棒)
+  const lookbackStart = Math.max(0, currentIdx - 80);
+  const lookbackEnd = Math.max(0, currentIdx - 10);
+
+  let maxVolBar = null;
+  let secondVolBar = null;
+  let accumHighestPrice = -Infinity;
+  let accumLowestPrice = Infinity;
+
+  for (let i = lookbackStart; i <= lookbackEnd; i++) {
+    const d = data[i];
+    if (!d) continue;
+
+    if (d.high > accumHighestPrice) accumHighestPrice = d.high;
+    if (d.low < accumLowestPrice) accumLowestPrice = d.low;
+
+    if (!maxVolBar || d.volume > maxVolBar.volume) {
+      secondVolBar = maxVolBar;
+      maxVolBar = d;
+    } else if (!secondVolBar || d.volume > secondVolBar.volume) {
+      secondVolBar = d;
+    }
+  }
+
+  // 大量與次大量的實體防守價位 (取實體下緣 min(open, close))
+  const maxVolSupport = maxVolBar ? Math.min(maxVolBar.open, maxVolBar.close) : 0;
+  const secondVolSupport = secondVolBar ? Math.min(secondVolBar.open, secondVolBar.close) : 0;
+  const keyVolumeBaseline = Math.min(maxVolSupport, secondVolSupport);
+  const isAboveKeyVolSupport = bar.close >= keyVolumeBaseline * 0.97;
+
+  return {
+    bar,
+    w20ma,
+    isAboveW20MA,
+    isW20MASlopeUp,
+    maxVolBar,
+    secondVolBar,
+    keyVolumeBaseline,
+    isAboveKeyVolSupport,
+    accumHighestPrice,
+    accumLowestPrice,
+    lookbackStart,
+    lookbackEnd
+  };
+};
+
+/**
+ * 🎯 天機模型 1：主力吸籌 -> ABC 深回洗盤 (不破週20MA) -> 橫盤不破前低 (Higher Lows) 補倉 -> 洗籌末端
+ */
+const detectTianjiModel1 = (data, targetIdx) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
+  const base = extractBaseMetrics(data, currentIdx);
+  if (!base || currentIdx < 50) return { isHit: false, score: 0, reason: '歷史數據不足' };
+
+  const details = [];
+
+  details.push({
+    name: '週 20MA 趨勢支撐',
+    pass: base.isAboveW20MA && base.isW20MASlopeUp,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})，斜率${base.isW20MASlopeUp ? '平揚' : '下彎'}`
+  });
+
+  details.push({
+    name: '守住吸籌段大量防守價',
+    pass: base.isAboveKeyVolSupport && base.maxVolBar !== null,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量低點 (${base.keyVolumeBaseline.toFixed(2)})`
+  });
+
+  const extremes = findLocalExtremes(data, base.lookbackStart, currentIdx, 2);
+  const troughs = extremes.filter(e => e.type === 'trough');
+  const recentTroughs = troughs.slice(-3);
+  let isHigherLows = true;
+  if (recentTroughs.length >= 2) {
+    for (let i = 1; i < recentTroughs.length; i++) {
+      if (recentTroughs[i].price < recentTroughs[i - 1].price * 0.985) {
+        isHigherLows = false;
+      }
+    }
+  }
+
+  const recentWashBars = data.slice(Math.max(0, currentIdx - 15), currentIdx + 1);
+  const recentAvgVol = recentWashBars.reduce((s, b) => s + b.volume, 0) / recentWashBars.length;
+  const isVolDryUp = base.maxVolBar ? recentAvgVol < base.maxVolBar.volume * 0.65 : false;
+
+  details.push({
+    name: '深回洗籌縮量且低點墊高',
+    pass: isVolDryUp && isHigherLows,
+    desc: `洗籌均量比大量縮 ${base.maxVolBar ? Math.round((1 - recentAvgVol / base.maxVolBar.volume) * 100) : 0}%，轉折低點墊高：${isHigherLows ? '符合' : '破前低'}`
+  });
+
+  const ma5 = base.bar.ma1 ?? base.bar.ma5 ?? base.bar.close;
+  const isTurnUp = base.bar.close >= ma5 && base.bar.close >= base.bar.open;
+  details.push({
+    name: '洗籌末端轉折紅 K (站上5MA)',
+    pass: isTurnUp,
+    desc: `收盤 ${base.bar.close.toFixed(2)} ${isTurnUp ? '已站上' : '未站上'} 5MA 啟動位`
+  });
+
+  const passCount = details.filter(d => d.pass).length;
+  const score = Math.round((passCount / details.length) * 100);
+
+  return {
+    modelType: 1,
+    modelName: '天機模型 1 (ABC深回洗盤·築底轉折)',
+    isHit: score >= 75,
+    score,
+    details,
+    keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: base.keyVolumeBaseline }
+  };
+};
+
+/**
+ * 🎯 天機模型 2：吸籌結束 -> 淺回強勢平台/奔走型 ABC (B過A跌幅一半甚至破A高, C回測不破A轉B低點) -> 洗籌末端
+ */
+const detectTianjiModel2 = (data, targetIdx) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
+  const base = extractBaseMetrics(data, currentIdx);
+  if (!base || currentIdx < 50) return { isHit: false, score: 0, reason: '歷史數據不足' };
+
+  const details = [];
+
+  details.push({
+    name: '週 20MA 趨勢支撐',
+    pass: base.isAboveW20MA && base.isW20MASlopeUp,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})`
+  });
+
+  details.push({
+    name: '洗籌末端守在大量之上',
+    pass: base.isAboveKeyVolSupport,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量低點 (${base.keyVolumeBaseline.toFixed(2)})`
+  });
+
+  const extremes = findLocalExtremes(data, base.lookbackStart, currentIdx, 2);
+  const peaks = extremes.filter(e => e.type === 'peak');
+  const troughs = extremes.filter(e => e.type === 'trough');
+
+  let isPlatformBStrong = false;
+  let isCAboveAFloor = false;
+
+  if (peaks.length >= 2 && troughs.length >= 2) {
+    const topOfAccum = peaks[peaks.length - 2];
+    const dropA = troughs[troughs.length - 2];
+    const bounceB = peaks[peaks.length - 1];
+    const dropC = troughs[troughs.length - 1];
+
+    if (topOfAccum && dropA && bounceB) {
+      const dropRangeA = topOfAccum.price - dropA.price;
+      const bounceRangeB = bounceB.price - dropA.price;
+      isPlatformBStrong = bounceRangeB >= dropRangeA * 0.48;
+    }
+
+    if (dropC && dropA) {
+      isCAboveAFloor = dropC.price >= dropA.price * 0.985;
+    }
+  } else {
+    const recentHigh = Math.max(...data.slice(currentIdx - 20, currentIdx + 1).map(b => b.high));
+    const recentLow = Math.min(...data.slice(currentIdx - 20, currentIdx + 1).map(b => b.low));
+    isPlatformBStrong = (recentHigh - recentLow) / recentLow <= 0.16;
+    isCAboveAFloor = base.bar.close >= recentLow * 0.99;
+  }
+
+  details.push({
+    name: '強勢平台回調 (B反彈強 + C淺回不破底)',
+    pass: isPlatformBStrong && isCAboveAFloor,
+    desc: `B反彈強度：${isPlatformBStrong ? '強勢(≥50%或過高)' : '偏弱'}，C回洗低點：${isCAboveAFloor ? '守住A低' : '破底'}`
+  });
+
+  const cBars = data.slice(Math.max(0, currentIdx - 8), currentIdx + 1);
+  const avgCVol = cBars.reduce((s, b) => s + b.volume, 0) / cBars.length;
+  const isCVolDry = base.maxVolBar ? avgCVol < base.maxVolBar.volume * 0.6 : false;
+  const isRedBreak = base.bar.close > base.bar.open && base.bar.close >= (base.bar.ma5 ?? base.bar.close);
+
+  details.push({
+    name: 'C浪量縮洗籌完畢與轉折紅 K',
+    pass: isCVolDry && isRedBreak,
+    desc: `C浪洗籌縮量：${isCVolDry ? '顯著萎縮' : '仍有量'}，轉折站上5MA：${isRedBreak ? '符合' : '未達'}`
+  });
+
+  const passCount = details.filter(d => d.pass).length;
+  const score = Math.round((passCount / details.length) * 100);
+
+  return {
+    modelType: 2,
+    modelName: '天機模型 2 (淺回平台/奔走·強勢補倉)',
+    isHit: score >= 75,
+    score,
+    details,
+    keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: base.keyVolumeBaseline }
+  };
+};
+
+/**
+ * 🎯 天機模型 3：吸籌結束 -> ABCD 收斂對稱/下降三角形洗盤
+ */
+const detectTianjiModel3 = (data, targetIdx) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
+  const base = extractBaseMetrics(data, currentIdx);
+  if (!base || currentIdx < 50) return { isHit: false, score: 0, reason: '歷史數據不足' };
+
+  const details = [];
+
+  details.push({
+    name: '週 20MA 趨勢支撐',
+    pass: base.isAboveW20MA && base.isW20MASlopeUp,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})`
+  });
+
+  details.push({
+    name: '收斂低點守在大量之上',
+    pass: base.isAboveKeyVolSupport,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量防守線 (${base.keyVolumeBaseline.toFixed(2)})`
+  });
+
+  const extremes = findLocalExtremes(data, Math.max(0, currentIdx - 35), currentIdx, 2);
+  const peaks = extremes.filter(e => e.type === 'peak');
+  const troughs = extremes.filter(e => e.type === 'trough');
+
+  let isPeaksDescending = false;
+  let isTroughsSupported = false;
+  let isRangeContracting = false;
+
+  if (peaks.length >= 2) {
+    const firstPeak = peaks[0];
+    const latestPeak = peaks[peaks.length - 1];
+    isPeaksDescending = latestPeak.price <= firstPeak.price * 1.01;
+  }
+
+  if (troughs.length >= 2) {
+    const firstTrough = troughs[0];
+    const latestTrough = troughs[troughs.length - 1];
+    isTroughsSupported = latestTrough.price >= firstTrough.price * 0.98;
+  }
+
+  const olderBars = data.slice(Math.max(0, currentIdx - 25), currentIdx - 10);
+  const recentBars = data.slice(Math.max(0, currentIdx - 8), currentIdx + 1);
+  if (olderBars.length > 0 && recentBars.length > 0) {
+    const oldRange = Math.max(...olderBars.map(b => b.high)) - Math.min(...olderBars.map(b => b.low));
+    const recentRange = Math.max(...recentBars.map(b => b.high)) - Math.min(...recentBars.map(b => b.low));
+    isRangeContracting = recentRange <= oldRange * 0.65;
+  }
+
+  details.push({
+    name: 'ABCD 收斂三角型結構 (高不過A/振幅急劇收窄)',
+    pass: (isPeaksDescending && isTroughsSupported) || isRangeContracting,
+    desc: `高點壓制：${isPeaksDescending ? '不過前高' : '已過高'}，振幅收縮比：${isRangeContracting ? '收斂至<65%' : '尚未收斂'}`
+  });
+
+  const recentAvgVol = recentBars.reduce((s, b) => s + b.volume, 0) / (recentBars.length || 1);
+  const isTriangleDryUp = base.maxVolBar ? recentAvgVol < base.maxVolBar.volume * 0.55 : false;
+
+  details.push({
+    name: '三角末端極致量縮',
+    pass: isTriangleDryUp,
+    desc: `末端均量縮至吸籌大量之 ${base.maxVolBar ? Math.round((recentAvgVol / base.maxVolBar.volume) * 100) : 0}% (標準<55%)`
+  });
+
+  const passCount = details.filter(d => d.pass).length;
+  const score = Math.round((passCount / details.length) * 100);
+
+  return {
+    modelType: 3,
+    modelName: '天機模型 3 (收斂三角ABCD·窒息量待破切)',
+    isHit: score >= 75,
+    score,
+    details,
+    keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: base.keyVolumeBaseline }
+  };
+};
+
+/**
+ * 🎯 天機模型 4：吸籌 -> 深回 2/3 -> 第二大波拉升創新高 (後量大於前量，兩底一新高) -> 均線糾結轉噴
+ */
+const detectTianjiModel4 = (data, targetIdx) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
+  const base = extractBaseMetrics(data, currentIdx);
+  if (!base || currentIdx < 70) return { isHit: false, score: 0, reason: '歷史數據不足' };
+
+  const details = [];
+
+  details.push({
+    name: '週 20MA 向上趨勢',
+    pass: base.isAboveW20MA && base.isW20MASlopeUp,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})，斜率翻揚`
+  });
+
+  const windowMid = Math.floor((base.lookbackStart + currentIdx) / 2);
+  const wave1Bars = data.slice(base.lookbackStart, windowMid);
+  const wave2Bars = data.slice(windowMid, Math.max(windowMid + 5, currentIdx - 8));
+
+  let maxVolWave1 = 0;
+  let maxHighWave1 = 0;
+  let minLowWave1 = Infinity;
+  for (const b of wave1Bars) {
+    if (b.volume > maxVolWave1) maxVolWave1 = b.volume;
+    if (b.high > maxHighWave1) maxHighWave1 = b.high;
+    if (b.low < minLowWave1) minLowWave1 = b.low;
+  }
+
+  let maxVolWave2 = 0;
+  let maxHighWave2 = 0;
+  let minLowWave2 = Infinity;
+  for (const b of wave2Bars) {
+    if (b.volume > maxVolWave2) maxVolWave2 = b.volume;
+    if (b.high > maxHighWave2) maxHighWave2 = b.high;
+    if (b.low < minLowWave2) minLowWave2 = b.low;
+  }
+
+  const isNewHighCreated = maxHighWave2 >= maxHighWave1 * 0.99;
+  const isPostVolumeDominant = maxVolWave2 >= maxVolWave1 * 0.92;
+  const isTwoBottomsAscending = minLowWave2 >= minLowWave1 * 0.98;
+
+  details.push({
+    name: '兩底一新高且後量大於前量 (量價齊揚)',
+    pass: isNewHighCreated && isPostVolumeDominant && isTwoBottomsAscending,
+    desc: `第2波創高：${isNewHighCreated ? '是' : '否'}，後量堆(${maxVolWave2}) ${isPostVolumeDominant ? '≥' : '<'} 前量堆(${maxVolWave1})`
+  });
+
+  const globalKeyVolSupport = Math.max(base.keyVolumeBaseline, minLowWave2);
+  const isAboveDualWaveSupport = base.bar.close >= globalKeyVolSupport * 0.97;
+
+  details.push({
+    name: '洗籌守在兩波推升大量防守點上方',
+    pass: isAboveDualWaveSupport,
+    desc: `現價 ${base.bar.close.toFixed(2)} ${isAboveDualWaveSupport ? '≥' : '<'} 兩波關鍵防守價 (${globalKeyVolSupport.toFixed(2)})`
+  });
+
+  const ma5 = base.bar.ma1 ?? base.bar.ma5 ?? base.bar.close;
+  const ma10 = base.bar.ma2 ?? base.bar.ma10 ?? base.bar.close;
+  const ma20 = base.bar.ma3 ?? base.bar.ma20 ?? base.bar.close;
+
+  const maxMA = Math.max(ma5, ma10, ma20);
+  const minMA = Math.min(ma5, ma10, ma20);
+  const maSpreadPct = minMA > 0 ? ((maxMA - minMA) / minMA) * 100 : 999;
+  const isMATangled = maSpreadPct <= 3.2;
+  const isKBreakout = base.bar.close >= maxMA && base.bar.close >= base.bar.open;
+
+  details.push({
+    name: '日均線 5/10/20 糾結合力轉噴 (天機K站上)',
+    pass: isMATangled && isKBreakout,
+    desc: `均線糾結度 ${maSpreadPct.toFixed(1)}% (${isMATangled ? '已糾結≤3.2%' : '發散'})，紅K站上短均：${isKBreakout ? '達成' : '未站上'}`
+  });
+
+  const passCount = details.filter(d => d.pass).length;
+  const score = Math.round((passCount / details.length) * 100);
+
+  return {
+    modelType: 4,
+    modelName: '天機模型 4 (兩底一新高·後量超前量·均線糾結轉噴)',
+    isHit: score >= 75,
+    score,
+    details,
+    keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: globalKeyVolSupport }
+  };
+};
+
+/**
+ * 🌟 天機全模型綜合掃描評估器
+ */
+const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4]) => {
+  const allResults = [];
+
+  if (requestedModels.includes(1)) allResults.push(detectTianjiModel1(data, targetIdx));
+  if (requestedModels.includes(2)) allResults.push(detectTianjiModel2(data, targetIdx));
+  if (requestedModels.includes(3)) allResults.push(detectTianjiModel3(data, targetIdx));
+  if (requestedModels.includes(4)) allResults.push(detectTianjiModel4(data, targetIdx));
+
+  allResults.sort((a, b) => b.score - a.score);
+  const bestHit = allResults.find(r => r.isHit) || allResults[0];
+
+  return {
+    bestHit,
+    allResults,
+    isAnyHit: allResults.some(r => r.isHit)
+  };
+};
+
+
   // 🧠 2. 買入條件動態判斷計算函式
   const evaluateBuyConditions = (targetBarIdx) => {
     if (!data || data.length === 0) return { results: [], totalEnabled: 0, passCount: 0 };
@@ -6421,17 +6867,31 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
 
         case 'tianji': {
           const checkDays = c.days || 5;
+          const targetModels = c.models || [1, 2, 3, 4];
+          let hitResult = null;
+          let hitDate = null;
+
+          // 往前回溯搜尋近 N 日內是否有觸發天機 1~4
           const startSearch = Math.max(0, idx - checkDays + 1);
-          let foundModel = null;
           for (let k = idx; k >= startSearch; k--) {
-            const dItem = data[k];
-            if (dItem && (dItem.tianjiModel || dItem.customMarks)) {
-              foundModel = dItem.tianjiModel || (dItem.customMarks && dItem.customMarks[0]);
-              if (foundModel) break;
+            const scan = evaluateTianjiModels(data, k, targetModels);
+            if (scan.isAnyHit) {
+              hitResult = scan.bestHit;
+              hitDate = data[k]?.date;
+              break;
             }
           }
-          pass = !!foundModel;
-          reason = pass ? `發現「${foundModel}」` : `近 ${checkDays} 日內無指定天機模型`;
+
+          if (hitResult) {
+            pass = true;
+            reason = `🔥 命中【${hitResult.modelName}】(契合度 ${hitResult.score}% 于 ${hitDate})`;
+          } else {
+            pass = false;
+            const currentScan = evaluateTianjiModels(data, idx, targetModels);
+            const closest = currentScan.bestHit;
+            const missing = closest?.details?.find(d => !d.pass);
+            reason = `近 ${checkDays} 日未成型 (最接近: ${closest?.modelName} ${closest?.score}%，缺: ${missing ? missing.name : '量價未到位'})`;
+          }
           break;
         }
 
