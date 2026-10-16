@@ -5259,12 +5259,17 @@ const handleOpenSectorMomentum = async () => {
           );
         }
 
-        // 呼叫 4 個模型演算法進行診斷評估 (帶安全檢查)
-        const m1 = typeof detectTianjiModel1 === 'function' ? detectTianjiModel1(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
-        const m2 = typeof detectTianjiModel2 === 'function' ? detectTianjiModel2(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
-        const m3 = typeof detectTianjiModel3 === 'function' ? detectTianjiModel3(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
-        const m4 = typeof detectTianjiModel4 === 'function' ? detectTianjiModel4(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
+        // 呼叫 4 個模型演算法進行診斷評估 (支援全域 window 雙向相容呼叫)
+        const fn1 = (typeof detectTianjiModel1 === 'function' ? detectTianjiModel1 : (typeof window !== 'undefined' ? window.detectTianjiModel1 : null));
+        const fn2 = (typeof detectTianjiModel2 === 'function' ? detectTianjiModel2 : (typeof window !== 'undefined' ? window.detectTianjiModel2 : null));
+        const fn3 = (typeof detectTianjiModel3 === 'function' ? detectTianjiModel3 : (typeof window !== 'undefined' ? window.detectTianjiModel3 : null));
+        const fn4 = (typeof detectTianjiModel4 === 'function' ? detectTianjiModel4 : (typeof window !== 'undefined' ? window.detectTianjiModel4 : null));
 
+        const m1 = typeof fn1 === 'function' ? fn1(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
+        const m2 = typeof fn2 === 'function' ? fn2(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
+        const m3 = typeof fn3 === 'function' ? fn3(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
+        const m4 = typeof fn4 === 'function' ? fn4(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
+        
         const modelList = [
           { type: 1, name: '模型 1 (ABC深回)', res: m1 },
           { type: 2, name: '模型 2 (淺回平台)', res: m2 },
@@ -6921,6 +6926,12 @@ const detectTianjiModel4 = (data, targetIdx, params = {}) => {
     keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: base.keyVolumeBaseline }
   };
 };
+if (typeof window !== 'undefined') {
+  window.detectTianjiModel1 = detectTianjiModel1;
+  window.detectTianjiModel2 = detectTianjiModel2;
+  window.detectTianjiModel3 = detectTianjiModel3;
+  window.detectTianjiModel4 = detectTianjiModel4;
+}
 
 /**
  * 🌟 天機全模型綜合掃描評估器
