@@ -6940,13 +6940,13 @@ const detectTianjiModel4 = (data, targetIdx, params = {}) => {
   };
 };
 /**
- * 🎯 天機模型 5：暗處吸籌型 (純型態版：上升三角3~4底逐底墊高 + 上下振幅≤45% + 底轉上放量)
+ * 🎯 天機模型 5：暗處吸籌型 (純型態版：上升三角3~4底逐底墊高 + 上下垂直振幅≤25% + 底轉上放量)
  *
  * 核心型態特徵：
  * 1. 走出標準上升三角形：高點有水平頸線壓制蓄勢
  * 2. 低點出現明顯 3~4 個波段底且「逐底階梯式墊高 (Higher Lows)」
  * 3. 轉折間距濾網：底和底之間不能太近 (至少相隔 5~8 根K棒)，若 2 與 3 距離過近或價格重疊，則需第 4 個底確認
- * 4. 🌟 上下垂直振幅濾網：三角區間上下最大振幅不得超過 45% (窄幅緊湊控盤，拒絕寬幅散漫震盪)
+ * 4. 🌟 上下垂直振幅濾網：三角區間上下最大振幅不得超過 25% (極致窄幅控盤，鎖籌緊湊)
  * 5. 🌟 量價健康度：放量發生在「底轉上的起漲初期 (低檔~中檔)」，頂部不爆異常出貨巨量
  * 6. 守住第 1 底起漲防守點
  */
@@ -7061,7 +7061,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
   });
 
   // ==========================================
-  // 🌟 3. 三角型上下垂直振幅 ≤ 45% (拒絕寬幅發散散漫震盪)
+  // 🌟 3. 三角型上下垂直振幅 ≤ 25% (極致窄幅收斂，拒絕寬幅散漫震盪)
   // ==========================================
   const triangleBars = data.slice(scanStart, currentIdx + 1);
   let isTightRange = false;
@@ -7072,14 +7072,15 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
     const triangleMinLow = Math.min(...triangleBars.map(b => b.low));
     if (triangleMinLow > 0) {
       rangePct = ((triangleMaxHigh - triangleMinLow) / triangleMinLow) * 100;
-      isTightRange = rangePct <= 45.0; // 🌟 垂直振幅限制 45% 以內
+      // 🌟 垂直振幅門檻調整為 25% (給予 26% 內的微幅緩衝)
+      isTightRange = rangePct <= 26.0; 
     }
   }
 
   details.push({
-    name: '三角型振幅緊湊 (上下幅度 ≤ 45%)',
+    name: '三角型振幅極致緊湊 (上下幅度 ≤ 25%)',
     pass: isTightRange,
-    desc: `區間垂直振幅 ${rangePct.toFixed(1)}% (${isTightRange ? '窄幅緊湊控盤 (≤45%)' : '振幅過大發散，浮額未沉澱 (>45%)'})`
+    desc: `區間垂直振幅 ${rangePct.toFixed(1)}% (${isTightRange ? '窄幅緊湊控盤 (≤25%)' : '振幅過大發散 (>25%)，非典型窄幅三角'})`
   });
 
   // ==========================================
