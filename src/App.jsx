@@ -2538,6 +2538,13 @@ const App = () => {
   // ✨ 新增：管理者權限狀態 (用來隱藏產業資訊)
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('MY_STOCK_ADMIN') === 'true');
 
+  // 🔮 天機獨立研發實驗室狀態 (半年~1年大波段格局)
+  const [isTianjiLabOpen, setIsTianjiLabOpen] = useState(false);
+  const [tianjiParams, setTianjiParams] = useState({
+    accumLookback: 180, // 吸籌大格局：預設 180 根 (約 9 個月，可調 60~260 根)
+    washLookback: 60,   // 洗籌週期：預設 60 根 (約 3 個月，可調 15~90 根)
+    activeTab: 1,       // 目前檢視模型 1~4
+  });
   // ✨ 新增：解鎖管理者的功能
   const handleUnlockAdmin = () => {
     setAppModal({
@@ -6324,14 +6331,7 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
     }
   };
   
-  /* STREAMING_CHUNK:Declaring state for Tianji model lab */
-  // 🔮 天機獨立研發實驗室狀態 (半年~1年大波段格局)
-  const [isTianjiLabOpen, setIsTianjiLabOpen] = useState(false);
-  const [tianjiParams, setTianjiParams] = useState({
-    accumLookback: 180, // 吸籌大格局：預設 180 根 (約 9 個月，可調 60~260 根)
-    washLookback: 60,   // 洗籌週期：預設 60 根 (約 3 個月，可調 15~90 根)
-    activeTab: 1,       // 目前檢視模型 1~4 (預設為模型 1)
-  });
+  
   // 🎯 1. 買入條件檢核器狀態管理
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [conditions, setConditions] = useState([
