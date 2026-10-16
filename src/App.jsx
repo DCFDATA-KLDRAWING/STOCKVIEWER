@@ -5197,6 +5197,14 @@ const handleOpenSectorMomentum = async () => {
                 <button onClick={() => window.open('https://gemini.google.com/share/cbe5a830f8a7?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-amber-500 text-amber-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>📈</span> 4. 營收觀察
                 </button>
+                
+                {/* 🔮 5. 天機模型深入研發儀表板 (調參/診斷) */}
+                <button 
+                  onClick={() => setIsTianjiLabOpen(true)} 
+                  className="w-full bg-indigo-950/60 border border-cyan-500/80 hover:bg-cyan-900/40 text-cyan-200 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all text-sm text-left px-3 flex items-center gap-2"
+                >
+                  <span>🔮</span> 5. 天機模型研發儀表板 (調參/診斷)
+                </button>
 
                 <div className="w-full h-px bg-slate-700/50 my-2"></div>
                 
@@ -6316,6 +6324,14 @@ const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, set
     }
   };
   
+  /* STREAMING_CHUNK:Declaring state for Tianji model lab */
+  // 🔮 天機獨立研發實驗室狀態 (半年~1年大波段格局)
+  const [isTianjiLabOpen, setIsTianjiLabOpen] = useState(false);
+  const [tianjiParams, setTianjiParams] = useState({
+    accumLookback: 180, // 吸籌大格局：預設 180 根 (約 9 個月，可調 60~260 根)
+    washLookback: 60,   // 洗籌週期：預設 60 根 (約 3 個月，可調 15~90 根)
+    activeTab: 1,       // 目前檢視模型 1~4 (預設為模型 1)
+  });
   // 🎯 1. 買入條件檢核器狀態管理
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [conditions, setConditions] = useState([
@@ -6383,12 +6399,13 @@ const findLocalExtremes = (data, startIdx, endIdx, window = 2) => {
   return filtered;
 };
 
+/* STREAMING_CHUNK:Upgrading extractBaseMetrics to support half-year to one-year horizon */
 /**
- * 提取通用基礎條件：
- * 1. 週 20MA (日線對應約 100MA) 支撐與斜率
- * 2. 左側吸籌波段的最大量與次大量防守價位
+ * 提取通用基礎條件（大波段半年~1年版）：
+ * 1. 週 20MA (日線對應 100MA) 支撐與斜率
+ * 2. 左側吸籌波段 (最長回溯 260 根，約 1 年) 的最大量與次大量防守價位
  */
-const extractBaseMetrics = (data, currentIdx) => {
+const extractBaseMetrics = (data, currentIdx, customParams = {}) => {
   const bar = data[currentIdx];
   if (!bar) return null;
 
@@ -6398,9 +6415,13 @@ const extractBaseMetrics = (data, currentIdx) => {
   const isAboveW20MA = bar.close >= w20ma * 0.98; // 容許極限 2% 影線測試
   const isW20MASlopeUp = w20ma >= prevW20ma * 0.998; // 斜率翻揚或走平
 
-  // 2. 左側吸籌區搜尋 (向前抓 15~80 根 K 棒)
-  const lookbackStart = Math.max(0, currentIdx - 80);
-  const lookbackEnd = Math.max(0, currentIdx - 10);
+  // 🌟 2. 大格局時間窗設定（半年~1年架構，可由前端滑桿直接控制）
+  const accumLookback = customParams.accumLookback || 180; // 預設向前看 180 根 (約 9 個月)
+  const washLookback = customParams.washLookback || 60;   // 預設洗籌期 60 根 (約 3 個月)
+
+  // 吸籌區間：從最遠處 (currentIdx - accumLookback) 到 洗籌開始前 (currentIdx - washLookback)
+  const lookbackStart = Math.max(0, currentIdx - accumLookback);
+  const lookbackEnd = Math.max(0, currentIdx - washLookback);
 
   let maxVolBar = null;
   let secondVolBar = null;
@@ -6440,7 +6461,9 @@ const extractBaseMetrics = (data, currentIdx) => {
     accumHighestPrice,
     accumLowestPrice,
     lookbackStart,
-    lookbackEnd
+    lookbackEnd,
+    accumLookback,
+    washLookback
   };
 };
 
@@ -8144,6 +8167,170 @@ const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4]) =
                 >
                   新增
                 </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+      /* STREAMING_CHUNK:Rendering Tianji Model Lab research and diagnostic modal */
+      {/* 🔮 天機模型深入研發與調參診斷儀表板 (Tianji Lab) */}
+      {isTianjiLabOpen && (() => {
+        const targetIdx = crosshair && crosshair.idx !== undefined ? crosshair.idx : (data ? data.length - 1 : 0);
+        const currentBar = data ? data[targetIdx] : null;
+
+        // 呼叫 4 個模型演算法進行診斷評估 (傳入前端動態調參參數)
+        const m1 = detectTianjiModel1(data, targetIdx, tianjiParams);
+        const m2 = detectTianjiModel2(data, targetIdx, tianjiParams);
+        const m3 = detectTianjiModel3(data, targetIdx, tianjiParams);
+        const m4 = detectTianjiModel4(data, targetIdx, tianjiParams);
+
+        const modelList = [
+          { type: 1, name: '模型 1 (ABC深回)', res: m1 },
+          { type: 2, name: '模型 2 (淺回平台)', res: m2 },
+          { type: 3, name: '模型 3 (收斂三角)', res: m3 },
+          { type: 4, name: '模型 4 (兩底一新高)', res: m4 },
+        ];
+
+        const activeModelObj = modelList.find(m => m.type === tianjiParams.activeTab) || modelList[0];
+        const activeRes = activeModelObj.res;
+
+        return (
+          <div className="fixed inset-0 z-[260] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 pointer-events-auto">
+            <div className="bg-[#0b1329] border border-cyan-500/80 shadow-[0_0_40px_rgba(6,182,212,0.35)] rounded-2xl w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
+              
+              {/* 頂部標題列 */}
+              <div className="p-4 border-b border-slate-700/80 bg-slate-900/90 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-bold text-cyan-300 flex items-center gap-2">
+                    <span>🔮</span> 天機形態量化研發實驗室 (Tianji Lab)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    診斷基準 K 線：<span className="text-pink-300 font-bold">{currentBar?.date || '最新'}</span> (收盤: {currentBar?.close})
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsTianjiLabOpen(false)}
+                  className="text-slate-400 hover:text-white bg-slate-800 px-3 py-1 rounded-lg text-sm font-bold"
+                >
+                  ✕ 關閉
+                </button>
+              </div>
+
+              {/* 🌟 核心控制台：前端手動調參滑桿區 (半年~1年大格局版) */}
+              <div className="p-4 bg-slate-950/70 border-b border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 參數 1：吸籌大格局回溯長度 (半～1年) */}
+                <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-700/60">
+                  <div className="flex justify-between items-center text-xs font-bold mb-1.5">
+                    <span className="text-amber-300">⏳ 吸籌大格局回溯 (日K)</span>
+                    <span className="text-cyan-400 font-mono text-sm">
+                      {tianjiParams.accumLookback} 根 (約 {Math.round(tianjiParams.accumLookback / 21)} 個月)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="60"
+                    max="260"
+                    step="10"
+                    value={tianjiParams.accumLookback}
+                    onChange={(e) => setTianjiParams({ ...tianjiParams, accumLookback: Number(e.target.value) })}
+                    className="w-full accent-cyan-500 cursor-pointer h-1.5"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                    <span>約3個月(60)</span>
+                    <span>半年(120)</span>
+                    <span>9個月(180)</span>
+                    <span>1年大底(260)</span>
+                  </div>
+                </div>
+
+                {/* 參數 2：洗籌段長度 (最長 3~4 個月) */}
+                <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-700/60">
+                  <div className="flex justify-between items-center text-xs font-bold mb-1.5">
+                    <span className="text-purple-300">🌊 洗籌回測週期 (最長3個月+)</span>
+                    <span className="text-cyan-400 font-mono text-sm">
+                      {tianjiParams.washLookback} 根 (約 {Math.round(tianjiParams.washLookback / 21)} 個月)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="15"
+                    max="90"
+                    step="5"
+                    value={tianjiParams.washLookback}
+                    onChange={(e) => setTianjiParams({ ...tianjiParams, washLookback: Number(e.target.value) })}
+                    className="w-full accent-purple-500 cursor-pointer h-1.5"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                    <span>短洗(15根/3週)</span>
+                    <span>1.5個月(30根)</span>
+                    <span>3個月洗盤(60根)</span>
+                    <span>深洗4個月(90根)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 個模型的契合度 Tab 切換 */}
+              <div className="flex border-b border-slate-800 bg-slate-900/50 p-2 gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+                {modelList.map((m) => (
+                  <button
+                    key={m.type}
+                    onClick={() => setTianjiParams({ ...tianjiParams, activeTab: m.type })}
+                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-0.5 whitespace-nowrap ${
+                      tianjiParams.activeTab === m.type
+                        ? 'bg-cyan-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                        : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>{m.name}</span>
+                    <span className={`text-[11px] font-mono font-black ${m.res.score >= 75 ? 'text-emerald-300' : 'text-amber-400'}`}>
+                      {m.res.score}% {m.res.isHit ? '✓' : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* 診斷詳情列表 */}
+              <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-3">
+                {/* 關鍵價位指標卡片 */}
+                {activeRes.keyLevels && (
+                  <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 flex flex-wrap gap-4 text-xs">
+                    <div>
+                      <span className="text-slate-400">週 20MA (100MA) 價位：</span>
+                      <span className="text-amber-300 font-mono font-bold ml-1">{activeRes.keyLevels.w20ma ? activeRes.keyLevels.w20ma.toFixed(2) : '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">吸籌段大量防守點：</span>
+                      <span className="text-emerald-400 font-mono font-bold ml-1">{activeRes.keyLevels.keyVolumeBaseline ? activeRes.keyLevels.keyVolumeBaseline.toFixed(2) : '-'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 條件逐項拆解與比對原因 */}
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">條件符合情況剖析：</div>
+                {activeRes.details && activeRes.details.map((d, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-xl border flex items-start justify-between gap-3 ${
+                      d.pass ? 'bg-emerald-950/20 border-emerald-800/50' : 'bg-rose-950/20 border-rose-900/50'
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${d.pass ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {d.pass ? '●' : '○'}
+                        </span>
+                        <span className="text-sm font-bold text-slate-200">{d.name}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 font-mono pl-5">{d.desc}</div>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold shrink-0 ${
+                      d.pass ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                    }`}>
+                      {d.pass ? '達成' : '未達'}
+                    </span>
+                  </div>
+                ))}
               </div>
 
             </div>
