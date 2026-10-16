@@ -6651,55 +6651,66 @@ const extractBaseMetrics = (data, currentIdx, customParams = {}) => {
 };
 
 /**
- * 🎯 天機模型 1：主力吸籌 -> ABC 深回洗盤 (不破週20MA) -> 橫盤不破前低 (Higher Lows) 補倉 -> 洗籌末端
+ * 🎯 天機模型 1：主力吸籌 -> ABC 深回洗盤 (支援前端自訂滑桿參數)
  */
-const detectTianjiModel1 = (data, targetIdx) => {
-  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
-  const base = extractBaseMetrics(data, currentIdx);
-  if (!base || currentIdx < 50) return { isHit: false, score: 0, reason: '歷史數據不足' };
+const detectTianjiModel1 = (data, targetIdx, params = {}) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : (data ? data.length - 1 : 0);
+  const base = extractBaseMetrics(data, currentIdx, params);
+  const bar = data ? data[currentIdx] : null;
+
+  if (!base || !bar || currentIdx < 15) {
+    return { 
+      isHit: false, 
+      score: 0, 
+      details: [{ name: '歷史資料長度', pass: false, desc: `目前 K 線數量僅 ${currentIdx + 1} 根，建議載入至少 30 根以上` }] 
+    };
+  }
 
   const details = [];
 
+  // 1. 週 20MA 檢驗
   details.push({
     name: '週 20MA 趨勢支撐',
     pass: base.isAboveW20MA && base.isW20MASlopeUp,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})，斜率${base.isW20MASlopeUp ? '平揚' : '下彎'}`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma?.toFixed(2)})，斜率${base.isW20MASlopeUp ? '平揚/翻揚' : '下彎'}`
   });
 
+  // 2. 守住吸籌段大量防守價
   details.push({
     name: '守住吸籌段大量防守價',
     pass: base.isAboveKeyVolSupport && base.maxVolBar !== null,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量低點 (${base.keyVolumeBaseline.toFixed(2)})`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量低點 (${base.keyVolumeBaseline?.toFixed(2)}) [大量日: ${base.maxVolBar?.date || '-'}]`
   });
 
-  const extremes = findLocalExtremes(data, base.lookbackStart, currentIdx, 2);
+  // 3. 深回洗籌縮量
+  const washLen = Math.min(params.washLookback || 30, currentIdx);
+  const recentWashBars = data.slice(Math.max(0, currentIdx - washLen), currentIdx + 1);
+  const recentAvgVol = recentWashBars.reduce((s, b) => s + b.volume, 0) / (recentWashBars.length || 1);
+  const isVolDryUp = base.maxVolBar ? recentAvgVol < base.maxVolBar.volume * 0.75 : false;
+
+  const extremes = findLocalExtremes(data, Math.max(0, currentIdx - washLen), currentIdx, 2);
   const troughs = extremes.filter(e => e.type === 'trough');
   const recentTroughs = troughs.slice(-3);
   let isHigherLows = true;
   if (recentTroughs.length >= 2) {
     for (let i = 1; i < recentTroughs.length; i++) {
-      if (recentTroughs[i].price < recentTroughs[i - 1].price * 0.985) {
-        isHigherLows = false;
-      }
+      if (recentTroughs[i].price < recentTroughs[i - 1].price * 0.985) isHigherLows = false;
     }
   }
 
-  const recentWashBars = data.slice(Math.max(0, currentIdx - 15), currentIdx + 1);
-  const recentAvgVol = recentWashBars.reduce((s, b) => s + b.volume, 0) / recentWashBars.length;
-  const isVolDryUp = base.maxVolBar ? recentAvgVol < base.maxVolBar.volume * 0.65 : false;
-
   details.push({
     name: '深回洗籌縮量且低點墊高',
-    pass: isVolDryUp && isHigherLows,
-    desc: `洗籌均量比大量縮 ${base.maxVolBar ? Math.round((1 - recentAvgVol / base.maxVolBar.volume) * 100) : 0}%，轉折低點墊高：${isHigherLows ? '符合' : '破前低'}`
+    pass: isVolDryUp,
+    desc: `洗籌均量比大量縮 ${base.maxVolBar ? Math.round((1 - recentAvgVol / base.maxVolBar.volume) * 100) : 0}% (標準>25%)，低點墊高：${isHigherLows ? '符合' : '曾跌破'}`
   });
 
+  // 4. 洗籌末端轉折紅 K
   const ma5 = base.bar.ma1 ?? base.bar.ma5 ?? base.bar.close;
   const isTurnUp = base.bar.close >= ma5 && base.bar.close >= base.bar.open;
   details.push({
-    name: '洗籌末端轉折紅 K (站上5MA)',
+    name: '洗籌末端轉折 (站上5MA)',
     pass: isTurnUp,
-    desc: `收盤 ${base.bar.close.toFixed(2)} ${isTurnUp ? '已站上' : '未站上'} 5MA 啟動位`
+    desc: `收盤 ${base.bar.close?.toFixed(2)} ${isTurnUp ? '已站上' : '未站上'} 5MA (${typeof ma5 === 'number' ? ma5.toFixed(2) : '-'})`
   });
 
   const passCount = details.filter(d => d.pass).length;
@@ -6707,7 +6718,7 @@ const detectTianjiModel1 = (data, targetIdx) => {
 
   return {
     modelType: 1,
-    modelName: '天機模型 1 (ABC深回洗盤·築底轉折)',
+    modelName: '天機模型 1 (ABC深回)',
     isHit: score >= 75,
     score,
     details,
@@ -6716,71 +6727,51 @@ const detectTianjiModel1 = (data, targetIdx) => {
 };
 
 /**
- * 🎯 天機模型 2：吸籌結束 -> 淺回強勢平台/奔走型 ABC (B過A跌幅一半甚至破A高, C回測不破A轉B低點) -> 洗籌末端
+ * 🎯 天機模型 2：淺回平台/奔走型 (支援前端自訂滑桿參數)
  */
-const detectTianjiModel2 = (data, targetIdx) => {
-  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
-  const base = extractBaseMetrics(data, currentIdx);
-  if (!base || currentIdx < 50) return { isHit: false, score: 0, reason: '歷史數據不足' };
+const detectTianjiModel2 = (data, targetIdx, params = {}) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : (data ? data.length - 1 : 0);
+  const base = extractBaseMetrics(data, currentIdx, params);
+  const bar = data ? data[currentIdx] : null;
+
+  if (!base || !bar || currentIdx < 15) {
+    return { isHit: false, score: 0, details: [{ name: '歷史資料長度', pass: false, desc: '資料長度不足' }] };
+  }
 
   const details = [];
-
   details.push({
     name: '週 20MA 趨勢支撐',
     pass: base.isAboveW20MA && base.isW20MASlopeUp,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma?.toFixed(2)})`
   });
 
   details.push({
     name: '洗籌末端守在大量之上',
     pass: base.isAboveKeyVolSupport,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量低點 (${base.keyVolumeBaseline.toFixed(2)})`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量防守點 (${base.keyVolumeBaseline?.toFixed(2)})`
   });
 
-  const extremes = findLocalExtremes(data, base.lookbackStart, currentIdx, 2);
-  const peaks = extremes.filter(e => e.type === 'peak');
-  const troughs = extremes.filter(e => e.type === 'trough');
-
-  let isPlatformBStrong = false;
-  let isCAboveAFloor = false;
-
-  if (peaks.length >= 2 && troughs.length >= 2) {
-    const topOfAccum = peaks[peaks.length - 2];
-    const dropA = troughs[troughs.length - 2];
-    const bounceB = peaks[peaks.length - 1];
-    const dropC = troughs[troughs.length - 1];
-
-    if (topOfAccum && dropA && bounceB) {
-      const dropRangeA = topOfAccum.price - dropA.price;
-      const bounceRangeB = bounceB.price - dropA.price;
-      isPlatformBStrong = bounceRangeB >= dropRangeA * 0.48;
-    }
-
-    if (dropC && dropA) {
-      isCAboveAFloor = dropC.price >= dropA.price * 0.985;
-    }
-  } else {
-    const recentHigh = Math.max(...data.slice(currentIdx - 20, currentIdx + 1).map(b => b.high));
-    const recentLow = Math.min(...data.slice(currentIdx - 20, currentIdx + 1).map(b => b.low));
-    isPlatformBStrong = (recentHigh - recentLow) / recentLow <= 0.16;
-    isCAboveAFloor = base.bar.close >= recentLow * 0.99;
-  }
+  const washLen = Math.min(params.washLookback || 30, currentIdx);
+  const recentBars = data.slice(Math.max(0, currentIdx - washLen), currentIdx + 1);
+  const recentHigh = Math.max(...recentBars.map(b => b.high));
+  const recentLow = Math.min(...recentBars.map(b => b.low));
+  const isPlatform = recentLow > 0 ? ((recentHigh - recentLow) / recentLow) <= 0.18 : false;
 
   details.push({
-    name: '強勢平台回調 (B反彈強 + C淺回不破底)',
-    pass: isPlatformBStrong && isCAboveAFloor,
-    desc: `B反彈強度：${isPlatformBStrong ? '強勢(≥50%或過高)' : '偏弱'}，C回洗低點：${isCAboveAFloor ? '守住A低' : '破底'}`
+    name: '強勢淺回平台型震盪 (振幅≤18%)',
+    pass: isPlatform,
+    desc: `洗籌區間振幅: ${recentLow > 0 ? (((recentHigh - recentLow) / recentLow) * 100).toFixed(1) : 0}% (${isPlatform ? '平台整理' : '振幅過大'})`
   });
 
   const cBars = data.slice(Math.max(0, currentIdx - 8), currentIdx + 1);
-  const avgCVol = cBars.reduce((s, b) => s + b.volume, 0) / cBars.length;
-  const isCVolDry = base.maxVolBar ? avgCVol < base.maxVolBar.volume * 0.6 : false;
-  const isRedBreak = base.bar.close > base.bar.open && base.bar.close >= (base.bar.ma5 ?? base.bar.close);
+  const avgCVol = cBars.reduce((s, b) => s + b.volume, 0) / (cBars.length || 1);
+  const isCVolDry = base.maxVolBar ? avgCVol < base.maxVolBar.volume * 0.7 : false;
+  const isRedBreak = base.bar.close >= base.bar.open;
 
   details.push({
-    name: 'C浪量縮洗籌完畢與轉折紅 K',
+    name: '末端量縮與紅 K 轉折',
     pass: isCVolDry && isRedBreak,
-    desc: `C浪洗籌縮量：${isCVolDry ? '顯著萎縮' : '仍有量'}，轉折站上5MA：${isRedBreak ? '符合' : '未達'}`
+    desc: `末端量縮：${isCVolDry ? '顯著萎縮' : '量仍大'}，收紅K：${isRedBreak ? '符合' : '未達'}`
   });
 
   const passCount = details.filter(d => d.pass).length;
@@ -6788,7 +6779,7 @@ const detectTianjiModel2 = (data, targetIdx) => {
 
   return {
     modelType: 2,
-    modelName: '天機模型 2 (淺回平台/奔走·強勢補倉)',
+    modelName: '天機模型 2 (淺回平台)',
     isHit: score >= 75,
     score,
     details,
@@ -6797,68 +6788,54 @@ const detectTianjiModel2 = (data, targetIdx) => {
 };
 
 /**
- * 🎯 天機模型 3：吸籌結束 -> ABCD 收斂對稱/下降三角形洗盤
+ * 🎯 天機模型 3：收斂三角 (支援前端自訂滑桿參數)
  */
-const detectTianjiModel3 = (data, targetIdx) => {
-  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
-  const base = extractBaseMetrics(data, currentIdx);
-  if (!base || currentIdx < 50) return { isHit: false, score: 0, reason: '歷史數據不足' };
+const detectTianjiModel3 = (data, targetIdx, params = {}) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : (data ? data.length - 1 : 0);
+  const base = extractBaseMetrics(data, currentIdx, params);
+  const bar = data ? data[currentIdx] : null;
+
+  if (!base || !bar || currentIdx < 15) {
+    return { isHit: false, score: 0, details: [{ name: '歷史資料長度', pass: false, desc: '資料長度不足' }] };
+  }
 
   const details = [];
-
   details.push({
     name: '週 20MA 趨勢支撐',
     pass: base.isAboveW20MA && base.isW20MASlopeUp,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma?.toFixed(2)})`
   });
 
   details.push({
     name: '收斂低點守在大量之上',
     pass: base.isAboveKeyVolSupport,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量防守線 (${base.keyVolumeBaseline.toFixed(2)})`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量防守線 (${base.keyVolumeBaseline?.toFixed(2)})`
   });
 
-  const extremes = findLocalExtremes(data, Math.max(0, currentIdx - 35), currentIdx, 2);
-  const peaks = extremes.filter(e => e.type === 'peak');
-  const troughs = extremes.filter(e => e.type === 'trough');
+  const washLen = Math.min(params.washLookback || 30, currentIdx);
+  const olderBars = data.slice(Math.max(0, currentIdx - washLen), Math.max(0, currentIdx - Math.floor(washLen / 2)));
+  const recentBars = data.slice(Math.max(0, currentIdx - Math.floor(washLen / 2)), currentIdx + 1);
 
-  let isPeaksDescending = false;
-  let isTroughsSupported = false;
-  let isRangeContracting = false;
-
-  if (peaks.length >= 2) {
-    const firstPeak = peaks[0];
-    const latestPeak = peaks[peaks.length - 1];
-    isPeaksDescending = latestPeak.price <= firstPeak.price * 1.01;
-  }
-
-  if (troughs.length >= 2) {
-    const firstTrough = troughs[0];
-    const latestTrough = troughs[troughs.length - 1];
-    isTroughsSupported = latestTrough.price >= firstTrough.price * 0.98;
-  }
-
-  const olderBars = data.slice(Math.max(0, currentIdx - 25), currentIdx - 10);
-  const recentBars = data.slice(Math.max(0, currentIdx - 8), currentIdx + 1);
+  let isContracting = false;
   if (olderBars.length > 0 && recentBars.length > 0) {
-    const oldRange = Math.max(...olderBars.map(b => b.high)) - Math.min(...olderBars.map(b => b.low));
-    const recentRange = Math.max(...recentBars.map(b => b.high)) - Math.min(...recentBars.map(b => b.low));
-    isRangeContracting = recentRange <= oldRange * 0.65;
+    const oldR = Math.max(...olderBars.map(b => b.high)) - Math.min(...olderBars.map(b => b.low));
+    const newR = Math.max(...recentBars.map(b => b.high)) - Math.min(...recentBars.map(b => b.low));
+    isContracting = newR <= oldR * 0.75;
   }
 
   details.push({
-    name: 'ABCD 收斂三角型結構 (高不過A/振幅急劇收窄)',
-    pass: (isPeaksDescending && isTroughsSupported) || isRangeContracting,
-    desc: `高點壓制：${isPeaksDescending ? '不過前高' : '已過高'}，振幅收縮比：${isRangeContracting ? '收斂至<65%' : '尚未收斂'}`
+    name: '收斂三角型結構 (振幅收縮比≤75%)',
+    pass: isContracting,
+    desc: `振幅收縮狀態：${isContracting ? '符合三角收斂' : '振幅尚未收斂'}`
   });
 
   const recentAvgVol = recentBars.reduce((s, b) => s + b.volume, 0) / (recentBars.length || 1);
-  const isTriangleDryUp = base.maxVolBar ? recentAvgVol < base.maxVolBar.volume * 0.55 : false;
+  const isTriangleDryUp = base.maxVolBar ? recentAvgVol < base.maxVolBar.volume * 0.6 : false;
 
   details.push({
     name: '三角末端極致量縮',
     pass: isTriangleDryUp,
-    desc: `末端均量縮至吸籌大量之 ${base.maxVolBar ? Math.round((recentAvgVol / base.maxVolBar.volume) * 100) : 0}% (標準<55%)`
+    desc: `末端均量縮至吸籌大量之 ${base.maxVolBar ? Math.round((recentAvgVol / base.maxVolBar.volume) * 100) : 0}% (標準<60%)`
   });
 
   const passCount = details.filter(d => d.pass).length;
@@ -6866,7 +6843,7 @@ const detectTianjiModel3 = (data, targetIdx) => {
 
   return {
     modelType: 3,
-    modelName: '天機模型 3 (收斂三角ABCD·窒息量待破切)',
+    modelName: '天機模型 3 (收斂三角)',
     isHit: score >= 75,
     score,
     details,
@@ -6875,76 +6852,61 @@ const detectTianjiModel3 = (data, targetIdx) => {
 };
 
 /**
- * 🎯 天機模型 4：吸籌 -> 深回 2/3 -> 第二大波拉升創新高 (後量大於前量，兩底一新高) -> 均線糾結轉噴
+ * 🎯 天機模型 4：兩底一新高 (支援前端自訂滑桿參數)
  */
-const detectTianjiModel4 = (data, targetIdx) => {
-  const currentIdx = targetIdx !== undefined ? targetIdx : data.length - 1;
-  const base = extractBaseMetrics(data, currentIdx);
-  if (!base || currentIdx < 70) return { isHit: false, score: 0, reason: '歷史數據不足' };
+const detectTianjiModel4 = (data, targetIdx, params = {}) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : (data ? data.length - 1 : 0);
+  const base = extractBaseMetrics(data, currentIdx, params);
+  const bar = data ? data[currentIdx] : null;
+
+  if (!base || !bar || currentIdx < 20) {
+    return { isHit: false, score: 0, details: [{ name: '歷史資料長度', pass: false, desc: '資料長度不足' }] };
+  }
 
   const details = [];
-
   details.push({
     name: '週 20MA 向上趨勢',
     pass: base.isAboveW20MA && base.isW20MASlopeUp,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma.toFixed(2)})，斜率翻揚`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma?.toFixed(2)})，斜率翻揚`
   });
 
-  const windowMid = Math.floor((base.lookbackStart + currentIdx) / 2);
-  const wave1Bars = data.slice(base.lookbackStart, windowMid);
-  const wave2Bars = data.slice(windowMid, Math.max(windowMid + 5, currentIdx - 8));
+  const mid = Math.floor((base.lookbackStart + currentIdx) / 2);
+  const w1 = data.slice(base.lookbackStart, mid);
+  const w2 = data.slice(mid, currentIdx + 1);
 
-  let maxVolWave1 = 0;
-  let maxHighWave1 = 0;
-  let minLowWave1 = Infinity;
-  for (const b of wave1Bars) {
-    if (b.volume > maxVolWave1) maxVolWave1 = b.volume;
-    if (b.high > maxHighWave1) maxHighWave1 = b.high;
-    if (b.low < minLowWave1) minLowWave1 = b.low;
-  }
+  const maxVol1 = Math.max(...w1.map(b => b.volume), 0);
+  const maxHigh1 = Math.max(...w1.map(b => b.high), 0);
+  const maxVol2 = Math.max(...w2.map(b => b.volume), 0);
+  const maxHigh2 = Math.max(...w2.map(b => b.high), 0);
 
-  let maxVolWave2 = 0;
-  let maxHighWave2 = 0;
-  let minLowWave2 = Infinity;
-  for (const b of wave2Bars) {
-    if (b.volume > maxVolWave2) maxVolWave2 = b.volume;
-    if (b.high > maxHighWave2) maxHighWave2 = b.high;
-    if (b.low < minLowWave2) minLowWave2 = b.low;
-  }
-
-  const isNewHighCreated = maxHighWave2 >= maxHighWave1 * 0.99;
-  const isPostVolumeDominant = maxVolWave2 >= maxVolWave1 * 0.92;
-  const isTwoBottomsAscending = minLowWave2 >= minLowWave1 * 0.98;
+  const isNewHigh = maxHigh2 >= maxHigh1 * 0.98;
+  const isVolGrown = maxVol2 >= maxVol1 * 0.88;
 
   details.push({
-    name: '兩底一新高且後量大於前量 (量價齊揚)',
-    pass: isNewHighCreated && isPostVolumeDominant && isTwoBottomsAscending,
-    desc: `第2波創高：${isNewHighCreated ? '是' : '否'}，後量堆(${maxVolWave2}) ${isPostVolumeDominant ? '≥' : '<'} 前量堆(${maxVolWave1})`
+    name: '兩底一新高且後量大於前量',
+    pass: isNewHigh && isVolGrown,
+    desc: `第2波創高：${isNewHigh ? '是' : '否'}，後量堆(${maxVol2}) ${isVolGrown ? '≥' : '<'} 前量堆(${maxVol1})`
   });
 
-  const globalKeyVolSupport = Math.max(base.keyVolumeBaseline, minLowWave2);
-  const isAboveDualWaveSupport = base.bar.close >= globalKeyVolSupport * 0.97;
-
   details.push({
-    name: '洗籌守在兩波推升大量防守點上方',
-    pass: isAboveDualWaveSupport,
-    desc: `現價 ${base.bar.close.toFixed(2)} ${isAboveDualWaveSupport ? '≥' : '<'} 兩波關鍵防守價 (${globalKeyVolSupport.toFixed(2)})`
+    name: '洗籌守在關鍵防守點上方',
+    pass: base.isAboveKeyVolSupport,
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 防守價 (${base.keyVolumeBaseline?.toFixed(2)})`
   });
 
   const ma5 = base.bar.ma1 ?? base.bar.ma5 ?? base.bar.close;
   const ma10 = base.bar.ma2 ?? base.bar.ma10 ?? base.bar.close;
   const ma20 = base.bar.ma3 ?? base.bar.ma20 ?? base.bar.close;
-
-  const maxMA = Math.max(ma5, ma10, ma20);
-  const minMA = Math.min(ma5, ma10, ma20);
-  const maSpreadPct = minMA > 0 ? ((maxMA - minMA) / minMA) * 100 : 999;
-  const isMATangled = maSpreadPct <= 3.2;
-  const isKBreakout = base.bar.close >= maxMA && base.bar.close >= base.bar.open;
+  const maxM = Math.max(ma5, ma10, ma20);
+  const minM = Math.min(ma5, ma10, ma20);
+  const maSpread = minM > 0 ? ((maxM - minM) / minM) * 100 : 999;
+  const isMATangled = maSpread <= 4.0;
+  const isKBreakout = base.bar.close >= maxM;
 
   details.push({
-    name: '日均線 5/10/20 糾結合力轉噴 (天機K站上)',
+    name: '日均線 5/10/20 糾結合力 (天機K站上)',
     pass: isMATangled && isKBreakout,
-    desc: `均線糾結度 ${maSpreadPct.toFixed(1)}% (${isMATangled ? '已糾結≤3.2%' : '發散'})，紅K站上短均：${isKBreakout ? '達成' : '未站上'}`
+    desc: `均線糾結度 ${maSpread.toFixed(1)}% (${isMATangled ? '已糾結≤4%' : '未糾結'})，紅K站上：${isKBreakout ? '達成' : '未站上'}`
   });
 
   const passCount = details.filter(d => d.pass).length;
@@ -6952,11 +6914,11 @@ const detectTianjiModel4 = (data, targetIdx) => {
 
   return {
     modelType: 4,
-    modelName: '天機模型 4 (兩底一新高·後量超前量·均線糾結轉噴)',
+    modelName: '天機模型 4 (兩底一新高)',
     isHit: score >= 75,
     score,
     details,
-    keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: globalKeyVolSupport }
+    keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: base.keyVolumeBaseline }
   };
 };
 
