@@ -5264,17 +5264,20 @@ const handleOpenSectorMomentum = async () => {
         const fn2 = (typeof detectTianjiModel2 === 'function' ? detectTianjiModel2 : (typeof window !== 'undefined' ? window.detectTianjiModel2 : null));
         const fn3 = (typeof detectTianjiModel3 === 'function' ? detectTianjiModel3 : (typeof window !== 'undefined' ? window.detectTianjiModel3 : null));
         const fn4 = (typeof detectTianjiModel4 === 'function' ? detectTianjiModel4 : (typeof window !== 'undefined' ? window.detectTianjiModel4 : null));
+        const fn5 = (typeof detectTianjiModel5 === 'function' ? detectTianjiModel5 : (typeof window !== 'undefined' ? window.detectTianjiModel5 : null));
 
         const m1 = typeof fn1 === 'function' ? fn1(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
         const m2 = typeof fn2 === 'function' ? fn2(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
         const m3 = typeof fn3 === 'function' ? fn3(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
         const m4 = typeof fn4 === 'function' ? fn4(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
-        
+        const m5 = typeof fn5 === 'function' ? fn5(targetData, targetIdx, tianjiParams) : { score: 0, details: [] };
+   
         const modelList = [
           { type: 1, name: '模型 1 (ABC深回)', res: m1 },
           { type: 2, name: '模型 2 (淺回平台)', res: m2 },
           { type: 3, name: '模型 3 (收斂三角)', res: m3 },
           { type: 4, name: '模型 4 (兩底一新高)', res: m4 },
+          { type: 5, name: '模型 5 (暗處吸籌)', res: m5 },
         ];
 
         const activeModelObj = modelList.find(m => m.type === tianjiParams.activeTab) || modelList[0];
@@ -6926,11 +6929,273 @@ const detectTianjiModel4 = (data, targetIdx, params = {}) => {
     keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: base.keyVolumeBaseline }
   };
 };
+/**
+ * 🎯 天機模型 5：暗處吸籌型 (深跌沉澱 -> 窄幅上升三角3~4底逐底墊高 -> 底轉上放量+均線糾結天機K起漲)
+ *
+ * 核心特徵：
+ * 1. 左側歷經深度下跌且量縮沈澱一段時間 (暗處吸籌)
+ * 2. 走出上升三角形：高點有水平頸線壓制，低點出現明顯 3~4 個波段底且「逐底墊高 (Higher Lows)」
+ * 3. 🌟 上下振幅濾網：三角區間上下最大振幅不得超過 45% (越緊湊籌碼越乾淨，拒絕寬幅散漫震盪)
+ * 4. 轉折間距濾網：底和底之間不能太近 (至少相隔 5~8 根K棒)，若 2 與 3 距離過近或價格重疊，則需第 4 個底確認
+ * 5. 🌟 量價健康度：放量發生在「底轉上的起漲初期 (低檔~中檔)」，頂部不爆異常出貨巨量
+ * 6. 洗籌末端起漲位：日均線 (5/10/20MA) 糾結合力，天機紅 K 突破站上
+ */
+const detectTianjiModel5 = (data, targetIdx, params = {}) => {
+  const currentIdx = targetIdx !== undefined ? targetIdx : (data ? data.length - 1 : 0);
+  const base = extractBaseMetrics(data, currentIdx, params);
+  const bar = data ? data[currentIdx] : null;
+
+  if (!base || !bar || currentIdx < 40) {
+    return { 
+      isHit: false, 
+      score: 0, 
+      details: [{ name: '歷史資料長度', pass: false, desc: `目前 K 線數量僅 ${currentIdx + 1} 根，模型5需至少 40 根以上` }] 
+    };
+  }
+
+  const details = [];
+  const washLen = Math.min(params.washLookback || 60, currentIdx);
+  const scanStart = Math.max(0, currentIdx - washLen);
+
+  // ==========================================
+  // 1. 檢驗左側是否為「深跌或量縮沉澱」
+  // ==========================================
+  const accumLen = Math.min(params.accumLookback || 180, currentIdx);
+  const leftStart = Math.max(0, currentIdx - accumLen);
+  const leftBars = data.slice(leftStart, scanStart + 1);
+
+  let isDeepDropOrDormant = false;
+  let dropPct = 0;
+  if (leftBars.length >= 20) {
+    const highestInLeft = Math.max(...leftBars.map(b => b.high));
+    const lowestInLeft = Math.min(...leftBars.map(b => b.low));
+    dropPct = highestInLeft > 0 ? ((highestInLeft - lowestInLeft) / highestInLeft) * 100 : 0;
+    isDeepDropOrDormant = dropPct >= 20; // 回撤達 20% 以上，代表從高檔深跌落入暗處沉澱
+  }
+
+  details.push({
+    name: '左側深跌或長期籌碼沉澱',
+    pass: isDeepDropOrDormant,
+    desc: `左側區間最大回撤 ${dropPct.toFixed(1)}% (${isDeepDropOrDormant ? '符合深跌沉澱' : '跌幅較淺/仍在多頭高檔'})`
+  });
+
+  // ==========================================
+  // 2. 抓取區域轉折點 (Peaks & Troughs)
+  // ==========================================
+  const extremes = findLocalExtremes(data, scanStart, currentIdx, 2);
+  const troughs = extremes.filter(e => e.type === 'trough');
+  const peaks = extremes.filter(e => e.type === 'peak');
+
+  // 篩選相鄰距離合理的有效波段底
+  const validTroughs = [];
+  for (let i = 0; i < troughs.length; i++) {
+    const curT = troughs[i];
+    if (validTroughs.length === 0) {
+      validTroughs.push(curT);
+      continue;
+    }
+    const prevT = validTroughs[validTroughs.length - 1];
+    const barDistance = curT.idx - prevT.idx;
+
+    // 若底與底小於 5 根 K 棒且價格極相近，視為同個複合底，保留較低者
+    if (barDistance < 5) {
+      if (curT.price < prevT.price) {
+        validTroughs[validTroughs.length - 1] = curT;
+      }
+    } else {
+      validTroughs.push(curT);
+    }
+  }
+
+  const recentTroughs = validTroughs.slice(-4);
+  const troughCount = recentTroughs.length;
+
+  let isHigherLows = false;
+  let isDistanceValid = true;
+  let stepDetailMsg = '';
+
+  if (troughCount >= 3) {
+    let ascending = true;
+    for (let k = 1; k < recentTroughs.length; k++) {
+      const prevPrice = recentTroughs[k - 1].price;
+      const curPrice = recentTroughs[k].price;
+      // 容許極微幅平行 0.99，但大方向須逐底抬高
+      if (curPrice < prevPrice * 0.99) {
+        ascending = false;
+      }
+    }
+
+    if (troughCount === 3) {
+      const dist23 = recentTroughs[2].idx - recentTroughs[1].idx;
+      const priceDiff23 = Math.abs(recentTroughs[2].price - recentTroughs[1].price) / recentTroughs[1].price;
+      if (dist23 < 6 || priceDiff23 < 0.01) {
+        isDistanceValid = false;
+        stepDetailMsg = '底2與底3過於相近/平底，需第4個底確認';
+      } else {
+        stepDetailMsg = '形成明顯 3 個階梯墊高底';
+      }
+    } else if (troughCount >= 4) {
+      stepDetailMsg = `形成完美 4 點階梯墊高底 (${recentTroughs.map(t => t.price.toFixed(1)).join(' < ')})`;
+      isDistanceValid = true;
+    }
+
+    isHigherLows = ascending && isDistanceValid;
+  } else {
+    stepDetailMsg = `目前僅辨識出 ${troughCount} 個波段轉折底 (需 3~4 個)`;
+  }
+
+  details.push({
+    name: '上升三角：3~4個波段底階梯墊高',
+    pass: isHigherLows,
+    desc: `${stepDetailMsg} [底數: ${troughCount} 個, 最近底價: ${recentTroughs.map(t => t.price.toFixed(1)).join(' -> ')}]`
+  });
+
+  // ==========================================
+  // 3. 頸線水平度
+  // ==========================================
+  let isCeilingFlat = false;
+  let ceilingPrice = 0;
+  if (peaks.length >= 2) {
+    const peakPrices = peaks.slice(-3).map(p => p.price);
+    const maxP = Math.max(...peakPrices);
+    const minP = Math.min(...peakPrices);
+    ceilingPrice = maxP;
+    isCeilingFlat = ((maxP - minP) / minP) <= 0.07; // 高點水平波動小於 7%
+  } else {
+    isCeilingFlat = true;
+    ceilingPrice = bar.high;
+  }
+
+  details.push({
+    name: '頸線水平壓制蓄勢',
+    pass: isCeilingFlat,
+    desc: `上方高點水平度：${isCeilingFlat ? '高點受阻於水平頸線，蓄勢破切' : '高點波動過於發散'}`
+  });
+
+  // ==========================================
+  // 🌟 4. 新增：三角型上下垂直振幅 ≤ 45% (拒絕寬幅發散散漫震盪)
+  // ==========================================
+  const triangleBars = data.slice(scanStart, currentIdx + 1);
+  let isTightRange = false;
+  let rangePct = 0;
+
+  if (triangleBars.length > 0) {
+    const triangleMaxHigh = Math.max(...triangleBars.map(b => b.high));
+    const triangleMinLow = Math.min(...triangleBars.map(b => b.low));
+    if (triangleMinLow > 0) {
+      rangePct = ((triangleMaxHigh - triangleMinLow) / triangleMinLow) * 100;
+      isTightRange = rangePct <= 45.0; // 🌟 振幅必須在 45% 以內
+    }
+  }
+
+  details.push({
+    name: '三角型振幅緊湊 (上下幅度 ≤ 45%)',
+    pass: isTightRange,
+    desc: `區間垂直振幅 ${rangePct.toFixed(1)}% (${isTightRange ? '窄幅緊湊控盤 (≤45%)' : '振幅過大發散，浮額未沉澱 (>45%)'})`
+  });
+
+  // ==========================================
+  // 🌟 5. 放量位置檢驗：放量在底轉上起漲，頂部不爆出貨量
+  // ==========================================
+  let isBottomVolumeHealthy = true;
+  let volReason = '';
+
+  if (triangleBars.length >= 10 && ceilingPrice > 0 && recentTroughs.length > 0) {
+    const lowestFloor = Math.min(...recentTroughs.map(t => t.price));
+    const rangeHeight = ceilingPrice - lowestFloor;
+
+    if (rangeHeight > 0) {
+      // 找出三角整理區間內的成交量前 3 大 K 棒
+      const sortedByVol = [...triangleBars].sort((a, b) => b.volume - a.volume);
+      const topVolBars = sortedByVol.slice(0, 3);
+
+      let topNearCeilingCount = 0;
+      let bottomTurnVolCount = 0;
+
+      topVolBars.forEach(b => {
+        // 價格位於區間上半部 75% 以上，且為黑 K 或長上影線 -> 頂部爆量滯銷/出貨
+        const isNearTop = b.high >= ceilingPrice - rangeHeight * 0.25;
+        const isBearishOrUpperShadow = (b.close < b.open) || ((b.high - Math.max(b.open, b.close)) > (b.high - b.low) * 0.4);
+        if (isNearTop && isBearishOrUpperShadow) {
+          topNearCeilingCount++;
+        }
+
+        // 價格位於區間下半部或轉折低點附近起漲 (低檔至中檔 0~60%)，且為紅 K
+        const isNearBottomOrMid = b.low <= lowestFloor + rangeHeight * 0.60;
+        const isBullish = b.close >= b.open;
+        if (isNearBottomOrMid && isBullish) {
+          bottomTurnVolCount++;
+        }
+      });
+
+      if (topNearCeilingCount >= 2) {
+        isBottomVolumeHealthy = false;
+        volReason = '警戒：頂部頸線處爆 2 次以上大量滯銷/出貨';
+      } else if (bottomTurnVolCount >= 1) {
+        isBottomVolumeHealthy = true;
+        volReason = `健康：大量多發生在底轉上推升段 (${bottomTurnVolCount} 次底轉上增量，頂部未見異常拋壓)`;
+      } else {
+        isBottomVolumeHealthy = true;
+        volReason = '量能溫和沉澱，頂部無異常拋盤';
+      }
+    }
+  }
+
+  details.push({
+    name: '量價結構：底轉上放量 (頂部無異常巨量)',
+    pass: isBottomVolumeHealthy,
+    desc: volReason || '量價符合底轉上推升格局'
+  });
+
+  // ==========================================
+  // 6. 均線 (5/10/20MA) 糾結轉發散 (天機K起漲)
+  // ==========================================
+  const ma5 = bar.ma1 ?? bar.ma5 ?? bar.close;
+  const ma10 = bar.ma2 ?? bar.ma10 ?? bar.close;
+  const ma20 = bar.ma3 ?? bar.ma20 ?? bar.close;
+
+  const maxMA = Math.max(ma5, ma10, ma20);
+  const minMA = Math.min(ma5, ma10, ma20);
+  const maSpread = minMA > 0 ? ((maxMA - minMA) / minMA) * 100 : 999;
+  const isMATangled = maSpread <= 4.2;
+  const isTianjiK = bar.close >= maxMA && bar.close >= bar.open;
+
+  details.push({
+    name: '第3/4底均線糾結轉發散 (天機K起漲)',
+    pass: isMATangled && isTianjiK,
+    desc: `日均線糾結度 ${maSpread.toFixed(1)}% (${isMATangled ? '已糾結≤4.2%' : '發散中'})，天機紅K站上短均合力：${isTianjiK ? '站上啟動' : '未達'}`
+  });
+
+  // ==========================================
+  // 7. 吸籌防守價位
+  // ==========================================
+  const firstTroughPrice = recentTroughs.length > 0 ? recentTroughs[0].price : base.keyVolumeBaseline;
+  const isAboveBaseline = bar.close >= firstTroughPrice * 0.97;
+
+  details.push({
+    name: '守住第 1 底起漲防守點',
+    pass: isAboveBaseline,
+    desc: `現價 ${bar.close?.toFixed(2)} ${isAboveBaseline ? '≥' : '<'} 暗處吸籌第 1 底基準價 (${firstTroughPrice?.toFixed(2)})`
+  });
+
+  const passCount = details.filter(d => d.pass).length;
+  const score = Math.round((passCount / details.length) * 100);
+
+  return {
+    modelType: 5,
+    modelName: '天機模型 5 (暗處吸籌·上升三角3~4底)',
+    isHit: score >= 75,
+    score,
+    details,
+    keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: firstTroughPrice }
+  };
+};
 if (typeof window !== 'undefined') {
   window.detectTianjiModel1 = detectTianjiModel1;
   window.detectTianjiModel2 = detectTianjiModel2;
   window.detectTianjiModel3 = detectTianjiModel3;
   window.detectTianjiModel4 = detectTianjiModel4;
+  window.detectTianjiModel5 = detectTianjiModel5;
 }
 
 /**
