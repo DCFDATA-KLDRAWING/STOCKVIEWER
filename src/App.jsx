@@ -6930,26 +6930,26 @@ const detectTianjiModel4 = (data, targetIdx, params = {}) => {
   };
 };
 /**
- * 🎯 天機模型 5：暗處吸籌型 (深跌沉澱 -> 窄幅上升三角3~4底逐底墊高 -> 底轉上放量+均線糾結天機K起漲)
+ * 🎯 天機模型 5：暗處吸籌型 (純型態版：上升三角3~4底逐底墊高 + 上下振幅≤45% + 底轉上放量)
  *
- * 核心特徵：
- * 1. 左側歷經深度下跌且量縮沈澱一段時間 (暗處吸籌)
- * 2. 走出上升三角形：高點有水平頸線壓制，低點出現明顯 3~4 個波段底且「逐底墊高 (Higher Lows)」
- * 3. 🌟 上下振幅濾網：三角區間上下最大振幅不得超過 45% (越緊湊籌碼越乾淨，拒絕寬幅散漫震盪)
- * 4. 轉折間距濾網：底和底之間不能太近 (至少相隔 5~8 根K棒)，若 2 與 3 距離過近或價格重疊，則需第 4 個底確認
+ * 核心型態特徵：
+ * 1. 走出標準上升三角形：高點有水平頸線壓制蓄勢
+ * 2. 低點出現明顯 3~4 個波段底且「逐底階梯式墊高 (Higher Lows)」
+ * 3. 轉折間距濾網：底和底之間不能太近 (至少相隔 5~8 根K棒)，若 2 與 3 距離過近或價格重疊，則需第 4 個底確認
+ * 4. 🌟 上下垂直振幅濾網：三角區間上下最大振幅不得超過 45% (窄幅緊湊控盤，拒絕寬幅散漫震盪)
  * 5. 🌟 量價健康度：放量發生在「底轉上的起漲初期 (低檔~中檔)」，頂部不爆異常出貨巨量
- * 6. 洗籌末端起漲位：日均線 (5/10/20MA) 糾結合力，天機紅 K 突破站上
+ * 6. 守住第 1 底起漲防守點
  */
 const detectTianjiModel5 = (data, targetIdx, params = {}) => {
   const currentIdx = targetIdx !== undefined ? targetIdx : (data ? data.length - 1 : 0);
   const base = extractBaseMetrics(data, currentIdx, params);
   const bar = data ? data[currentIdx] : null;
 
-  if (!base || !bar || currentIdx < 40) {
+  if (!base || !bar || currentIdx < 25) {
     return { 
       isHit: false, 
       score: 0, 
-      details: [{ name: '歷史資料長度', pass: false, desc: `目前 K 線數量僅 ${currentIdx + 1} 根，模型5需至少 40 根以上` }] 
+      details: [{ name: '歷史資料長度', pass: false, desc: `目前 K 線數量僅 ${currentIdx + 1} 根，模型5需至少 25 根以上` }] 
     };
   }
 
@@ -6958,29 +6958,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
   const scanStart = Math.max(0, currentIdx - washLen);
 
   // ==========================================
-  // 1. 檢驗左側是否為「深跌或量縮沉澱」
-  // ==========================================
-  const accumLen = Math.min(params.accumLookback || 180, currentIdx);
-  const leftStart = Math.max(0, currentIdx - accumLen);
-  const leftBars = data.slice(leftStart, scanStart + 1);
-
-  let isDeepDropOrDormant = false;
-  let dropPct = 0;
-  if (leftBars.length >= 20) {
-    const highestInLeft = Math.max(...leftBars.map(b => b.high));
-    const lowestInLeft = Math.min(...leftBars.map(b => b.low));
-    dropPct = highestInLeft > 0 ? ((highestInLeft - lowestInLeft) / highestInLeft) * 100 : 0;
-    isDeepDropOrDormant = dropPct >= 20; // 回撤達 20% 以上，代表從高檔深跌落入暗處沉澱
-  }
-
-  details.push({
-    name: '左側深跌或長期籌碼沉澱',
-    pass: isDeepDropOrDormant,
-    desc: `左側區間最大回撤 ${dropPct.toFixed(1)}% (${isDeepDropOrDormant ? '符合深跌沉澱' : '跌幅較淺/仍在多頭高檔'})`
-  });
-
-  // ==========================================
-  // 2. 抓取區域轉折點 (Peaks & Troughs)
+  // 1. 抓取區域轉折點 (Peaks & Troughs)
   // ==========================================
   const extremes = findLocalExtremes(data, scanStart, currentIdx, 2);
   const troughs = extremes.filter(e => e.type === 'trough');
@@ -7035,7 +7013,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
         stepDetailMsg = '形成明顯 3 個階梯墊高底';
       }
     } else if (troughCount >= 4) {
-      stepDetailMsg = `形成完美 4 點階梯墊高底 (${recentTroughs.map(t => t.price.toFixed(1)).join(' < ')})`;
+      stepDetailMsg = `形成完整 4 點階梯墊高底 (${recentTroughs.map(t => t.price.toFixed(1)).join(' < ')})`;
       isDistanceValid = true;
     }
 
@@ -7051,7 +7029,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
   });
 
   // ==========================================
-  // 3. 頸線水平度
+  // 2. 頸線水平度
   // ==========================================
   let isCeilingFlat = false;
   let ceilingPrice = 0;
@@ -7060,7 +7038,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
     const maxP = Math.max(...peakPrices);
     const minP = Math.min(...peakPrices);
     ceilingPrice = maxP;
-    isCeilingFlat = ((maxP - minP) / minP) <= 0.07; // 高點水平波動小於 7%
+    isCeilingFlat = ((maxP - minP) / minP) <= 0.08; // 高點水平波動小於 8%
   } else {
     isCeilingFlat = true;
     ceilingPrice = bar.high;
@@ -7073,7 +7051,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
   });
 
   // ==========================================
-  // 🌟 4. 新增：三角型上下垂直振幅 ≤ 45% (拒絕寬幅發散散漫震盪)
+  // 🌟 3. 三角型上下垂直振幅 ≤ 45% (拒絕寬幅發散散漫震盪)
   // ==========================================
   const triangleBars = data.slice(scanStart, currentIdx + 1);
   let isTightRange = false;
@@ -7084,7 +7062,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
     const triangleMinLow = Math.min(...triangleBars.map(b => b.low));
     if (triangleMinLow > 0) {
       rangePct = ((triangleMaxHigh - triangleMinLow) / triangleMinLow) * 100;
-      isTightRange = rangePct <= 45.0; // 🌟 振幅必須在 45% 以內
+      isTightRange = rangePct <= 45.0; // 🌟 垂直振幅限制 45% 以內
     }
   }
 
@@ -7095,12 +7073,12 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
   });
 
   // ==========================================
-  // 🌟 5. 放量位置檢驗：放量在底轉上起漲，頂部不爆出貨量
+  // 🌟 4. 放量位置檢驗：放量在底轉上起漲，頂部不爆出貨量
   // ==========================================
   let isBottomVolumeHealthy = true;
   let volReason = '';
 
-  if (triangleBars.length >= 10 && ceilingPrice > 0 && recentTroughs.length > 0) {
+  if (triangleBars.length >= 8 && ceilingPrice > 0 && recentTroughs.length > 0) {
     const lowestFloor = Math.min(...recentTroughs.map(t => t.price));
     const rangeHeight = ceilingPrice - lowestFloor;
 
@@ -7148,26 +7126,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
   });
 
   // ==========================================
-  // 6. 均線 (5/10/20MA) 糾結轉發散 (天機K起漲)
-  // ==========================================
-  const ma5 = bar.ma1 ?? bar.ma5 ?? bar.close;
-  const ma10 = bar.ma2 ?? bar.ma10 ?? bar.close;
-  const ma20 = bar.ma3 ?? bar.ma20 ?? bar.close;
-
-  const maxMA = Math.max(ma5, ma10, ma20);
-  const minMA = Math.min(ma5, ma10, ma20);
-  const maSpread = minMA > 0 ? ((maxMA - minMA) / minMA) * 100 : 999;
-  const isMATangled = maSpread <= 4.2;
-  const isTianjiK = bar.close >= maxMA && bar.close >= bar.open;
-
-  details.push({
-    name: '第3/4底均線糾結轉發散 (天機K起漲)',
-    pass: isMATangled && isTianjiK,
-    desc: `日均線糾結度 ${maSpread.toFixed(1)}% (${isMATangled ? '已糾結≤4.2%' : '發散中'})，天機紅K站上短均合力：${isTianjiK ? '站上啟動' : '未達'}`
-  });
-
-  // ==========================================
-  // 7. 吸籌防守價位
+  // 5. 吸籌防守價位
   // ==========================================
   const firstTroughPrice = recentTroughs.length > 0 ? recentTroughs[0].price : base.keyVolumeBaseline;
   const isAboveBaseline = bar.close >= firstTroughPrice * 0.97;
@@ -7190,6 +7149,7 @@ const detectTianjiModel5 = (data, targetIdx, params = {}) => {
     keyLevels: { w20ma: base.w20ma, keyVolumeBaseline: firstTroughPrice }
   };
 };
+
 if (typeof window !== 'undefined') {
   window.detectTianjiModel1 = detectTianjiModel1;
   window.detectTianjiModel2 = detectTianjiModel2;
