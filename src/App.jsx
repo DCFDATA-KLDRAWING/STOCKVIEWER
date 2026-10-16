@@ -6658,16 +6658,16 @@ const extractBaseMetrics = (data, currentIdx, customParams = {}) => {
   };
 };
 
-/* STREAMING_CHUNK:Refining Model 1 to exclude multi-bottom ascending triangles */
 /**
- * 🎯 天機模型 1：主力吸籌 -> ABC 深回洗盤 (增加多底上升三角排他濾網)
+ * 🎯 天機模型 1：主力明處吸籌 -> ABC 深回洗盤
+ * (核心差異：模型 1 必須有左側明顯放量「明處吸籌波段」，而模型 5 是暗處窄幅吸籌無單一吸籌段)
  */
 const detectTianjiModel1 = (data, targetIdx, params = {}) => {
   const currentIdx = targetIdx !== undefined ? targetIdx : (data ? data.length - 1 : 0);
   const base = extractBaseMetrics(data, currentIdx, params);
   const bar = data ? data[currentIdx] : null;
 
-  if (!base || !bar || currentIdx < 15) {
+  if (!base || !bar || currentIdx < 20) {
     return { 
       isHit: false, 
       score: 0, 
@@ -6677,27 +6677,48 @@ const detectTianjiModel1 = (data, targetIdx, params = {}) => {
 
   const details = [];
   const washLen = Math.min(params.washLookback || 30, currentIdx);
+  const recentWashBars = data.slice(Math.max(0, currentIdx - washLen), currentIdx + 1);
+  const recentAvgVol = recentWashBars.reduce((s, b) => s + b.volume, 0) / (recentWashBars.length || 1);
 
-  // 1. 週 20MA
+  // ==========================================
+  // 🌟 核心區分 1：左側必須具備明確的「明處吸籌波段」(成交量顯著放大)
+  // ==========================================
+  // 若左側最大量連洗籌均量的 1.6 倍都不到，代表根本沒有大資金進場拉升建倉段 (屬於模型5的暗處型態)
+  const hasDistinctAccumWave = base.maxVolBar ? base.maxVolBar.volume >= recentAvgVol * 1.6 : false;
+
+  details.push({
+    name: '左側具備明確吸籌放量段 (明處吸籌)',
+    pass: hasDistinctAccumWave,
+    desc: hasDistinctAccumWave 
+      ? `吸籌波段最大量 (${base.maxVolBar?.volume}) 為洗籌均量之 ${(base.maxVolBar.volume / recentAvgVol).toFixed(1)} 倍 (標準≥1.6倍)`
+      : `未見明顯放量吸籌段 (最大量僅洗籌均量 ${(base.maxVolBar ? base.maxVolBar.volume / recentAvgVol : 0).toFixed(1)} 倍，非模型 1)`
+  });
+
+  // ==========================================
+  // 2. 週 20MA
+  // ==========================================
   details.push({
     name: '週 20MA 趨勢支撐',
     pass: base.isAboveW20MA && base.isW20MASlopeUp,
     desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveW20MA ? '≥' : '<'} 週20MA (${base.w20ma?.toFixed(2)})，斜率${base.isW20MASlopeUp ? '平揚' : '下彎'}`
   });
 
-  // 2. 守住吸籌段大量防守價
+  // ==========================================
+  // 3. 守住吸籌段大量防守價
+  // ==========================================
   details.push({
     name: '守住吸籌段大量防守價',
     pass: base.isAboveKeyVolSupport && base.maxVolBar !== null,
-    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量低點 (${base.keyVolumeBaseline?.toFixed(2)})`
+    desc: `現價 ${base.bar.close?.toFixed(2)} ${base.isAboveKeyVolSupport ? '≥' : '<'} 大量低點 (${base.keyVolumeBaseline?.toFixed(2)}) [大量日: ${base.maxVolBar?.date || '-'}]`
   });
 
-  // 3. 轉折波段分析與排他檢驗
+  // ==========================================
+  // 🌟 核心區分 2：回檔形態檢測 (排除 3 底以上的高檔水平上升三角)
+  // ==========================================
   const extremes = findLocalExtremes(data, Math.max(0, currentIdx - washLen), currentIdx, 2);
   const troughs = extremes.filter(e => e.type === 'trough');
   const peaks = extremes.filter(e => e.type === 'peak');
 
-  // 🌟 排他濾網：若已經形成 3 個以上墊高底，且上方頸線平坦 -> 這是模型 5 (上升三角)，非模型 1 (ABC深回)
   let isNotAscendingTriangle = true;
   if (troughs.length >= 3 && peaks.length >= 2) {
     const peakPrices = peaks.slice(-3).map(p => p.price);
@@ -6705,24 +6726,23 @@ const detectTianjiModel1 = (data, targetIdx, params = {}) => {
     const minP = Math.min(...peakPrices);
     const isCeilingFlat = ((maxP - minP) / minP) <= 0.08;
     if (isCeilingFlat) {
-      isNotAscendingTriangle = false; // 這是典型上升三角，模型 1 予以排他
+      isNotAscendingTriangle = false;
     }
   }
 
-  // 洗籌縮量
-  const recentWashBars = data.slice(Math.max(0, currentIdx - washLen), currentIdx + 1);
-  const recentAvgVol = recentWashBars.reduce((s, b) => s + b.volume, 0) / (recentWashBars.length || 1);
   const isVolDryUp = base.maxVolBar ? recentAvgVol < base.maxVolBar.volume * 0.75 : false;
 
   details.push({
-    name: 'ABC深回結構 (非多重底上升三角)',
+    name: 'ABC深回洗籌縮量 (非上升三角)',
     pass: isVolDryUp && isNotAscendingTriangle,
     desc: isNotAscendingTriangle 
-      ? `洗籌均量較大量縮 ${base.maxVolBar ? Math.round((1 - recentAvgVol / base.maxVolBar.volume) * 100) : 0}% (標準>25%)`
-      : '型態特徵：高點水平壓制且已有 3 底以上，屬於「模型 5 (上升三角)」，非 ABC 深回'
+      ? `洗籌均量較吸籌段量縮 ${base.maxVolBar ? Math.round((1 - recentAvgVol / base.maxVolBar.volume) * 100) : 0}%`
+      : '型態為水平頸線多底上升三角 (屬於模型 5)'
   });
 
+  // ==========================================
   // 4. 洗籌末端轉折紅 K
+  // ==========================================
   const ma5 = base.bar.ma1 ?? base.bar.ma5 ?? base.bar.close;
   const isTurnUp = base.bar.close >= ma5 && base.bar.close >= base.bar.open;
   details.push({
