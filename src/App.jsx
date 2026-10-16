@@ -8173,7 +8173,7 @@ const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4]) =
           </div>
         );
       })()}
-      /* STREAMING_CHUNK:Rendering Tianji Model Lab research and diagnostic modal */
+      
       {/* 🔮 天機模型深入研發與調參診斷儀表板 (Tianji Lab) */}
       {isTianjiLabOpen && (() => {
         const targetIdx = crosshair && crosshair.idx !== undefined ? crosshair.idx : (data ? data.length - 1 : 0);
