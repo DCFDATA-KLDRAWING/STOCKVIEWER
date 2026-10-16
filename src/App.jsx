@@ -7190,17 +7190,31 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * 🌟 天機全模型綜合掃描評估器 (已升級：支援模型 1~5，並支援調參 params)
+ * 🌟 天機全模型綜合掃描評估器 (已升級：優先吃全域最新演算法、強制加入模型 5、平手時專屬型態優先)
  */
-const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4, 5], params = {}) => {
+export const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4, 5], params = {}) => {
   const allResults = [];
 
-  // 安全取得函式 (相容全域 window 或局部變數)
-  const fn1 = typeof detectTianjiModel1 === 'function' ? detectTianjiModel1 : (typeof window !== 'undefined' ? window.detectTianjiModel1 : null);
-  const fn2 = typeof detectTianjiModel2 === 'function' ? detectTianjiModel2 : (typeof window !== 'undefined' ? window.detectTianjiModel2 : null);
-  const fn3 = typeof detectTianjiModel3 === 'function' ? detectTianjiModel3 : (typeof window !== 'undefined' ? window.detectTianjiModel3 : null);
-  const fn4 = typeof detectTianjiModel4 === 'function' ? detectTianjiModel4 : (typeof window !== 'undefined' ? window.detectTianjiModel4 : null);
-  const fn5 = typeof detectTianjiModel5 === 'function' ? detectTianjiModel5 : (typeof window !== 'undefined' ? window.detectTianjiModel5 : null);
+  // 🌟 核心防護 1：優先取用掛在 window 上的最新版演算法 (避免被本機舊 closure 綁架)
+  const fn1 = (typeof window !== 'undefined' && typeof window.detectTianjiModel1 === 'function') 
+    ? window.detectTianjiModel1 
+    : (typeof detectTianjiModel1 === 'function' ? detectTianjiModel1 : null);
+
+  const fn2 = (typeof window !== 'undefined' && typeof window.detectTianjiModel2 === 'function') 
+    ? window.detectTianjiModel2 
+    : (typeof detectTianjiModel2 === 'function' ? detectTianjiModel2 : null);
+
+  const fn3 = (typeof window !== 'undefined' && typeof window.detectTianjiModel3 === 'function') 
+    ? window.detectTianjiModel3 
+    : (typeof detectTianjiModel3 === 'function' ? detectTianjiModel3 : null);
+
+  const fn4 = (typeof window !== 'undefined' && typeof window.detectTianjiModel4 === 'function') 
+    ? window.detectTianjiModel4 
+    : (typeof detectTianjiModel4 === 'function' ? detectTianjiModel4 : null);
+
+  const fn5 = (typeof window !== 'undefined' && typeof window.detectTianjiModel5 === 'function') 
+    ? window.detectTianjiModel5 
+    : (typeof detectTianjiModel5 === 'function' ? detectTianjiModel5 : null);
 
   if (requestedModels.includes(1) && typeof fn1 === 'function') allResults.push(fn1(data, targetIdx, params));
   if (requestedModels.includes(2) && typeof fn2 === 'function') allResults.push(fn2(data, targetIdx, params));
@@ -7208,8 +7222,14 @@ const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4, 5]
   if (requestedModels.includes(4) && typeof fn4 === 'function') allResults.push(fn4(data, targetIdx, params));
   if (requestedModels.includes(5) && typeof fn5 === 'function') allResults.push(fn5(data, targetIdx, params));
 
-  // 契合度由高到低排序
-  allResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+  // 🌟 核心防護 2：排序規則升級！
+  // 分數高者優先；若同分時，進階型態（如模型 5、4、3）優先於基礎型態（模型 1）
+  allResults.sort((a, b) => {
+    const scoreDiff = (b.score || 0) - (a.score || 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    return (b.modelType || 0) - (a.modelType || 0); // 同分時，型態定義更精確的高編號優先
+  });
+
   const bestHit = allResults.find(r => r.isHit) || allResults[0] || { modelType: 0, modelName: '無吻合模型', score: 0 };
 
   return {
@@ -7220,7 +7240,7 @@ const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4, 5]
 };
 
 // 🧠 2. 買入條件動態判斷計算函式 (已連動模型 5 與 tianjiParams 調參)
-const evaluateBuyConditions = (targetBarIdx) => {
+export const evaluateBuyConditionsWithTianji = (data, conditions, targetBarIdx, crosshair, drawings, tianjiParams = {}) => {
   if (!data || data.length === 0) return { results: [], totalEnabled: 0, passCount: 0 };
 
   const idx = targetBarIdx ?? (crosshair && crosshair.idx !== undefined ? crosshair.idx : data.length - 1);
@@ -7243,7 +7263,7 @@ const evaluateBuyConditions = (targetBarIdx) => {
     }
   }
 
-  // 抓取目前研發實驗室的滑桿參數 (若存在)，確保買訊與滑桿調參同步連動
+  // 抓取目前研發實驗室的滑桿參數
   const currentTianjiParams = (typeof tianjiParams !== 'undefined') ? tianjiParams : {};
 
   const results = conditions.map(c => {
@@ -7311,21 +7331,29 @@ const evaluateBuyConditions = (targetBarIdx) => {
         break;
       }
 
-      // 🌟 天機模型偵測：支援 1~5 全部模型，並接收滑桿調參
+      // 🌟 天機模型偵測：強制保送模型 5，且平手時以進階形態優先
       case 'tianji': {
         const checkDays = c.days || 5;
-        const targetModels = c.models || [1, 2, 3, 4, 5]; // 🌟 加入模型 5
+        // 🌟 核心防護 3：不管 localStorage 以前存什麼，強制把 1~5 號模型全部補齊！
+        const targetModels = Array.from(new Set([...(c.models || [1, 2, 3, 4, 5]), 1, 2, 3, 4, 5]));
         let hitResult = null;
         let hitDate = null;
 
-        // 往前回溯搜尋近 N 日內是否有觸發天機 1~5
-        const startSearch = Math.max(0, idx - checkDays + 1);
-        for (let k = idx; k >= startSearch; k--) {
-          const scan = evaluateTianjiModels(data, k, targetModels, currentTianjiParams);
-          if (scan.isAnyHit) {
-            hitResult = scan.bestHit;
-            hitDate = data[k]?.date;
-            break;
+        // 🌟 優先檢查當前基準日 (最即時、契合度最高)
+        const todayScan = evaluateTianjiModels(data, idx, targetModels, currentTianjiParams);
+        if (todayScan.isAnyHit) {
+          hitResult = todayScan.bestHit;
+          hitDate = data[idx]?.date;
+        } else {
+          // 當前日若未達標，才往前回溯近 N 日
+          const startSearch = Math.max(0, idx - checkDays + 1);
+          for (let k = idx - 1; k >= startSearch; k--) {
+            const scan = evaluateTianjiModels(data, k, targetModels, currentTianjiParams);
+            if (scan.isAnyHit) {
+              hitResult = scan.bestHit;
+              hitDate = data[k]?.date;
+              break;
+            }
           }
         }
 
