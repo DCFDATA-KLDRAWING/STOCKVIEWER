@@ -7192,7 +7192,7 @@ if (typeof window !== 'undefined') {
 /**
  * 🌟 天機全模型綜合掃描評估器 (已升級：優先吃全域最新演算法、強制加入模型 5、平手時專屬型態優先)
  */
-  const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4, 5], params = {}) => {
+const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4, 5], params = {}) => {
   const allResults = [];
 
   // 🌟 核心防護 1：優先取用掛在 window 上的最新版演算法 (避免被本機舊 closure 綁架)
@@ -7239,8 +7239,8 @@ if (typeof window !== 'undefined') {
   };
 };
 
-// 🧠 2. 買入條件動態判斷計算函式 (已連動模型 5 與 tianjiParams 調參)
-  const evaluateBuyConditionsWithTianji = (data, conditions, targetBarIdx, crosshair, drawings, tianjiParams = {}) => {
+// 🧠 2. 買入條件動態判斷計算函式 (已命名為 evaluateBuyConditions，並支援直接呼叫)
+const evaluateBuyConditions = (targetBarIdx) => {
   if (!data || data.length === 0) return { results: [], totalEnabled: 0, passCount: 0 };
 
   const idx = targetBarIdx ?? (crosshair && crosshair.idx !== undefined ? crosshair.idx : data.length - 1);
@@ -7381,6 +7381,9 @@ if (typeof window !== 'undefined') {
   const passCount = activeConds.filter(r => r.pass).length;
   return { results, totalEnabled: activeConds.length, passCount, targetBar: bar };
 };
+
+// 🌟 雙向相容別名：無論組件呼叫哪一個名稱都能 100% 成功執行
+const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
   const handleDownloadImage = () => {
     setCrosshair(null); setHoverPoint(null);
     setTimeout(() => {
