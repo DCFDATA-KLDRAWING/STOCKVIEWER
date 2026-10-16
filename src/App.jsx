@@ -7190,18 +7190,27 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * 🌟 天機全模型綜合掃描評估器
+ * 🌟 天機全模型綜合掃描評估器 (已升級：支援模型 1~5，並支援調參 params)
  */
-const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4]) => {
+const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4, 5], params = {}) => {
   const allResults = [];
 
-  if (requestedModels.includes(1)) allResults.push(detectTianjiModel1(data, targetIdx));
-  if (requestedModels.includes(2)) allResults.push(detectTianjiModel2(data, targetIdx));
-  if (requestedModels.includes(3)) allResults.push(detectTianjiModel3(data, targetIdx));
-  if (requestedModels.includes(4)) allResults.push(detectTianjiModel4(data, targetIdx));
+  // 安全取得函式 (相容全域 window 或局部變數)
+  const fn1 = typeof detectTianjiModel1 === 'function' ? detectTianjiModel1 : (typeof window !== 'undefined' ? window.detectTianjiModel1 : null);
+  const fn2 = typeof detectTianjiModel2 === 'function' ? detectTianjiModel2 : (typeof window !== 'undefined' ? window.detectTianjiModel2 : null);
+  const fn3 = typeof detectTianjiModel3 === 'function' ? detectTianjiModel3 : (typeof window !== 'undefined' ? window.detectTianjiModel3 : null);
+  const fn4 = typeof detectTianjiModel4 === 'function' ? detectTianjiModel4 : (typeof window !== 'undefined' ? window.detectTianjiModel4 : null);
+  const fn5 = typeof detectTianjiModel5 === 'function' ? detectTianjiModel5 : (typeof window !== 'undefined' ? window.detectTianjiModel5 : null);
 
-  allResults.sort((a, b) => b.score - a.score);
-  const bestHit = allResults.find(r => r.isHit) || allResults[0];
+  if (requestedModels.includes(1) && typeof fn1 === 'function') allResults.push(fn1(data, targetIdx, params));
+  if (requestedModels.includes(2) && typeof fn2 === 'function') allResults.push(fn2(data, targetIdx, params));
+  if (requestedModels.includes(3) && typeof fn3 === 'function') allResults.push(fn3(data, targetIdx, params));
+  if (requestedModels.includes(4) && typeof fn4 === 'function') allResults.push(fn4(data, targetIdx, params));
+  if (requestedModels.includes(5) && typeof fn5 === 'function') allResults.push(fn5(data, targetIdx, params));
+
+  // 契合度由高到低排序
+  allResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+  const bestHit = allResults.find(r => r.isHit) || allResults[0] || { modelType: 0, modelName: '無吻合模型', score: 0 };
 
   return {
     bestHit,
@@ -7210,137 +7219,140 @@ const evaluateTianjiModels = (data, targetIdx, requestedModels = [1, 2, 3, 4]) =
   };
 };
 
+// 🧠 2. 買入條件動態判斷計算函式 (已連動模型 5 與 tianjiParams 調參)
+const evaluateBuyConditions = (targetBarIdx) => {
+  if (!data || data.length === 0) return { results: [], totalEnabled: 0, passCount: 0 };
 
-  // 🧠 2. 買入條件動態判斷計算函式
-  const evaluateBuyConditions = (targetBarIdx) => {
-    if (!data || data.length === 0) return { results: [], totalEnabled: 0, passCount: 0 };
+  const idx = targetBarIdx ?? (crosshair && crosshair.idx !== undefined ? crosshair.idx : data.length - 1);
+  const bar = data[idx];
+  if (!bar) return { results: [], totalEnabled: 0, passCount: 0 };
 
-    const idx = targetBarIdx ?? (crosshair && crosshair.idx !== undefined ? crosshair.idx : data.length - 1);
-    const bar = data[idx];
-    if (!bar) return { results: [], totalEnabled: 0, passCount: 0 };
+  // 抓取畫布上的最新一條手繪趨勢切線 (trend 或 segment)
+  const activeLines = drawings ? drawings.filter(d => d.type === 'trend' || d.type === 'segment') : [];
+  const latestLine = activeLines.length > 0 ? activeLines[activeLines.length - 1] : null;
 
-    // 抓取畫布上的最新一條手繪趨勢切線 (trend 或 segment)
-    const activeLines = drawings ? drawings.filter(d => d.type === 'trend' || d.type === 'segment') : [];
-    const latestLine = activeLines.length > 0 ? activeLines[activeLines.length - 1] : null;
+  let linePriceAtBar = null;
+  if (latestLine && latestLine.points && latestLine.points.length >= 2) {
+    const p1 = latestLine.points[0];
+    const p2 = latestLine.points[1];
+    const idx1 = data.length - 1 - (p1.idxFromEnd ?? 0);
+    const idx2 = data.length - 1 - (p2.idxFromEnd ?? 0);
+    if (idx1 !== idx2) {
+      const slope = (p2.price - p1.price) / (idx2 - idx1);
+      linePriceAtBar = p1.price + slope * (idx - idx1);
+    }
+  }
 
-    let linePriceAtBar = null;
-    if (latestLine && latestLine.points && latestLine.points.length >= 2) {
-      const p1 = latestLine.points[0];
-      const p2 = latestLine.points[1];
-      const idx1 = data.length - 1 - (p1.idxFromEnd ?? 0);
-      const idx2 = data.length - 1 - (p2.idxFromEnd ?? 0);
-      if (idx1 !== idx2) {
-        const slope = (p2.price - p1.price) / (idx2 - idx1);
-        linePriceAtBar = p1.price + slope * (idx - idx1);
+  // 抓取目前研發實驗室的滑桿參數 (若存在)，確保買訊與滑桿調參同步連動
+  const currentTianjiParams = (typeof tianjiParams !== 'undefined') ? tianjiParams : {};
+
+  const results = conditions.map(c => {
+    if (!c.enabled) return { ...c, pass: null, reason: '未啟用' };
+
+    let pass = false;
+    let reason = '';
+
+    switch (c.type) {
+      case 'ma': {
+        const maVal = bar[`ma${c.period}`] ?? bar[`fixedMa${c.period}`];
+        if (maVal !== undefined && maVal !== null) {
+          pass = bar.close >= maVal;
+          reason = `收盤 ${bar.close.toFixed(2)} ${pass ? '≥' : '<'} MA${c.period} (${maVal.toFixed(2)})`;
+        } else {
+          reason = `無 MA${c.period} 數據`;
+        }
+        break;
       }
+
+      case 'vol_vma': {
+        const vma5 = bar.vma1 ?? bar.vma5;
+        if (vma5 !== undefined && vma5 !== null) {
+          pass = bar.volume >= vma5;
+          reason = `量 ${bar.volume} ${pass ? '≥' : '<'} 5日均量 (${Math.round(vma5)})`;
+        } else {
+          reason = '無均量數據';
+        }
+        break;
+      }
+
+      case 'vol_min': {
+        pass = bar.volume >= (c.minVol || 1000);
+        reason = `量 ${bar.volume} ${pass ? '≥' : '<'} ${c.minVol || 1000} 張`;
+        break;
+      }
+
+      case 'break_line': {
+        if (linePriceAtBar === null) {
+          pass = false;
+          reason = '畫布上未找到趨勢切線';
+        } else {
+          const bodyBottom = Math.min(bar.open, bar.close);
+          const bodyTop = Math.max(bar.open, bar.close);
+          const isRed = bar.close >= bar.open;
+
+          if (!isRed) {
+            pass = false;
+            reason = `黑K未站上 (切線價: ${linePriceAtBar.toFixed(2)})`;
+          } else if (bodyBottom >= linePriceAtBar) {
+            pass = true;
+            reason = `全實體完全站上切線 (${linePriceAtBar.toFixed(2)})`;
+          } else if (bodyTop <= linePriceAtBar) {
+            pass = false;
+            reason = `實體完全在切線下方 (${linePriceAtBar.toFixed(2)})`;
+          } else {
+            const bodyHeight = bodyTop - bodyBottom;
+            const abovePart = bodyTop - linePriceAtBar;
+            const pct = (abovePart / bodyHeight) * 100;
+            const targetPct = c.thresholdPct || 50;
+            pass = pct >= targetPct;
+            reason = `實體突破 ${pct.toFixed(0)}% (${pass ? '≥' : '<'} 目標 ${targetPct}%)`;
+          }
+        }
+        break;
+      }
+
+      // 🌟 天機模型偵測：支援 1~5 全部模型，並接收滑桿調參
+      case 'tianji': {
+        const checkDays = c.days || 5;
+        const targetModels = c.models || [1, 2, 3, 4, 5]; // 🌟 加入模型 5
+        let hitResult = null;
+        let hitDate = null;
+
+        // 往前回溯搜尋近 N 日內是否有觸發天機 1~5
+        const startSearch = Math.max(0, idx - checkDays + 1);
+        for (let k = idx; k >= startSearch; k--) {
+          const scan = evaluateTianjiModels(data, k, targetModels, currentTianjiParams);
+          if (scan.isAnyHit) {
+            hitResult = scan.bestHit;
+            hitDate = data[k]?.date;
+            break;
+          }
+        }
+
+        if (hitResult) {
+          pass = true;
+          reason = `🔥 命中【${hitResult.modelName}】(契合度 ${hitResult.score}% 于 ${hitDate})`;
+        } else {
+          pass = false;
+          const currentScan = evaluateTianjiModels(data, idx, targetModels, currentTianjiParams);
+          const closest = currentScan.bestHit;
+          const missing = closest?.details?.find(d => !d.pass);
+          reason = `近 ${checkDays} 日未成型 (最接近: ${closest?.modelName} ${closest?.score}%，缺: ${missing ? missing.name : '量價未到位'})`;
+        }
+        break;
+      }
+
+      default:
+        reason = '未知條件';
     }
 
-    const results = conditions.map(c => {
-      if (!c.enabled) return { ...c, pass: null, reason: '未啟用' };
+    return { ...c, pass, reason };
+  });
 
-      let pass = false;
-      let reason = '';
-
-      switch (c.type) {
-        case 'ma': {
-          const maVal = bar[`ma${c.period}`] ?? bar[`fixedMa${c.period}`];
-          if (maVal !== undefined && maVal !== null) {
-            pass = bar.close >= maVal;
-            reason = `收盤 ${bar.close.toFixed(2)} ${pass ? '≥' : '<'} MA${c.period} (${maVal.toFixed(2)})`;
-          } else {
-            reason = `無 MA${c.period} 數據`;
-          }
-          break;
-        }
-
-        case 'vol_vma': {
-          const vma5 = bar.vma1 ?? bar.vma5;
-          if (vma5 !== undefined && vma5 !== null) {
-            pass = bar.volume >= vma5;
-            reason = `量 ${bar.volume} ${pass ? '≥' : '<'} 5日均量 (${Math.round(vma5)})`;
-          } else {
-            reason = '無均量數據';
-          }
-          break;
-        }
-
-        case 'vol_min': {
-          pass = bar.volume >= (c.minVol || 1000);
-          reason = `量 ${bar.volume} ${pass ? '≥' : '<'} ${c.minVol || 1000} 張`;
-          break;
-        }
-
-        case 'break_line': {
-          if (linePriceAtBar === null) {
-            pass = false;
-            reason = '畫布上未找到趨勢切線';
-          } else {
-            const bodyBottom = Math.min(bar.open, bar.close);
-            const bodyTop = Math.max(bar.open, bar.close);
-            const isRed = bar.close >= bar.open;
-
-            if (!isRed) {
-              pass = false;
-              reason = `黑K未站上 (切線價: ${linePriceAtBar.toFixed(2)})`;
-            } else if (bodyBottom >= linePriceAtBar) {
-              pass = true;
-              reason = `全實體完全站上切線 (${linePriceAtBar.toFixed(2)})`;
-            } else if (bodyTop <= linePriceAtBar) {
-              pass = false;
-              reason = `實體完全在切線下方 (${linePriceAtBar.toFixed(2)})`;
-            } else {
-              const bodyHeight = bodyTop - bodyBottom;
-              const abovePart = bodyTop - linePriceAtBar;
-              const pct = (abovePart / bodyHeight) * 100;
-              const targetPct = c.thresholdPct || 50;
-              pass = pct >= targetPct;
-              reason = `實體突破 ${pct.toFixed(0)}% (${pass ? '≥' : '<'} 目標 ${targetPct}%)`;
-            }
-          }
-          break;
-        }
-
-        case 'tianji': {
-          const checkDays = c.days || 5;
-          const targetModels = c.models || [1, 2, 3, 4];
-          let hitResult = null;
-          let hitDate = null;
-
-          // 往前回溯搜尋近 N 日內是否有觸發天機 1~4
-          const startSearch = Math.max(0, idx - checkDays + 1);
-          for (let k = idx; k >= startSearch; k--) {
-            const scan = evaluateTianjiModels(data, k, targetModels);
-            if (scan.isAnyHit) {
-              hitResult = scan.bestHit;
-              hitDate = data[k]?.date;
-              break;
-            }
-          }
-
-          if (hitResult) {
-            pass = true;
-            reason = `🔥 命中【${hitResult.modelName}】(契合度 ${hitResult.score}% 于 ${hitDate})`;
-          } else {
-            pass = false;
-            const currentScan = evaluateTianjiModels(data, idx, targetModels);
-            const closest = currentScan.bestHit;
-            const missing = closest?.details?.find(d => !d.pass);
-            reason = `近 ${checkDays} 日未成型 (最接近: ${closest?.modelName} ${closest?.score}%，缺: ${missing ? missing.name : '量價未到位'})`;
-          }
-          break;
-        }
-
-        default:
-          reason = '未知條件';
-      }
-
-      return { ...c, pass, reason };
-    });
-
-    const activeConds = results.filter(r => r.enabled);
-    const passCount = activeConds.filter(r => r.pass).length;
-    return { results, totalEnabled: activeConds.length, passCount, targetBar: bar };
-  };
+  const activeConds = results.filter(r => r.enabled);
+  const passCount = activeConds.filter(r => r.pass).length;
+  return { results, totalEnabled: activeConds.length, passCount, targetBar: bar };
+};
   const handleDownloadImage = () => {
     setCrosshair(null); setHoverPoint(null);
     setTimeout(() => {
