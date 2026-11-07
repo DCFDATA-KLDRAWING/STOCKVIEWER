@@ -4771,10 +4771,16 @@ const handleOpenSectorMomentum = async () => {
                     <span className="text-[10px] text-slate-400">之後的指標與策略</span>
                   </div>
                   
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" /><span className="text-xs text-pink-400 font-bold">查價線</span></label>                  
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+                    <input type="checkbox" checked={toggles.showCrosshair !== false} onChange={() => handleToggle('showCrosshair')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900" />
+                    <span className="text-xs text-pink-400 font-bold">查價線</span>
+                  </label>                  
                   
                   {/* ✨ 新增：詳細資訊分流勾選鍵 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showTooltipDetail} onChange={() => handleToggle('showTooltipDetail')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-amber-400 font-bold">查價詳細資訊</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+                    <input type="checkbox" checked={toggles.showTooltipDetail} onChange={() => handleToggle('showTooltipDetail')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-amber-400 font-bold">查價詳細資訊</span>
+                  </label>
 
                   {/* ✨ 升級：天量撐壓線開關 + 參數與樣式設定 */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
@@ -4817,9 +4823,18 @@ const handleOpenSectorMomentum = async () => {
                   </div>
  
                   {/* ✨ 補回：量能標記、起漲、黑頓 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showVolSignal} onChange={() => handleToggle('showVolSignal')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">量能標記</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showTrend} onChange={() => handleToggle('showTrend')} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-emerald-400 font-bold">🔺起漲</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors"><input type="checkbox" checked={toggles.showHeidun} onChange={() => handleToggle('showHeidun')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-400 font-bold">黑頓</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors">
+                    <input type="checkbox" checked={toggles.showVolSignal} onChange={() => handleToggle('showVolSignal')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-slate-300">量能標記</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors">
+                    <input type="checkbox" checked={toggles.showTrend} onChange={() => handleToggle('showTrend')} className="w-3.5 h-3.5 text-emerald-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-emerald-400 font-bold">🔺起漲</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 transition-colors">
+                    <input type="checkbox" checked={toggles.showHeidun} onChange={() => handleToggle('showHeidun')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-slate-400 font-bold">黑頓</span>
+                  </label>
                 </div>
 
                 {/* ✨ 補回：自訂策略 (天機K) */}
