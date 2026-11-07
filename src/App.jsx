@@ -4678,7 +4678,86 @@ const handleOpenSectorMomentum = async () => {
       </div>
 
       {/* ========================================== */}
-      <label className="flex items-center gap-1.5 cursor-pointer bg-amber-950/40 px-2 py-1 rounded border border-amber-800/50 hover:bg-amber-900/40 transition-colors">
+      {/* 🌟 佈局：左側 (K線圖+面板) | 右側 (產業工具) */}
+      {/* ========================================== */}
+      <div className="max-w-[1600px] w-full mx-auto grid grid-cols-1 xl:grid-cols-12 gap-5 mt-2 flex-1 min-h-0">
+        
+        {/* 左側：主看盤區 + 均線控制面板 (佔 10 格) */}
+        <div className="xl:col-span-10 flex flex-col h-full min-h-[500px]">
+          
+          {/* ✨ 新增的折疊面板 (圖表與均線設定) */}
+          <Panel title="圖表技術指標與策略設定" icon="🎛️" isOpen={panelsOpen.config} onToggle={() => setPanelsOpen(p => ({...p, config: !p.config}))}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1">K BARS 數量與均線 (MA / VMA)</span>
+                <div className="flex flex-col gap-2 mt-1">
+                  {[1, 2, 3, 4, 5, 6].map(n => {
+                    const currentMA = maParams[`ma${n}`];
+                    // ✨ 加上防呆：如果這條線還沒準備好，就先不要畫這個格子，防止當機！
+                    if (!currentMA) return null; 
+
+                    return (
+                      <div key={`ma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
+                        <input type="checkbox" checked={currentMA.show !== false} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
+                        <input type="color" value={currentMA.c} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
+                        <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA {n}</span>
+                        <input type="number" value={currentMA.p ?? ''} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: currentMA.c}} />
+                        <select value={currentMA.w} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
+                          <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1 mt-2">均量線 (VMA)</span>
+                <div className="flex flex-col gap-2 mt-1">
+                  {[1, 2, 3].map(n => (
+                    <div key={`vma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
+                      <input type="checkbox" checked={vmaParams[`vma${n}`].show !== false} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
+                      <input type="color" value={vmaParams[`vma${n}`].c} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
+                      <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">VMA {n}</span>
+                      <input type="number" value={vmaParams[`vma${n}`]?.p ?? ''} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams[`vma${n}`].c}} />
+                      <select value={vmaParams[`vma${n}`].w} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
+                        <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1">圖表訊號與自訂策略</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMA} onChange={() => handleToggle('showMA')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均線總開關</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線總開關</span></label>
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
+                  {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
+                  {/* ✨ 新增：布林壓縮(0.15%) 打勾按鈕 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBandsCompress} onChange={() => handleToggle('showBBandsCompress')} className="w-3.5 h-3.5 text-yellow-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-yellow-400 font-bold">布林壓縮</span></label>
+
+                  {/* 🌟 新增：均量線轉折指標開關 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
+                    <input type="checkbox" checked={toggles.showVmaTurn} onChange={() => handleToggle('showVmaTurn')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
+                    <span className="text-xs text-amber-400 font-bold">量線轉折(▲▼)</span>
+                  </label>
+                  {/* 🌟 新增：多方篩選 (收盤價 > 55MA) */}
+                  {toggles.showVmaTurn && (
+                    <label className="flex items-center gap-1 cursor-pointer bg-red-950/40 px-2 py-1 rounded border border-red-900/50 hover:bg-red-900/40 transition-colors">
+                      <input type="checkbox" checked={toggles.vmaLongOnly} onChange={() => handleToggle('vmaLongOnly')} className="w-3 h-3 text-red-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-[11px] text-red-400 font-bold">僅多方(&gt;55MA)</span>
+                    </label>
+                  )}
+
+                  {/* 🌟 新增：空方篩選 (收盤價 < 55MA) */}
+                  {toggles.showVmaTurn && (
+                    <label className="flex items-center gap-1 cursor-pointer bg-emerald-950/40 px-2 py-1 rounded border border-emerald-900/50 hover:bg-emerald-900/40 transition-colors">
+                      <input type="checkbox" checked={toggles.vmaShortOnly} onChange={() => handleToggle('vmaShortOnly')} className="w-3 h-3 text-emerald-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-[11px] text-emerald-400 font-bold">僅空方(&lt;55MA)</span>
+                    </label>
+                  )}
+                  {/* 🌟 新增：扣抵智慧提醒開關 */}
+                  <label className="flex items-center gap-1.5 cursor-pointer bg-amber-950/40 px-2 py-1 rounded border border-amber-800/50 hover:bg-amber-900/40 transition-colors">
                     <input type="checkbox" checked={toggles.showDeductionNotice} onChange={() => handleToggle('showDeductionNotice')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
                     <span className="text-xs text-amber-400 font-bold">💬 扣抵智慧提醒</span>
                   </label>
