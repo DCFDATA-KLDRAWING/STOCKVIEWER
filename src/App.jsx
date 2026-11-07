@@ -4514,7 +4514,8 @@ const handleOpenSectorMomentum = async () => {
                 revMoM: currentRev.mom,
                 eps: currentFin.EPS || 0,
                 eps4q: currentFin.eps4q || 0,
-                grossMargin: currentFin.GrossMargin || 0
+                grossMargin: currentFin.GrossMargin || 0,
+                marginCost: fmMap[dateKey]?.marginCost || null
             };
         });
 
