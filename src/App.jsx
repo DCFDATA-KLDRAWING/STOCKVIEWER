@@ -4678,7 +4678,7 @@ const handleOpenSectorMomentum = async () => {
       </div>
 
       {/* ========================================== */}
-      {nter bg-amber-950/40 px-2 py-1 rounded border border-amber-800/50 hover:bg-amber-900/40 transition-colors">
+      <label className="flex items-center gap-1.5 cursor-pointer bg-amber-950/40 px-2 py-1 rounded border border-amber-800/50 hover:bg-amber-900/40 transition-colors">
                     <input type="checkbox" checked={toggles.showDeductionNotice} onChange={() => handleToggle('showDeductionNotice')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
                     <span className="text-xs text-amber-400 font-bold">💬 扣抵智慧提醒</span>
                   </label>
