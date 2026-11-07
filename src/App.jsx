@@ -2296,16 +2296,6 @@ const App = () => {
     }
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_MA_PARAMS', JSON.stringify(maParams)); }, [maParams]);
-  // 🌟 CMoney 同款：主圖融資成本線狀態管理
-  const [showMarginCost, setShowMarginCost] = useState(() => {
-    return localStorage.getItem('MY_STOCK_SHOW_MARGIN_COST') === 'true';
-  });
-  useEffect(() => {
-    localStorage.setItem('MY_STOCK_SHOW_MARGIN_COST', showMarginCost);
-  }, [showMarginCost]);
-
-  // 儲存從 FinMind 抓下來的原始個股融資融券數據
-  const [marginTradingData, setMarginTradingData] = useState([]);
 
   // 3. 均量線 VMA 參數記憶 (加入 show 獨立開關)
   const [vmaParams, setVmaParams] = useState(() => {
@@ -3363,63 +3353,12 @@ const App = () => {
            });
         }
         
-        /* STREAMING_CHUNK:Computing margin cost directly within marginJson block */
-        // 🌟 1. 處理融資買賣超與融券，並計算「CMoney 同款 60 日融資成本」
-        if (marginJson.data && Array.isArray(marginJson.data) && marginJson.data.length > 0) {
-           // 存入 State 備用
-           try { setMarginTradingData(marginJson.data); } catch(e) {}
-
+        if (marginJson.data) {
            marginJson.data.forEach(d => {
-               if (!d || !d.date) return;
-               const dKey = String(d.date).substring(0, 10);
-               if (!fmMap[dKey]) fmMap[dKey] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-               fmMap[dKey].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
-               fmMap[dKey].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
+               if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+               fmMap[d.date].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
+               fmMap[d.date].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
            });
-
-           // 建立融資每日買進速查表 (統一取前 10 碼 YYYY-MM-DD)
-           const marginBuyMap = new Map();
-           marginJson.data.forEach(m => {
-             if (!m || !m.date) return;
-             const mDateKey = String(m.date).substring(0, 10);
-             const buyShares = Number(m.MarginPurchaseBuy || m.buy || 0);
-             if (buyShares > 0) marginBuyMap.set(mDateKey, buyShares);
-           });
-
-           // 根據日 K 線滾動 60 日計算融資成本 (加權均價)
-           if (Array.isArray(candles) && candles.length > 0) {
-             for (let i = 0; i < candles.length; i++) {
-               const startIdx = Math.max(0, i - 60 + 1);
-               let totalAmount = 0;
-               let totalShares = 0;
-
-               for (let k = startIdx; k <= i; k++) {
-                 const b = candles[k];
-                 if (!b || !b.date) continue;
-                 const bDateKey = String(b.date).substring(0, 10);
-                 const shares = marginBuyMap.get(bDateKey) || 0;
-                 if (shares > 0) {
-                   const h = Number(b.high ?? b.close ?? 0);
-                   const l = Number(b.low ?? b.close ?? 0);
-                   const c = Number(b.close ?? 0);
-                   const avgPrice = (h + l + c) / 3;
-                   if (avgPrice > 0) {
-                     totalAmount += shares * avgPrice;
-                     totalShares += shares;
-                   }
-                 }
-               }
-
-             if (totalShares > 0 && totalAmount > 0 && !isNaN(totalAmount)) {
-                 const cost = totalAmount / totalShares;
-                 const curDateKey = String(candles[i]?.date || '').substring(0, 10);
-                 if (curDateKey) {
-                   if (!fmMap[curDateKey]) fmMap[curDateKey] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-                   fmMap[curDateKey].marginCost = parseFloat(cost.toFixed(2));
-                 }
-               }
-             }
-           }
         }
 
         // ✨ 2. 處理月營收資料 (自動計算 YoY 與 MoM)
@@ -3502,8 +3441,7 @@ const App = () => {
               revMoM: currentRev.mom,
               eps: currentFin.EPS || 0,
               eps4q: currentFin.eps4q || 0,
-              grossMargin: currentFin.GrossMargin || 0,
-              marginCost: fmMap[dateKey]?.marginCost || null // 👈 CMoney 同款 60 日融資成本
+              grossMargin: currentFin.GrossMargin || 0
           };
       });
 
@@ -4514,8 +4452,7 @@ const handleOpenSectorMomentum = async () => {
                 revMoM: currentRev.mom,
                 eps: currentFin.EPS || 0,
                 eps4q: currentFin.eps4q || 0,
-                grossMargin: currentFin.GrossMargin || 0,
-                marginCost: fmMap[dateKey]?.marginCost || null
+                grossMargin: currentFin.GrossMargin || 0
             };
         });
 
@@ -4827,7 +4764,7 @@ const handleOpenSectorMomentum = async () => {
   <span className="text-xs text-amber-400 font-bold">FVG中線</span>
 </label>
                   
-                  {/* 🌟 新：仙人指路指標切換按鈕 */}
+                  {/* 🌟 新進：仙人指路指標切換按鈕 */}
 <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
   <input 
     type="checkbox" 
@@ -4837,16 +4774,6 @@ const handleOpenSectorMomentum = async () => {
   />
   <span className="text-xs text-cyan-400 font-bold">仙人指路</span>
 </label>
-                  {/* 🌟 CMoney 同款：融資成本線切換開關 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-amber-600/60 hover:bg-amber-950/30 transition-colors">
-                    <input 
-                      type="checkbox" 
-                      checked={showMarginCost} 
-                      onChange={() => setShowMarginCost(!showMarginCost)} 
-                      className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" 
-                    />
-                    <span className="text-xs text-amber-400 font-bold">融資成本線</span>
-                  </label>
 
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
@@ -8776,6 +8703,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
             <div className="absolute top-2 left-1/2 -translate-x-1/2 text-cyan-300 font-bold bg-slate-800/80 backdrop-blur-sm border border-cyan-800 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.2)] text-sm pointer-events-none z-10">✏️ 作圖模式：拖曳放開即畫完</div>
           )}
           */}      
+
         <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} 
           className={`select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} 
           style={{ width: `${width}px`, minWidth: `${width}px`, height: `${totalSVGHeight}px`, touchAction: (activeTool !== 'cursor' || toggles.showCrosshair) ? 'none' : 'pan-y' }}
@@ -8829,17 +8757,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
             {toggles.showMA && maParams?.ma4?.show !== false && <path d={getLinePath(data, 'ma4')} stroke={maParams?.ma4?.c || '#3b82f6'} strokeWidth={maParams?.ma4?.w || 1.5} fill="none" opacity="0.8"/>}
             {toggles.showMA && maParams?.ma5?.show !== false && <path d={getLinePath(data, 'ma5')} stroke={maParams?.ma5?.c || '#a855f7'} strokeWidth={maParams?.ma5?.w || 1.5} fill="none" opacity="0.8"/>}
             {toggles.showMA && maParams?.ma6?.show !== false && <path d={getLinePath(data, 'ma6')} stroke={maParams?.ma6?.c || '#f472b6'} strokeWidth={maParams?.ma6?.w || 1.5} fill="none" opacity="0.8"/>}
-            {/* 🌟 CMoney 同款：60日融資成本線 (亮橘黃色虛線，具備極致防呆與平滑渲染) */}
-            {showMarginCost && (typeof getLinePath === 'function') && (
-              <path
-                d={getLinePath(data, 'marginCost')}
-                stroke="#f59e0b"
-                strokeWidth="1.8"
-                strokeDasharray="4,2"
-                fill="none"
-                opacity="0.95"
-              />
-            )}
+
             {/* ✨ 修正布林通道：同步拿掉 x < -100 的截斷，確保 SVG 語法正確 */}
             {toggles.showBBands && (<g opacity="0.6">
                 <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
@@ -9046,7 +8964,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
   }
   return null;
 })}
-{toggles.showBBandsCompress && (<g>
+            {toggles.showBBandsCompress && (<g>
                 {(() => {
                   const zones = []; let startIdx = -1; let count = 0;
                   data.forEach((d, i) => {
@@ -9262,6 +9180,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
               const maxY = getY(maxItem.high);
               const minX = getX(minActualIdx);
               const minY = getY(minItem.low);
+
               // 超出螢幕左右邊界時不畫，避免破圖
               const isMaxVisible = maxX >= paddingLeft && maxX <= width - paddingRight;
               const isMinVisible = minX >= paddingLeft && minX <= width - paddingRight;
@@ -9628,10 +9547,6 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
                 if (maParams?.ma4?.show !== false) tooltipLines.push({ color: maParams?.ma4?.c || '#3b82f6', text: `MA${maParams?.ma4?.p || 60}： ${hoverD?.ma4?.toFixed(2) || '-'}` });
                 if (maParams?.ma5?.show !== false) tooltipLines.push({ color: maParams?.ma5?.c || '#a855f7', text: `MA${maParams?.ma5?.p || 120}： ${hoverD?.ma5?.toFixed(2) || '-'}` });
                 if (maParams?.ma6?.show !== false) tooltipLines.push({ color: maParams?.ma6?.c || '#f472b6', text: `MA${maParams?.ma6?.p || 240}： ${hoverD?.ma6?.toFixed(2) || '-'}` });
-                // 🌟 CMoney 同款：當勾選融資成本線時，在查價框顯示亮橘黃色數值
-                if (showMarginCost && hoverD?.marginCost != null) {
-                    tooltipLines.push({ color: '#f59e0b', text: `融資成本： ${hoverD.marginCost.toFixed(2)}` });
-                }
             }
             if (toggles.showVolume && vmaParams?.vma1?.show !== false) {
                 tooltipLines.push({ color: vmaParams?.vma1?.c || '#f59e0b', text: `VMA${vmaParams?.vma1?.p || 5}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
@@ -9864,7 +9779,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
                </g>
              );
           })}
-        {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
+          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
             <g>
               <rect x={0} y={crosshair.y - 12} width={yAxisWidth} height={24} fill="#ef4444" rx="2" />
               <text x={yAxisWidth / 2} y={crosshair.y + 4} fill="#ffffff" fontSize="12" fontWeight="bold" textAnchor="middle">{crosshair.priceHover > 1000 ? Math.round(crosshair.priceHover) : crosshair.priceHover.toFixed(2)}</text>
