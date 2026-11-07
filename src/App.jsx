@@ -8829,14 +8829,10 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
             {toggles.showMA && maParams?.ma4?.show !== false && <path d={getLinePath(data, 'ma4')} stroke={maParams?.ma4?.c || '#3b82f6'} strokeWidth={maParams?.ma4?.w || 1.5} fill="none" opacity="0.8"/>}
             {toggles.showMA && maParams?.ma5?.show !== false && <path d={getLinePath(data, 'ma5')} stroke={maParams?.ma5?.c || '#a855f7'} strokeWidth={maParams?.ma5?.w || 1.5} fill="none" opacity="0.8"/>}
             {toggles.showMA && maParams?.ma6?.show !== false && <path d={getLinePath(data, 'ma6')} stroke={maParams?.ma6?.c || '#f472b6'} strokeWidth={maParams?.ma6?.w || 1.5} fill="none" opacity="0.8"/>}
-            {/* 🌟 CMoney 同款：60日融資成本線 (亮橘黃色虛線) */}
-            {showMarginCost && (
+            {/* 🌟 CMoney 同款：60日融資成本線 (亮橘黃色虛線，具備極致防呆與平滑渲染) */}
+            {showMarginCost && (typeof getLinePath === 'function') && (
               <path
-                d={data.map((d, i) => {
-                  if (d.marginCost == null || isNaN(d.marginCost)) return '';
-                  const prevHasVal = i > 0 && data[i - 1]?.marginCost != null && !isNaN(data[i - 1]?.marginCost);
-                  return `${!prevHasVal ? 'M' : 'L'} ${getX(i)} ${getY(d.marginCost)}`;
-                }).filter(Boolean).join(' ')}
+                d={getLinePath(data, 'marginCost')}
                 stroke="#f59e0b"
                 strokeWidth="1.8"
                 strokeDasharray="4,2"
