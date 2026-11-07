@@ -4840,9 +4840,9 @@ const handleOpenSectorMomentum = async () => {
                       <input type="checkbox" checked={showMarginCost} onChange={() => setShowMarginCost(!showMarginCost)} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
                       <span className="text-xs text-amber-400 font-bold">融資成本線</span>
                     </label>
-                    <input type="number" min="1" max="999" value={indicatorParams?.marginCost?.p || 60} onChange={e => setIndicatorParams({...indicatorParams, marginCost: {...indicatorParams.marginCost, p: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-amber-800/50 rounded text-amber-300 text-[10px] text-center outline-none focus:border-amber-500 font-bold px-0.5 py-0.5 ml-1" title="計算天數" />
+                    <input type="number" min="1" max="999" step="1" value={indicatorParams?.marginCost?.p || 60} onChange={e => setIndicatorParams({...indicatorParams, marginCost: {...indicatorParams.marginCost, p: Math.max(1, Math.round(Number(e.target.value)))}})} className="w-10 bg-slate-900 border border-amber-800/50 rounded text-amber-300 text-[10px] text-center outline-none focus:border-amber-500 font-bold px-0.5 py-0.5 ml-1" title="計算天數" />
                     <span className="text-[10px] text-slate-400 font-bold">日</span>
-                  </div>            
+                  </div>          
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
