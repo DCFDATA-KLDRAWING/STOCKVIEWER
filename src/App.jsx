@@ -5044,6 +5044,7 @@ const handleOpenSectorMomentum = async () => {
                 setShowFvgIndicator={setShowFvgIndicator}
                 setShowFvgIndicator={setShowFvgIndicator}
                 showXianRenIndicator={showXianRenIndicator}
+                showMarginCost={showMarginCost}
                 activeIndicators={activeIndicators} // 👈 傳入陣列
                 indicatorParams={indicatorParams}
                 setDisplayCount={setDisplayCount}
@@ -5958,7 +5959,7 @@ const MetricSelector = ({ value, onChange }) => (
 );
 
 // === 📈 K線圖與終極畫線工具 (🚀 PRO 級虛擬視窗引擎升級版) ===
-const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, setShowFvgIndicator, showXianRenIndicator, setShowXianRenIndicator, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist }) => {
+const TrendChart = ({ data, timeframe, stockName, toggles, showFvgIndicator, setShowFvgIndicator, showXianRenIndicator, setShowXianRenIndicator, isFocusMode, focusModeDate, setFocusModeDate, onToggleCrosshair, customStrategies, maParams, vmaParams, defensivePrice, realSymbol, displayCount, activeIndicators, indicatorParams, setDisplayCount, totalDataLength, savedLayouts, setSavedLayouts, onLoadLayout, rankingList, onOpenRanking, rankingModalContent, hasListData, onNavigateList, watchlist, onToggleWatchlist, showMarginCost }) => {
   const chartContainerRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
