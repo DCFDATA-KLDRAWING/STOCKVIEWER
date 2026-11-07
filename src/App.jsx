@@ -4784,7 +4784,7 @@ const handleOpenSectorMomentum = async () => {
                     </label>
                     <input type="number" min="1" max="999" value={toggles.maxVolDays ?? 180} onChange={(e) => setToggles(p => ({...p, maxVolDays: Number(e.target.value)}))} className="w-10 bg-slate-900 border border-slate-600 rounded text-cyan-300 text-[10px] text-center outline-none focus:border-cyan-500 font-bold px-0.5 py-0.5" title="天數" />
                     <span className="text-xs text-red-400 font-bold">日大量線</span>
-                    
+
                     {/* ✨ 新增：價格基準下拉選單 */}
                     <select
                       className="bg-slate-900 border border-slate-600 text-amber-300 text-[10px] rounded px-1 py-0.5 outline-none font-bold"
