@@ -3367,7 +3367,7 @@ const App = () => {
            });
         }
         
-        // 🌟 1. 處理融資買賣超與融券，並計算「CMoney 同款 60 日融資成本」
+        // 🌟 1. 處理融資買賣超與融券，並記錄每日買進張數供動態計算
         if (marginJson.data && Array.isArray(marginJson.data) && marginJson.data.length > 0) {
            // 存入 State 備用
            try { setMarginTradingData(marginJson.data); } catch(e) {}
@@ -3375,63 +3375,11 @@ const App = () => {
            marginJson.data.forEach(d => {
                if (!d || !d.date) return;
                const dKey = String(d.date).substring(0, 10);
-               if (!fmMap[dKey]) fmMap[dKey] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+               if (!fmMap[dKey]) fmMap[dKey] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0, marginBuy: 0 };
                fmMap[dKey].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
                fmMap[dKey].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
+               fmMap[dKey].marginBuy = Number(d.MarginPurchaseBuy || d.buy || 0); // 👈 存下買進張數供動態引擎使用
            });
-
-           // 建立融資每日買進速查表 (統一取前 10 碼 YYYY-MM-DD)
-           const marginBuyMap = new Map();
-           marginJson.data.forEach(m => {
-             if (!m || !m.date) return;
-             const mDateKey = String(m.date).substring(0, 10);
-             const buyShares = Number(m.MarginPurchaseBuy || m.buy || 0);
-             if (buyShares > 0) marginBuyMap.set(mDateKey, buyShares);
-           });
-
-           // 🌟 根據日 K 線滾動計算融資成本 (改採最精準的 VWAP 算法)
-           const marginDays = indicatorParams?.marginCost?.p || 60; // 支援動態天數
-           if (Array.isArray(candles) && candles.length > 0) {
-             for (let i = 0; i < candles.length; i++) {
-               const startIdx = Math.max(0, i - marginDays + 1);
-               let totalAmount = 0;
-               let totalShares = 0;
-
-               for (let k = startIdx; k <= i; k++) {
-                 const b = candles[k];
-                 if (!b || !b.date) continue;
-                 const bDateKey = String(b.date).substring(0, 10);
-                 const shares = marginBuyMap.get(bDateKey) || 0;
-                 if (shares > 0) {
-                   // 🌟 神準還原 CMoney 算法：優先使用每日真實成交均價 (VWAP = 總金額 / 總股數)
-                   let avgPrice = 0;
-                   if (b.turnover && b.turnover > 0 && b.volume > 0) {
-                     avgPrice = b.turnover / (b.volume * 1000);
-                     // 防呆：如果 API 的量價單位有誤差導致均價偏離收盤價 > 15%，退回使用 OHLC 均價
-                     if (Math.abs(avgPrice - b.close) / b.close > 0.15) {
-                         avgPrice = (Number(b.open ?? b.close) + Number(b.high ?? b.close) + Number(b.low ?? b.close) + Number(b.close)) / 4;
-                     }
-                   } else {
-                     avgPrice = (Number(b.open ?? b.close) + Number(b.high ?? b.close) + Number(b.low ?? b.close) + Number(b.close)) / 4;
-                   }
-
-                   if (avgPrice > 0) {
-                     totalAmount += shares * avgPrice;
-                     totalShares += shares;
-                   }
-                 }
-               }
-
-               if (totalShares > 0 && totalAmount > 0 && !isNaN(totalAmount)) {
-                 const cost = totalAmount / totalShares;
-                 const curDateKey = String(candles[i]?.date || '').substring(0, 10);
-                 if (curDateKey) {
-                   if (!fmMap[curDateKey]) fmMap[curDateKey] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-                   fmMap[curDateKey].marginCost = parseFloat(cost.toFixed(2));
-                 }
-               }
-             }
-           }
         }
 
         // ✨ 2. 處理月營收資料 (自動計算 YoY 與 MoM)
@@ -3510,12 +3458,12 @@ const App = () => {
               dealer: fmMap[dateKey]?.dealer || 0,
               marginDiff: fmMap[dateKey]?.marginDiff || 0,
               shortDiff: fmMap[dateKey]?.shortDiff || 0,
+              marginBuy: fmMap[dateKey]?.marginBuy || 0,
               revYoY: currentRev.yoy,
               revMoM: currentRev.mom,
               eps: currentFin.EPS || 0,
               eps4q: currentFin.eps4q || 0,
-              grossMargin: currentFin.GrossMargin || 0,
-              marginCost: fmMap[dateKey]?.marginCost || null
+              grossMargin: currentFin.GrossMargin || 0             
           };
       });
 
@@ -3631,6 +3579,41 @@ const App = () => {
     const ma4 = calculateSMA(closes, maParams?.ma4?.p || 60); const ma5 = calculateSMA(closes, maParams?.ma5?.p || 120); const ma6 = calculateSMA(closes, maParams?.ma6?.p || 240); 
     const vma1 = calculateSMA(volumes, vmaParams?.vma1?.p || 5); const vma2 = calculateSMA(volumes, vmaParams?.vma2?.p || 13); const vma3 = calculateSMA(volumes, vmaParams?.vma3?.p || 34); 
     const fixedMv5 = calculateSMA(volumes, 5); const numShares = parseFloat(shares) || 0;
+    // 🌟 動態計算融資成本線 (VWAP 算法，隨時監聽 UI 週期變化)
+    const marginDays = indParams?.marginCost?.p || 60;
+    const marginCostArr = [];
+    for (let i = 0; i < data.length; i++) {
+      const startIdx = Math.max(0, i - marginDays + 1);
+      let totalAmount = 0;
+      let totalShares = 0;
+
+      for (let k = startIdx; k <= i; k++) {
+        const b = data[k];
+        const shares = b.marginBuy || 0;
+        if (shares > 0) {
+          let avgPrice = 0;
+          if (b.turnover && b.turnover > 0 && b.volume > 0) {
+            avgPrice = b.turnover / (b.volume * 1000); // turnover 是金額，volume 是張
+            // 防呆：如果 API 量價失真超過 15%，退回保守 OHLC 計算
+            if (Math.abs(avgPrice - b.close) / b.close > 0.15) {
+                avgPrice = (Number(b.open ?? b.close) + Number(b.high ?? b.close) + Number(b.low ?? b.close) + Number(b.close)) / 4;
+            }
+          } else {
+            avgPrice = (Number(b.open ?? b.close) + Number(b.high ?? b.close) + Number(b.low ?? b.close) + Number(b.close)) / 4;
+          }
+          if (avgPrice > 0) {
+            totalAmount += shares * avgPrice;
+            totalShares += shares;
+          }
+        }
+      }
+      
+      if (totalShares > 0 && totalAmount > 0 && !isNaN(totalAmount)) {
+        marginCostArr.push(parseFloat((totalAmount / totalShares).toFixed(2)));
+      } else {
+        marginCostArr.push(null);
+      }
+    }
 
        
     // 🌟 修正版：嚴格捕捉 5MV 與 13MV 的「轉折點」（斜率由負轉正為上揚，由正轉負為下彎）
@@ -4129,6 +4112,7 @@ const App = () => {
       const enrichedCandle = { 
           ...current, ma1: ma1[i], ma2: ma2[i], ma3: ma3[i], ma4: ma4[i], ma5: ma5[i], ma6: ma6[i], bias5, bias10, bias20, bias60, vma1: vma1[i], vma2: vma2[i], vma3: vma3[i], 
           fixedMa5: fixedMa5[i], fixedMa10: fixedMa10[i], fixedMa20: fixedMa20[i], fixedMa28: fixedMa28[i], fixedMa60: fixedMa60[i], fixedMv5: fixedMv5[i],
+          marginCost: marginCostArr[i], // 🌟 動態附加融資成本
           // 🌟 貼在這裡！把剛剛算好的 5MV 與 13MV 轉折狀態放進去
           vma1Slope: vma1Trend[i], 
           vma2Slope: vma2Trend[i],
@@ -4522,12 +4506,12 @@ const handleOpenSectorMomentum = async () => {
                 dealer: fmMap[c.date]?.dealer || 0,
                 marginDiff: fmMap[c.date]?.marginDiff || 0,
                 shortDiff: fmMap[c.date]?.shortDiff || 0,
+                marginBuy: fmMap[c.date]?.marginBuy || 0, // 👈 傳給動態計算引擎
                 revYoY: currentRev.yoy,
                 revMoM: currentRev.mom,
                 eps: currentFin.EPS || 0,
                 eps4q: currentFin.eps4q || 0,
-                grossMargin: currentFin.GrossMargin || 0,
-                marginCost: fmMap[dateKey]?.marginCost || null
+                grossMargin: currentFin.GrossMargin || 0                
             };
         });
 
