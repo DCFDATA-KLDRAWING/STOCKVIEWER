@@ -2296,6 +2296,16 @@ const App = () => {
     }
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_MA_PARAMS', JSON.stringify(maParams)); }, [maParams]);
+  // 🌟 CMoney 同款：主圖融資成本線狀態管理
+  const [showMarginCost, setShowMarginCost] = useState(() => {
+    return localStorage.getItem('MY_STOCK_SHOW_MARGIN_COST') === 'true';
+  });
+  useEffect(() => {
+    localStorage.setItem('MY_STOCK_SHOW_MARGIN_COST', showMarginCost);
+  }, [showMarginCost]);
+
+  // 儲存從 FinMind 抓下來的原始個股融資融券數據
+  const [marginTradingData, setMarginTradingData] = useState([]);
 
   // 3. 均量線 VMA 參數記憶 (加入 show 獨立開關)
   const [vmaParams, setVmaParams] = useState(() => {
@@ -3353,12 +3363,48 @@ const App = () => {
            });
         }
         
+        /* STREAMING_CHUNK:Computing margin cost directly within marginJson block */
+        // 🌟 1. 處理融資買賣超與融券，並計算「CMoney 同款 60 日融資成本」
         if (marginJson.data) {
+           // 存入 State 備用
+           setMarginTradingData(marginJson.data);
+
            marginJson.data.forEach(d => {
                if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
                fmMap[d.date].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
                fmMap[d.date].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
            });
+
+           // 建立融資每日買進速查表
+           const marginBuyMap = new Map();
+           marginJson.data.forEach(m => {
+             const buyShares = Number(m.MarginPurchaseBuy || m.buy || 0);
+             if (buyShares > 0) marginBuyMap.set(m.date, buyShares);
+           });
+
+           // 根據日 K 線滾動 60 日計算融資成本 (加權均價)
+           for (let i = 0; i < candles.length; i++) {
+             const startIdx = Math.max(0, i - 60 + 1);
+             let totalAmount = 0;
+             let totalShares = 0;
+
+             for (let k = startIdx; k <= i; k++) {
+               const b = candles[k];
+               const shares = marginBuyMap.get(b.date) || 0;
+               if (shares > 0) {
+                 const avgPrice = (b.high + b.low + b.close) / 3;
+                 totalAmount += shares * avgPrice;
+                 totalShares += shares;
+               }
+             }
+
+             if (totalShares > 0 && !isNaN(totalAmount)) {
+               const cost = totalAmount / totalShares;
+               const curDate = candles[i].date;
+               if (!fmMap[curDate]) fmMap[curDate] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+               fmMap[curDate].marginCost = parseFloat(cost.toFixed(2));
+             }
+           }
         }
 
         // ✨ 2. 處理月營收資料 (自動計算 YoY 與 MoM)
@@ -3441,7 +3487,8 @@ const App = () => {
               revMoM: currentRev.mom,
               eps: currentFin.EPS || 0,
               eps4q: currentFin.eps4q || 0,
-              grossMargin: currentFin.GrossMargin || 0
+              grossMargin: currentFin.GrossMargin || 0,
+              marginCost: fmMap[dateKey]?.marginCost || null // 👈 CMoney 同款 60 日融資成本
           };
       });
 
@@ -4631,86 +4678,7 @@ const handleOpenSectorMomentum = async () => {
       </div>
 
       {/* ========================================== */}
-      {/* 🌟 佈局：左側 (K線圖+面板) | 右側 (產業工具) */}
-      {/* ========================================== */}
-      <div className="max-w-[1600px] w-full mx-auto grid grid-cols-1 xl:grid-cols-12 gap-5 mt-2 flex-1 min-h-0">
-        
-        {/* 左側：主看盤區 + 均線控制面板 (佔 10 格) */}
-        <div className="xl:col-span-10 flex flex-col h-full min-h-[500px]">
-          
-          {/* ✨ 新增的折疊面板 (圖表與均線設定) */}
-          <Panel title="圖表技術指標與策略設定" icon="🎛️" isOpen={panelsOpen.config} onToggle={() => setPanelsOpen(p => ({...p, config: !p.config}))}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1">K BARS 數量與均線 (MA / VMA)</span>
-                <div className="flex flex-col gap-2 mt-1">
-                  {[1, 2, 3, 4, 5, 6].map(n => {
-                    const currentMA = maParams[`ma${n}`];
-                    // ✨ 加上防呆：如果這條線還沒準備好，就先不要畫這個格子，防止當機！
-                    if (!currentMA) return null; 
-
-                    return (
-                      <div key={`ma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                        <input type="checkbox" checked={currentMA.show !== false} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
-                        <input type="color" value={currentMA.c} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                        <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">MA {n}</span>
-                        <input type="number" value={currentMA.p ?? ''} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: currentMA.c}} />
-                        <select value={currentMA.w} onChange={e => setMaParams({...maParams, [`ma${n}`]: {...currentMA, w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
-                          <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                        </select>
-                      </div>
-                    );
-                  })}
-                </div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1 mt-2">均量線 (VMA)</span>
-                <div className="flex flex-col gap-2 mt-1">
-                  {[1, 2, 3].map(n => (
-                    <div key={`vma-${n}`} className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50 shadow-inner">
-                      <input type="checkbox" checked={vmaParams[`vma${n}`].show !== false} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], show: e.target.checked}})} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600 shrink-0 cursor-pointer" />
-                      <input type="color" value={vmaParams[`vma${n}`].c} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], c: e.target.value}})} className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent shrink-0" />
-                      <span className="text-[10px] text-slate-400 font-bold w-8 shrink-0">VMA {n}</span>
-                      <input type="number" value={vmaParams[`vma${n}`]?.p ?? ''} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], p: Number(e.target.value)}})} className="w-10 p-0.5 text-center text-sm font-bold bg-slate-900 rounded border border-slate-700 outline-none shrink-0" style={{color: vmaParams[`vma${n}`].c}} />
-                      <select value={vmaParams[`vma${n}`].w} onChange={e => setVmaParams({...vmaParams, [`vma${n}`]: {...vmaParams[`vma${n}`], w: Number(e.target.value)}})} className="flex-1 p-0.5 bg-slate-900 border border-slate-700 text-slate-300 text-[10px] rounded cursor-pointer">
-                        <option value={1}>細 1px</option><option value={1.5}>中 1.5px</option><option value={2.5}>粗 2.5px</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-1">圖表訊號與自訂策略</span>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showMA} onChange={() => handleToggle('showMA')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均線總開關</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showVolume} onChange={() => handleToggle('showVolume')} className="w-3.5 h-3.5 text-cyan-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-slate-300">均量線總開關</span></label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands} onChange={() => handleToggle('showBBands')} className="w-3.5 h-3.5 text-purple-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-purple-400 font-bold">布林通道</span></label>
-                  {/* ✨ 新增：高布林(3.0) 打勾按鈕 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBands3} onChange={() => handleToggle('showBBands3')} className="w-3.5 h-3.5 text-pink-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-pink-400 font-bold">高布林(3.0)</span></label>
-                  {/* ✨ 新增：布林壓縮(0.15%) 打勾按鈕 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors"><input type="checkbox" checked={toggles.showBBandsCompress} onChange={() => handleToggle('showBBandsCompress')} className="w-3.5 h-3.5 text-yellow-500 rounded bg-slate-900 border-slate-600" /><span className="text-xs text-yellow-400 font-bold">布林壓縮</span></label>
-
-                  {/* 🌟 新增：均量線轉折指標開關 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
-                    <input type="checkbox" checked={toggles.showVmaTurn} onChange={() => handleToggle('showVmaTurn')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
-                    <span className="text-xs text-amber-400 font-bold">量線轉折(▲▼)</span>
-                  </label>
-                  {/* 🌟 新增：多方篩選 (收盤價 > 55MA) */}
-                  {toggles.showVmaTurn && (
-                    <label className="flex items-center gap-1 cursor-pointer bg-red-950/40 px-2 py-1 rounded border border-red-900/50 hover:bg-red-900/40 transition-colors">
-                      <input type="checkbox" checked={toggles.vmaLongOnly} onChange={() => handleToggle('vmaLongOnly')} className="w-3 h-3 text-red-500 rounded bg-slate-900 border-slate-600" />
-                      <span className="text-[11px] text-red-400 font-bold">僅多方(&gt;55MA)</span>
-                    </label>
-                  )}
-
-                  {/* 🌟 新增：空方篩選 (收盤價 < 55MA) */}
-                  {toggles.showVmaTurn && (
-                    <label className="flex items-center gap-1 cursor-pointer bg-emerald-950/40 px-2 py-1 rounded border border-emerald-900/50 hover:bg-emerald-900/40 transition-colors">
-                      <input type="checkbox" checked={toggles.vmaShortOnly} onChange={() => handleToggle('vmaShortOnly')} className="w-3 h-3 text-emerald-500 rounded bg-slate-900 border-slate-600" />
-                      <span className="text-[11px] text-emerald-400 font-bold">僅空方(&lt;55MA)</span>
-                    </label>
-                  )}
-                  {/* 🌟 新增：扣抵智慧提醒開關 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-amber-950/40 px-2 py-1 rounded border border-amber-800/50 hover:bg-amber-900/40 transition-colors">
+      {nter bg-amber-950/40 px-2 py-1 rounded border border-amber-800/50 hover:bg-amber-900/40 transition-colors">
                     <input type="checkbox" checked={toggles.showDeductionNotice} onChange={() => handleToggle('showDeductionNotice')} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
                     <span className="text-xs text-amber-400 font-bold">💬 扣抵智慧提醒</span>
                   </label>
@@ -4774,7 +4742,16 @@ const handleOpenSectorMomentum = async () => {
   />
   <span className="text-xs text-cyan-400 font-bold">仙人指路</span>
 </label>
-
+                  {/* 🌟 CMoney 同款：融資成本線切換開關 */}
+<label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-amber-600/60 hover:bg-amber-950/30 transition-colors">
+  <input 
+    type="checkbox" 
+    checked={showMarginCost} 
+    onChange={() => setShowMarginCost(!showMarginCost)} 
+    className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" 
+  />
+  <span className="text-xs text-amber-400 font-bold">融資成本線</span>
+</label>
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
@@ -8704,410 +8681,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
           )}
           */}      
 
-        <svg id="trend-chart-svg" ref={svgRef} viewBox={`0 0 ${width} ${totalSVGHeight}`} 
-          className={`select-none ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`} 
-          style={{ width: `${width}px`, minWidth: `${width}px`, height: `${totalSVGHeight}px`, touchAction: (activeTool !== 'cursor' || toggles.showCrosshair) ? 'none' : 'pan-y' }}
-          onWheel={handleWheel}
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove} 
-          onMouseUp={handlePointerUp}
-          onMouseLeave={(e) => { setCrosshair(null); setHoverPoint(null); handlePointerUp(e); }}
-          onTouchStart={handlePointerDown} 
-          onTouchMove={handlePointerMove} 
-          onTouchEnd={handlePointerUp}
-          onTouchCancel={handlePointerUp}
-        >
-          {/* ✨ 修正2：精準對齊遮罩，解除被誤剪掉的「右側黑洞」！ */}
-          <defs>
-            <clipPath id="chartClip">
-              <rect x={paddingLeft} y={0} width={width - paddingLeft - paddingRight} height={totalSVGHeight} />
-            </clipPath>
-            {/* ✨ 分離出兩個遮罩：一個給細折線，一個給粗折線 */}
-            <clipPath id="zigzagClip">
-              <rect x={paddingLeft} y={0} width={(width - paddingLeft - paddingRight) * zigzagAnimProgress} height={totalSVGHeight} />
-            </clipPath>
-            <clipPath id="macroZigzagClip">
-              <rect x={paddingLeft} y={0} width={(width - paddingLeft - paddingRight) * macroAnimProgress} height={totalSVGHeight} />
-            </clipPath>
-          </defs>
-          <rect x={0} y={0} width={width} height={totalSVGHeight} fill="#0f172a" />
-          
-          <text id="chart-title" x={width / 2} y={totalSVGHeight / 5} fill="none" stroke="#475569" strokeWidth="2" fontSize={isFullscreen ? "4vw" : "8vw"} fontWeight="900" opacity="0.5" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" className="tracking-widest watermark-text">
-            {stockName} ({tfLabel})
-          </text>
-          
-          <g clipPath="url(#chartClip)">
-            
-            <line x1={0} y1={getY(minPrice)} x2={width} y2={getY(minPrice)} stroke="#1e293b" strokeDasharray="4,4" />
-            <line x1={0} y1={getY(maxPrice)} x2={width} y2={getY(maxPrice)} stroke="#1e293b" strokeDasharray="4,4" />
-            
-            {toggles.showVolSignal && defensivePrice && (() => {
-              const latestX = getX(data.length - 1);
-              return (
-                <g>
-                  <line x1={0} y1={getY(defensivePrice)} x2={width} y2={getY(defensivePrice)} stroke="#ef4444" strokeDasharray="6,4" strokeWidth="1.5" opacity="0.8" />
-                  <text x={Math.min(latestX + 10, width - 80)} y={getY(defensivePrice) - 6} fill="#ef4444" fontSize="14" fontWeight="bold" textAnchor="start">🛡️ {defensivePrice.toFixed(2)}</text>
-                </g>
-              );
-            })()}
-
-            {toggles.showMA && maParams?.ma1?.show !== false && <path d={getLinePath(data, 'ma1')} stroke={maParams?.ma1?.c || '#ef4444'} strokeWidth={maParams?.ma1?.w || 1.5} fill="none" opacity="0.8"/>}
-            {toggles.showMA && maParams?.ma2?.show !== false && <path d={getLinePath(data, 'ma2')} stroke={maParams?.ma2?.c || '#eab308'} strokeWidth={maParams?.ma2?.w || 1.5} fill="none" opacity="0.8"/>}
-            {toggles.showMA && maParams?.ma3?.show !== false && <path d={getLinePath(data, 'ma3')} stroke={maParams?.ma3?.c || '#22c55e'} strokeWidth={maParams?.ma3?.w || 1.5} fill="none" opacity="0.8"/>}
-            {toggles.showMA && maParams?.ma4?.show !== false && <path d={getLinePath(data, 'ma4')} stroke={maParams?.ma4?.c || '#3b82f6'} strokeWidth={maParams?.ma4?.w || 1.5} fill="none" opacity="0.8"/>}
-            {toggles.showMA && maParams?.ma5?.show !== false && <path d={getLinePath(data, 'ma5')} stroke={maParams?.ma5?.c || '#a855f7'} strokeWidth={maParams?.ma5?.w || 1.5} fill="none" opacity="0.8"/>}
-            {toggles.showMA && maParams?.ma6?.show !== false && <path d={getLinePath(data, 'ma6')} stroke={maParams?.ma6?.c || '#f472b6'} strokeWidth={maParams?.ma6?.w || 1.5} fill="none" opacity="0.8"/>}
-
-            {/* ✨ 修正布林通道：同步拿掉 x < -100 的截斷，確保 SVG 語法正確 */}
-            {toggles.showBBands && (<g opacity="0.6">
-                <path d={data.map((d, i) => d.bbands?.up != null ? `${i===0 || data[i-1]?.bbands?.up == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.up)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.mid != null ? `${i===0 || data[i-1]?.bbands?.mid == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.mid)}` : '').join(' ')} stroke="#d8b4fe" strokeWidth="1" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.down != null ? `${i===0 || data[i-1]?.bbands?.down == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.down)}` : '').join(' ')} stroke="#a855f7" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
-            </g>)}
-
-            {toggles.showBBands3 && (<g opacity="0.5">
-                <path d={data.map((d, i) => d.bbands?.up3 != null ? `${i===0 || data[i-1]?.bbands?.up3 == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.up3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
-                <path d={data.map((d, i) => d.bbands?.down3 != null ? `${i===0 || data[i-1]?.bbands?.down3 == null ? 'M' : 'L'} ${getX(i)} ${getY(d.bbands.down3)}` : '').join(' ')} stroke="#f472b6" strokeWidth="1.5" strokeDasharray="2,4" fill="none" />
-            </g>)}
-
-            {toggles.showSAR && data.map((d, i) => {
-                if (d.sar === undefined || i === 0) return null; 
-                const x = getX(i); if (x < -20 || x > width + 20) return null; // 效能過濾
-                const sarColor = d.sarTrend === 1 ? '#ef4444' : '#22c55e';
-                return <circle key={`sar-${i}`} cx={x} cy={getY(d.sar)} r="2" fill={sarColor} opacity="0.4" />;
-            })}
-            {/* 🌟 升級版 FVG 缺口自動偵測與橫向延伸中線繪製 */}
-{showFvgIndicator && data.map((d, i, arr) => {
-  if (i < 2 || i >= arr.length - 1) return null;
-  
-  const midCandle = arr[i - 1];     // 中間那根 K 棒
-  const leftCandle = arr[i - 2];    // 左側 K 棒（2天前，i - 2）
-  const rightCandle = arr[i];       // 右側 K 棒（今天/下一根，i）
-
-  const bodyRatio = midCandle.open === 0 ? 0 : ((midCandle.close - midCandle.open) / midCandle.open) * 100;
-  
-  if (bodyRatio >= 5) {
-    if (rightCandle.low > leftCandle.high & rightCandle.high > midCandle.high)  {
-      
-      const fvgPrice = (rightCandle.low + leftCandle.high) / 2;
-      
-      const xBoxStart = getX(i - 2);
-      const xBoxEnd = getX(i) + 70;                 
-      const xStart = getX(i - 1); 
-      const xEnd = xStart + 80;   
-      const boxWidth = Math.max(30, xBoxEnd - xBoxStart); 
-
-      // 🌟 使用價格高低極值來正確對應 Y 軸高度
-      const highestPrice = Math.max(leftCandle.high, rightCandle.low);
-      const lowestPrice = Math.min(leftCandle.high, rightCandle.low);
-
-      const yHigh = getY(highestPrice);           
-      const yLow = getY(lowestPrice);            
-      const yCoord = getY(fvgPrice);
-
-      if (yCoord < paddingLeft || yCoord > mainHeight - paddingLeft) return null;
-
-      return (
-        <g key={`fvg-${i}`}>
-          {/* 從中間那根 K 棒開始，向右畫出短的橫向虛線 */}
-          <line 
-            x1={xStart} 
-            y1={yCoord} 
-            x2={xEnd} 
-            y2={yCoord} 
-            stroke="#f59e0b" 
-            strokeWidth="1.5" 
-            strokeDasharray="3,3" 
-          />
-          <rect 
-            x={xBoxStart} 
-            y={yHigh}    
-            width={boxWidth} 
-            height={Math.max(4, yLow - yHigh)} 
-            fill="#f59e0b" 
-            fillOpacity="0.15" 
-            stroke="#f59e0b" 
-            strokeWidth="1.2" 
-            strokeDasharray="2,2" 
-            rx="2"
-          />
-          
-          {/* 計算出來的中間價格文字 */}
-          <text 
-            x={xStart + 45} 
-            y={yCoord + 10} 
-            fill="#f59e0b" 
-            fontSize="9" 
-            fontWeight="bold" 
-            textAnchor="Middle"
-            opacity="0.65"
-          >
-            FVG: {fvgPrice.toFixed(1)}
-          </text>
-        </g>
-      );
-    }
-  }
-  return null;
-})}
-            {/* 🌟 仙人指路指標自動偵測與延伸中線繪製 */}
-{/* 🌟 支援完美十字線與長上影線的自動偵測 */}
-{showXianRenIndicator && data.map((d, i, arr) => {
-  if (!d) return null;
-
-  if (
-    typeof d.open !== 'number' || 
-    typeof d.close !== 'number' || 
-    typeof d.high !== 'number' || 
-    typeof d.low !== 'number'
-  ) {
-    return null;
-  }
-
-  // 1. 抓取當天均線數值 (自動相容各種命名)
-  const ma5 = d.fixedMa5 ?? d.ma5;
-  const ma20 = d.fixedMa20 ?? d.ma20;
-
-  // 2. 均線過濾條件：收盤價 > 5日均線 且 5日均線 > 20日均線
-  const isMaConditionMet = ma5 !== undefined && ma20 !== undefined &&
-                            d.close > ma5 && ma5 > ma20;
-
-  if (!isMaConditionMet) return null;
-
-  const bodySize = Math.abs(d.close - d.open);
-  const bodyBottom = Math.min(d.open, d.close);
-  const bodyTop = Math.max(d.open, d.close);
-  
-  const upperShadow = d.high - bodyTop;       
-  const lowerShadow = bodyBottom - d.low;     
-
-  // 🌟 核心修改：同時支援「一般實體 2 倍以上」以及「實體趨近於零的十字線長上影線」
-  // 1. 一般長上影線：實體大於 0.001 且 上影線 >= 實體 * 2
-  const isNormalLongShadow = bodySize >= 0.001 && upperShadow >= bodySize * 2;
-
-  // 2. 十字線長上影線：實體極小（< 0.001，幾乎為 0），但上影線必須有一定的長度（例如 >= 0.1 元，避免極小雜訊）
-  const isDoziLongShadow = bodySize < 0.001 && upperShadow >= 0.1;
-
-  // 綜合條件：滿足上述任一種，且上影線必須比下影線長
-  const isValidPattern = (isNormalLongShadow || isDoziLongShadow) && (upperShadow > lowerShadow);
-
-  if (isValidPattern) {
-    // 計算上影線的中間值（如果是十字線，中線就是從開收盤價到最高價的中間）
-    const shadowMidPrice = bodyBottom + (d.high - bodyBottom) / 2;
-
-    const xPos = getX(i);              
-    const xEnd = xPos + 90;            
-    const yMid = getY(shadowMidPrice);   
-    const yShadowTop = getY(d.high);   
-
-    if (isNaN(yMid) || isNaN(yShadowTop) || yMid < paddingLeft || yMid > mainHeight - paddingLeft) {
-      return null;
-    }
-
-    // 讓右側價格標籤靠近該 K 棒 (將 xPriceLabel 設為靠近 xPos)
-    const xPriceLabel = xPos + 25;
-
-    return (
-      <g key={`xianren-${i}`} pointerEvents="none">
-        {/* 從當前 K 棒的中線位置，向右畫出長虛線延伸 */}
-        <line 
-          x1={xPos} 
-          y1={yMid} 
-          x2={xEnd} 
-          y2={yMid} 
-          stroke="#f59e0b" 
-          strokeWidth="1.5" 
-          strokeDasharray="3,3" 
-        />
-
-        {/* 上方的半透明提醒與引導虛線 (已移除外框，僅留文字與引導線) */}
-        <g transform={`translate(${xPos}, ${yShadowTop - 35})`}>
-          <line 
-            x1="0" 
-            y1="12" 
-            x2="0" 
-            y2={Math.abs((yShadowTop - 35) - yShadowTop)} 
-            stroke="#38bdf8" 
-            strokeWidth="1" 
-            strokeDasharray="2,2" 
-            strokeOpacity="0.5"
-          />
-          <text 
-            x="0" 
-            y="4" 
-            fill="#ecf1f3" 
-            fontSize="9.5" 
-            fontWeight="bold" 
-            textAnchor="middle"
-            opacity="0.85"
-          >
-            <tspan x="0" dy="0">待隔日</tspan>
-            <tspan x="0" dy="11">K線確認</tspan>
-          </text>
-        </g>
-
-        {/* 移至靠近 K 棒處的中線價格標籤 (無外框) */}
-        <g transform={`translate(${xPriceLabel}, ${yMid - 4})`}>
-          <text 
-            x="0" 
-            y="1" 
-            fill="#f59e0b"
-            fontSize="9" 
-            fontWeight="bold" 
-            textAnchor="middle"
-          >
-            {shadowMidPrice.toFixed(1)}
-          </text>
-        </g>
-      </g>
-    );
-  }
-  return null;
-})}
-            {toggles.showBBandsCompress && (<g>
-                {(() => {
-                  const zones = []; let startIdx = -1; let count = 0;
-                  data.forEach((d, i) => {
-                    if (d.bbands?.up != null && d.bbands?.down != null && d.bbands?.mid != null) {
-                      const bandwidth = (d.bbands.up - d.bbands.down) / d.bbands.mid;
-                      if (bandwidth <= 0.15) { if (startIdx === -1) startIdx = i; count++; } else { if (count >= 10) zones.push({ start: startIdx, end: i - 1 }); startIdx = -1; count = 0; }
-                    } else { if (count >= 10) zones.push({ start: startIdx, end: i - 1 }); startIdx = -1; count = 0; }
-                  });
-                  if (count >= 10) zones.push({ start: startIdx, end: data.length - 1 });
-
-                  return zones.map((z, idx) => {
-                    const rectX = getX(z.start) - spacing / 2;
-                    const rectWidth = (z.end - z.start + 1) * spacing;
-                    if (rectX + rectWidth < 0 || rectX > width) return null;
-                    return <rect key={`compress-${idx}`} x={rectX} y={0} width={rectWidth} height={mainHeight} fill="rgba(234, 179, 8, 0.15)" pointerEvents="none" />;
-                  });
-                })()}
-              </g>
-            )}
-
-            {toggles.showAutoWave && data.length > 0 && (() => {
-               const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.zigzag || !lastDay.zigzag.pivots) return null;
-               const pivots = lastDay.zigzag.pivots; if (pivots.length < 2) return null;
-               const waves = [];
-               for (let i = 1; i < pivots.length; i++) {
-                   const p0 = pivots[i-1], p1 = pivots[i]; const idx0 = p0.idx, idx1 = p1.idx; if (idx0 > idx1) continue;
-                   const c0 = data[idx0], c1 = data[idx1]; if (!c0 || !c1) continue;
-                   const diff = c1.close - c0.close, absDiff = Math.abs(diff), bars = Math.max(1, idx1 - idx0);
-                   let totalVol = 0; for (let j = idx0; j <= idx1; j++) if (data[j]) totalVol += data[j].volume;
-                   const startVma5 = c0.vma1 !== null ? c0.vma1 : 0; const endVma5 = c1.vma1 !== null ? c1.vma1 : 0;
-                   const ma55 = c1.fixedMa60 ?? c1.ma4 ?? c1.close; const isLong = c1.close >= ma55; const isShort = c1.close < ma55;
-                   let showWaveInfo = true; if (toggles.autoWaveLongOnly && !isLong) showWaveInfo = false; if (toggles.autoWaveShortOnly && !isShort) showWaveInfo = false;
-                   waves.push({ p0, p1, diff, absDiff, bars, dir: diff >= 0 ? 'up' : 'down', isVmaUp: endVma5 >= startVma5, showWaveInfo });
-               }
-
-               return waves.map((w, i) => {
-                   if (!w.showWaveInfo) return null;
-                   const labels = []; const pct = (w.diff / w.p0.price) * 100;
-                   labels.push(`幅: ${w.diff>0?'+':''}${w.diff.toFixed(2)} (${pct>0?'+':''}${pct.toFixed(1)}%)`);
-                   if (i >= 1) { const prev = waves[i-1]; const isVolInc = w.isVmaUp; const isAmpInc = w.absDiff > prev.absDiff; let text = w.dir === 'up' ? (isVolInc ? "量增" : "量縮") + (isAmpInc ? "價漲角度陡" : "價彈角度緩") : (isVolInc ? "量增" : "量縮") + (isAmpInc ? "價跌角度陡" : "價跌角度緩"); labels.push(`[異位] ${text}`); }
-                   if (i >= 2) { const prevPrev = waves[i-2]; if (w.dir === prevPrev.dir) labels.push(`[同位] 幅度${w.absDiff > prevPrev.absDiff ? '強' : '弱'} / 量${w.isVmaUp ? '增' : '縮'}`); }
-
-                   const x0 = getX(w.p0.idx), y0 = getY(w.p0.price);
-                   const x1 = getX(w.p1.idx), y1 = getY(w.p1.price);
-                   if ((x0 < -100 && x1 < -100) || (x0 > width + 100 && x1 > width + 100)) return null;
-                   const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2;
-                   const boxHeight = labels.length * 16 + 8, boxWidth = 160, offsetY = w.dir === 'up' ? -boxHeight/2 - 50 : boxHeight/2 + 50;
-
-                   return (
-                     <g key={`autowave-info-${i}`} pointerEvents="none">
-                       <line x1={midX} y1={midY} x2={midX} y2={midY + offsetY} stroke="#38bdf8" strokeWidth="1" strokeDasharray="4,4" opacity="0.6" />
-                       <g transform={`translate(${midX}, ${midY + offsetY})`}>
-                         <rect x={-boxWidth/2} y={-boxHeight/2} width={boxWidth} height={boxHeight} fill="#0f172a" fillOpacity="0.85" rx="6" stroke="#38bdf8" strokeWidth="1" strokeOpacity="0.6" />
-                         {labels.map((lb, lIdx) => <text key={lIdx} x={0} y={-boxHeight/2 + 15 + lIdx * 16} fill={lIdx === 0 ? "#f8fafc" : (lIdx === 1 ? "#fbbf24" : "#a78bfa")} fontSize="11" fontWeight="bold" textAnchor="middle">{lb}</text>)}
-                       </g>
-                     </g>
-                   );
-               });
-            })()}
-
-            {toggles.showZigZag && data.length > 0 && (() => {
-               const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.zigzag) return null;
-               const { pivots, floatPoint } = lastDay.zigzag;
-               return (
-                 
-                 <g pointerEvents="none" clipPath="url(#zigzagClip)">
-                    {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#facc15" strokeWidth="1.5" fill="none" opacity="0.8" />)}
-                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#facc15" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />)}
-                    {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`zz-pt-${i}`} cx={px} cy={getY(p.price)} r={3.5} fill="#facc15" />; })}
-                    {floatPoint && floatPoint.idx !== null && (<circle cx={getX(floatPoint.idx)} cy={getY(floatPoint.price)} r={3} fill="#facc15" opacity="0.5" />)}
-                 </g>
-               );
-            })()}
-            {toggles.showMacroZigZag && data.length > 0 && (() => {
-               const lastDay = data[data.length - 1]; if (!lastDay || !lastDay.macroZigZag) return null;
-               const { pivots, floatPoint } = lastDay.macroZigZag;
-               return (
-                 
-                 <g pointerEvents="none" clipPath="url(#macroZigzagClip)">
-                    {/* 🌟 已確立的波段 (實線) */}
-                    {pivots.length >= 2 && (<path d={pivots.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(p.idx)} ${getY(p.price)}`).join(' ')} stroke="#38bdf8" strokeWidth="3" fill="none" opacity="0.9" />)}
-                    {/* 🌟 行進中的波段 (虛線，對準收盤價) */}
-                    {pivots.length >= 1 && floatPoint && floatPoint.idx !== null && (<line x1={getX(pivots[pivots.length - 1].idx)} y1={getY(pivots[pivots.length - 1].price)} x2={getX(floatPoint.idx)} y2={getY(floatPoint.price)} stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6,6" opacity="0.5" />)}
-                    {/* 🌟 轉折點 (只畫確立的實體點) */}
-                    {pivots.map((p, i) => { const px = getX(p.idx); if (px < -20 || px > width + 20) return null; return <circle key={`mzz-pt-${i}`} cx={px} cy={getY(p.price)} r={4.5} fill="#38bdf8" shadow="0 0 10px #38bdf8" />; })}
-                 </g>
-               );
-            })()}
-
-            {toggles.showMaxVolLines && data.length > 0 && (() => {
-               const lastDay = data[data.length - 1]; if (!lastDay || lastDay.maxVolPrice === undefined || lastDay.maxVolPrice === null) return null;
-               const maxP = lastDay.maxVolPrice, secP = lastDay.secondVolPrice;
-               const maxStartX = getX(lastDay.topVolIdx || 0); const secStartX = getX(lastDay.secondVolIdx || 0);
-               const lineStyle = toggles.maxVolLineStyle || { width: 1, type: 'dashed' };
-
-               return (
-                 <g pointerEvents="none">
-                    {maxP !== null && typeof maxP === 'number' && !isNaN(maxP) && maxStartX < width + 100 && (
-                      <g>
-                        <line x1={maxStartX} y1={getY(maxP)} x2={width} y2={getY(maxP)} stroke="#f97316" strokeWidth={lineStyle.width} strokeDasharray={lineStyle.type === 'dashed' ? "4,4" : ""} opacity="0.8" />
-                        <text x={Math.max(10, maxStartX)} y={getY(maxP) - 5} fill="#f97316" fontSize="11" fontWeight="bold">最大量: {maxP.toFixed(2)}</text>
-                      </g>
-                    )}
-                    {secP !== null && typeof secP === 'number' && !isNaN(secP) && secStartX < width + 100 && (
-                      <g>
-                        <line x1={secStartX} y1={getY(secP)} x2={width} y2={getY(secP)} stroke="#f472b6" strokeWidth={lineStyle.width} strokeDasharray={lineStyle.type === 'dashed' ? "4,4" : ""} opacity="0.8" />
-                        <text x={Math.max(10, secStartX)} y={getY(secP) - 5} fill="#f472b6" fontSize="11" fontWeight="bold">次大量: {secP.toFixed(2)}</text>
-                      </g>
-                    )}
-                 </g>
-               );
-            })()}
-
-            {/* ✨ 6. 【精準渲染】只有螢幕內的 K 棒才需要畫出來 */}
-            {data.map((d, i) => {
-              const x = getX(i);
-              if (x < -100 || x > width + 100) return null; // 🚀 效能殺手鐧：太遠的不畫
-              
-              const color = d.close >= d.open ? '#ef4444' : '#22c55e';
-              const hideSignals = isFocusMode && focusModeDate && d.date < focusModeDate;
-              return (
-                <g key={`candle-${i}`}>
-                  <line x1={x} y1={getY(d.high)} x2={x} y2={getY(d.low)} stroke={color} strokeWidth="1.5" />
-                  <rect x={x - candleWidth / 2} y={getY(Math.max(d.open, d.close))} width={candleWidth} height={Math.max(1, getY(Math.min(d.open, d.close)) - getY(Math.max(d.open, d.close)))} fill={color} />
-                  
-                  {!hideSignals && toggles.showDeductionNotice && d.deductionNotice && (
-                    <g pointerEvents="none" opacity="0.6">
-                      <line x1={x} y1={getY(d.high) - 43} x2={x} y2={getY(d.high)} stroke="#fbbf24" strokeWidth="1" strokeDasharray="2,2" />
-                      <rect x={x - 65} y={getY(d.high) - 75} width="130" height="32" fill="#0f172a" fillOpacity="0.8" rx="4" stroke="#fbbf24" strokeWidth="1" />
-                      {d.deductionNotice.split('\n').map((line, lIdx) => <text key={lIdx} x={x} y={getY(d.high) - 59 + (lIdx * 13)} fill="#fbbf24" fontSize="10" fontWeight="bold" textAnchor="middle">{line}</text>)}
-                    </g>
-                  )}
-                  
-                  <g textAnchor="middle" fontSize="12" fontWeight="bold">
-                    {!hideSignals && toggles.showHeidun && d.signalHeidun && <text x={x} y={getY(d.high) - 10} fill="#f8fafc">黑頓</text>}
-                    
-                    {!hideSignals && (d.customRenderMarks || (d.customMarks ? d.customMarks.map(m => ({ displayStyle: 'marker', marker: m })) : [])).map((markObj, mIdx) => {
-                      if (markObj.displayStyle === 'line') {
-                        const markY = getY(markObj.priceVal);
-                        return (
-                          <g key={`s-line-${i}-${mIdx}`}>
-                            <line x1={x} y1={markY} x2={width - paddingRight} y2={markY} stroke={markObj.lineColor} strokeWidth="1.5" strokeDasharray={markObj.lineStyle === 'dashed' ? '5,5' : 'none'} opacity="0.6" />
-                            <text x={x} y={markY - 6} fill={markObj.lineColor} fontSize="11" fontWeight="bold" textAnchor="middle">{markObj.marker} {markObj.priceVal}</text>
+        ht="bold" textAnchor="middle">{markObj.marker} {markObj.priceVal}</text>
                           </g>
                         );
                       } else if (markObj.displayStyle === 'text') {
@@ -9180,7 +8754,6 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
               const maxY = getY(maxItem.high);
               const minX = getX(minActualIdx);
               const minY = getY(minItem.low);
-
               // 超出螢幕左右邊界時不畫，避免破圖
               const isMaxVisible = maxX >= paddingLeft && maxX <= width - paddingRight;
               const isMinVisible = minX >= paddingLeft && minX <= width - paddingRight;
@@ -9547,6 +9120,10 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
                 if (maParams?.ma4?.show !== false) tooltipLines.push({ color: maParams?.ma4?.c || '#3b82f6', text: `MA${maParams?.ma4?.p || 60}： ${hoverD?.ma4?.toFixed(2) || '-'}` });
                 if (maParams?.ma5?.show !== false) tooltipLines.push({ color: maParams?.ma5?.c || '#a855f7', text: `MA${maParams?.ma5?.p || 120}： ${hoverD?.ma5?.toFixed(2) || '-'}` });
                 if (maParams?.ma6?.show !== false) tooltipLines.push({ color: maParams?.ma6?.c || '#f472b6', text: `MA${maParams?.ma6?.p || 240}： ${hoverD?.ma6?.toFixed(2) || '-'}` });
+                // 🌟 CMoney 同款：當勾選融資成本線時，在查價框顯示亮橘黃色數值
+                if (showMarginCost && hoverD?.marginCost != null) {
+                    tooltipLines.push({ color: '#f59e0b', text: `融資成本： ${hoverD.marginCost.toFixed(2)}` });
+                }
             }
             if (toggles.showVolume && vmaParams?.vma1?.show !== false) {
                 tooltipLines.push({ color: vmaParams?.vma1?.c || '#f59e0b', text: `VMA${vmaParams?.vma1?.p || 5}： ${hoverD?.vma1?.toFixed(2) || '-'}` });
@@ -9779,7 +9356,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
                </g>
              );
           })}
-          {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
+        {activeTool === 'cursor' && toggles.showCrosshair !== false && crosshair && data[crosshair.idx] && crosshair.priceHover !== null && (
             <g>
               <rect x={0} y={crosshair.y - 12} width={yAxisWidth} height={24} fill="#ef4444" rx="2" />
               <text x={yAxisWidth / 2} y={crosshair.y + 4} fill="#ffffff" fontSize="12" fontWeight="bold" textAnchor="middle">{crosshair.priceHover > 1000 ? Math.round(crosshair.priceHover) : crosshair.priceHover.toFixed(2)}</text>
