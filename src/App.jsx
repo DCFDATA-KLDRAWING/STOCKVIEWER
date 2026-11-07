@@ -3365,44 +3365,59 @@ const App = () => {
         
         /* STREAMING_CHUNK:Computing margin cost directly within marginJson block */
         // 🌟 1. 處理融資買賣超與融券，並計算「CMoney 同款 60 日融資成本」
-        if (marginJson.data) {
+        if (marginJson.data && Array.isArray(marginJson.data) && marginJson.data.length > 0) {
            // 存入 State 備用
-           setMarginTradingData(marginJson.data);
+           try { setMarginTradingData(marginJson.data); } catch(e) {}
 
            marginJson.data.forEach(d => {
-               if (!fmMap[d.date]) fmMap[d.date] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-               fmMap[d.date].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
-               fmMap[d.date].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
+               if (!d || !d.date) return;
+               const dKey = String(d.date).substring(0, 10);
+               if (!fmMap[dKey]) fmMap[dKey] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+               fmMap[dKey].marginDiff = (Number(d.MarginPurchaseBuy || 0) - Number(d.MarginPurchaseSell || 0) - Number(d.MarginPurchaseCashRepayment || 0)) / 1000;
+               fmMap[dKey].shortDiff = (Number(d.ShortSaleBuy || 0) - Number(d.ShortSaleSell || 0) - Number(d.ShortSaleCashRepayment || 0)) / 1000;
            });
 
-           // 建立融資每日買進速查表
+           // 建立融資每日買進速查表 (統一取前 10 碼 YYYY-MM-DD)
            const marginBuyMap = new Map();
            marginJson.data.forEach(m => {
+             if (!m || !m.date) return;
+             const mDateKey = String(m.date).substring(0, 10);
              const buyShares = Number(m.MarginPurchaseBuy || m.buy || 0);
-             if (buyShares > 0) marginBuyMap.set(m.date, buyShares);
+             if (buyShares > 0) marginBuyMap.set(mDateKey, buyShares);
            });
 
            // 根據日 K 線滾動 60 日計算融資成本 (加權均價)
-           for (let i = 0; i < candles.length; i++) {
-             const startIdx = Math.max(0, i - 60 + 1);
-             let totalAmount = 0;
-             let totalShares = 0;
+           if (Array.isArray(candles) && candles.length > 0) {
+             for (let i = 0; i < candles.length; i++) {
+               const startIdx = Math.max(0, i - 60 + 1);
+               let totalAmount = 0;
+               let totalShares = 0;
 
-             for (let k = startIdx; k <= i; k++) {
-               const b = candles[k];
-               const shares = marginBuyMap.get(b.date) || 0;
-               if (shares > 0) {
-                 const avgPrice = (b.high + b.low + b.close) / 3;
-                 totalAmount += shares * avgPrice;
-                 totalShares += shares;
+               for (let k = startIdx; k <= i; k++) {
+                 const b = candles[k];
+                 if (!b || !b.date) continue;
+                 const bDateKey = String(b.date).substring(0, 10);
+                 const shares = marginBuyMap.get(bDateKey) || 0;
+                 if (shares > 0) {
+                   const h = Number(b.high ?? b.close ?? 0);
+                   const l = Number(b.low ?? b.close ?? 0);
+                   const c = Number(b.close ?? 0);
+                   const avgPrice = (h + l + c) / 3;
+                   if (avgPrice > 0) {
+                     totalAmount += shares * avgPrice;
+                     totalShares += shares;
+                   }
+                 }
                }
-             }
 
-             if (totalShares > 0 && !isNaN(totalAmount)) {
-               const cost = totalAmount / totalShares;
-               const curDate = candles[i].date;
-               if (!fmMap[curDate]) fmMap[curDate] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
-               fmMap[curDate].marginCost = parseFloat(cost.toFixed(2));
+             if (totalShares > 0 && totalAmount > 0 && !isNaN(totalAmount)) {
+                 const cost = totalAmount / totalShares;
+                 const curDateKey = String(candles[i]?.date || '').substring(0, 10);
+                 if (curDateKey) {
+                   if (!fmMap[curDateKey]) fmMap[curDateKey] = { foreign: 0, trust: 0, dealer: 0, marginDiff: 0, shortDiff: 0 };
+                   fmMap[curDateKey].marginCost = parseFloat(cost.toFixed(2));
+                 }
+               }
              }
            }
         }
