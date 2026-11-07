@@ -4732,7 +4732,7 @@ const handleOpenSectorMomentum = async () => {
   <span className="text-xs text-amber-400 font-bold">FVG中線</span>
 </label>
                   
-                  {/* 🌟 新進：仙人指路指標切換按鈕 */}
+                  {/* 🌟 新：仙人指路指標切換按鈕 */}
 <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-slate-700 hover:bg-slate-700 transition-colors">
   <input 
     type="checkbox" 
