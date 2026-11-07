@@ -2256,9 +2256,9 @@ const App = () => {
     try {
       const saved = localStorage.getItem('MY_STOCK_INDICATOR_PARAMS');
       return saved ? JSON.parse(saved) : {
-        macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 } // ✨ 確保這裡有愛德恩動能的預設參數
+        macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 }, marginCost: { p: 60 }
       };
-    } catch (e) { return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 } }; }
+    } catch (e) { return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 }, marginCost: { p: 60 } }; }
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
   // 🌟 只保留一個簡單的目標網址狀態
@@ -3222,7 +3222,8 @@ const App = () => {
           const histData = await histRes.json();
           candles = histData.data.reverse().map(d => ({
               date: isIntra ? d.date.replace('T', ' ').substring(0, 16) : d.date,
-              open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000)
+              open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000),
+              turnover: d.turnover || 0 // ✨ 補上成交金額
           }));
       } else {
           // ─── 模式 B：日K/週K/月K 切換成 FinMind (抓取 1200 天超長歷史！) ───
@@ -3243,7 +3244,8 @@ const App = () => {
                   high: d.max,  
                   low: d.min,   
                   close: d.close,
-                  volume: Math.round(d.Trading_Volume / 1000) 
+                  volume: Math.round(d.Trading_Volume / 1000),
+                  turnover: d.Trading_money || 0 // ✨ 補上成交金額
               }));
           }
       }
@@ -3265,7 +3267,8 @@ const App = () => {
                 high: d.high,
                 low: d.low,
                 close: d.close,
-                volume: d.volume // 盤中 API 的成交量已經是「張」數，直接套用
+                volume: d.volume, // 盤中 API 的成交量已經是「張」數，直接套用
+                turnover: d.turnover || 0 // ✨ 補上成交金額
               }));
               
               // 確保盤中時間是由舊到新排序 (09:00 -> 13:30)
@@ -3295,6 +3298,7 @@ const App = () => {
               const low = quote.lowPrice || open;
               const close = quote.closePrice || quote.lastPrice || quote.previousClose;
               let volume = quote.total?.tradeVolume || 0;
+              let turnover = quote.total?.tradeValue || 0; // ✨ 補上成交金額
 
               if (open != null && close != null) {
                 const currentCandle = { date: quote.date || new Date().toISOString().split('T')[0], open, high, low, close, volume };
@@ -3385,10 +3389,11 @@ const App = () => {
              if (buyShares > 0) marginBuyMap.set(mDateKey, buyShares);
            });
 
-           // 根據日 K 線滾動 60 日計算融資成本 (加權均價)
+           // 🌟 根據日 K 線滾動計算融資成本 (改採最精準的 VWAP 算法)
+           const marginDays = indicatorParams?.marginCost?.p || 60; // 支援動態天數
            if (Array.isArray(candles) && candles.length > 0) {
              for (let i = 0; i < candles.length; i++) {
-               const startIdx = Math.max(0, i - 60 + 1);
+               const startIdx = Math.max(0, i - marginDays + 1);
                let totalAmount = 0;
                let totalShares = 0;
 
@@ -3398,10 +3403,18 @@ const App = () => {
                  const bDateKey = String(b.date).substring(0, 10);
                  const shares = marginBuyMap.get(bDateKey) || 0;
                  if (shares > 0) {
-                   const h = Number(b.high ?? b.close ?? 0);
-                   const l = Number(b.low ?? b.close ?? 0);
-                   const c = Number(b.close ?? 0);
-                   const avgPrice = (h + l + c) / 3;
+                   // 🌟 神準還原 CMoney 算法：優先使用每日真實成交均價 (VWAP = 總金額 / 總股數)
+                   let avgPrice = 0;
+                   if (b.turnover && b.turnover > 0 && b.volume > 0) {
+                     avgPrice = b.turnover / (b.volume * 1000);
+                     // 防呆：如果 API 的量價單位有誤差導致均價偏離收盤價 > 15%，退回使用 OHLC 均價
+                     if (Math.abs(avgPrice - b.close) / b.close > 0.15) {
+                         avgPrice = (Number(b.open ?? b.close) + Number(b.high ?? b.close) + Number(b.low ?? b.close) + Number(b.close)) / 4;
+                     }
+                   } else {
+                     avgPrice = (Number(b.open ?? b.close) + Number(b.high ?? b.close) + Number(b.low ?? b.close) + Number(b.close)) / 4;
+                   }
+
                    if (avgPrice > 0) {
                      totalAmount += shares * avgPrice;
                      totalShares += shares;
@@ -4837,11 +4850,15 @@ const handleOpenSectorMomentum = async () => {
   <span className="text-xs text-cyan-400 font-bold">仙人指路</span>
 </label>
 
-                  {/* 🌟 CMoney 同款：融資成本線切換開關 */}
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-slate-800/50 px-2 py-1 rounded border border-amber-600/60 hover:bg-amber-950/30 transition-colors">
-                    <input type="checkbox" checked={showMarginCost} onChange={() => setShowMarginCost(!showMarginCost)} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
-                    <span className="text-xs text-amber-400 font-bold">融資成本線</span>
-                  </label>            
+                  {/* 🌟 CMoney 同款：融資成本線切換開關與週期設定 */}
+                  <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-amber-600/60 hover:bg-amber-950/30 transition-colors">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={showMarginCost} onChange={() => setShowMarginCost(!showMarginCost)} className="w-3.5 h-3.5 text-amber-500 rounded bg-slate-900 border-slate-600" />
+                      <span className="text-xs text-amber-400 font-bold">融資成本線</span>
+                    </label>
+                    <input type="number" min="1" max="999" value={indicatorParams?.marginCost?.p || 60} onChange={e => setIndicatorParams({...indicatorParams, marginCost: {...indicatorParams.marginCost, p: Number(e.target.value)}})} className="w-10 bg-slate-900 border border-amber-800/50 rounded text-amber-300 text-[10px] text-center outline-none focus:border-amber-500 font-bold px-0.5 py-0.5 ml-1" title="計算天數" />
+                    <span className="text-[10px] text-slate-400 font-bold">日</span>
+                  </div>            
                   {/* ✨ 新增：走圖專注模式 (指定日期後顯示) */}
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded border border-emerald-900/50">
                     <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition-colors">
