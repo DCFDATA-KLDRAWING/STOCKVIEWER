@@ -2251,14 +2251,27 @@ const App = () => {
   // 🌟 新增：仙人指路指標開關狀態 (預設開啟)
   const [showXianRenIndicator, setShowXianRenIndicator] = useState(false);
   
-  // 1. 副圖指標參數記憶
+  // 1. 副圖指標參數記憶 (✨ 加入自動修復機制，防止舊記憶導致黑屏)
   const [indicatorParams, setIndicatorParams] = useState(() => {
+    // 預設的所有參數 (包含融資成本預設 60)
+    const defaultParams = {
+      macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 }, marginCost: { p: 60 }
+    };
     try {
       const saved = localStorage.getItem('MY_STOCK_INDICATOR_PARAMS');
-      return saved ? JSON.parse(saved) : {
-        macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 }, marginCost: { p: 60 }
-      };
-    } catch (e) { return { macd: { fast: 12, slow: 26, signal: 9 }, kd: { rsv: 9, k: 3, d: 3 }, rsi: { p1: 6, p2: 12 }, obv: { ma: 20 }, tower: { p: 3 }, edwinMomentum: { length: 20 }, marginCost: { p: 60 } }; }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // 🛡️ 防呆與自動修復：檢查舊記憶有沒有 marginCost，如果沒有或數值異常，就強制補上預設值 60
+        if (!parsed.marginCost || typeof parsed.marginCost.p !== 'number' || isNaN(parsed.marginCost.p)) {
+          parsed.marginCost = { p: 60 };
+        }
+        // 將舊記憶與預設值合併回傳 (保留使用者的其他設定，只修復壞掉的部分)
+        return { ...defaultParams, ...parsed, marginCost: parsed.marginCost };
+      }
+      return defaultParams;
+    } catch (e) { 
+      return defaultParams; 
+    }
   });
   useEffect(() => { localStorage.setItem('MY_STOCK_INDICATOR_PARAMS', JSON.stringify(indicatorParams)); }, [indicatorParams]);
   // 🌟 只保留一個簡單的目標網址狀態
