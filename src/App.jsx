@@ -3065,13 +3065,21 @@ const parseStockList = (text) => text.split('\n').map(l => l.trim()).filter(Bool
             // 我們把含有 % 的字串都抽出來
             const percentParts = parts.filter(p => p.includes('%'));
             
-            if (percentParts.length >= 3) {
-                // 依據我們寫入的順序，[1] 是今日集中度，[2] 是增幅
-                volume = `集中:${percentParts[1]}`;
+            // 👑 新版解析邏輯：現在有 4 個 % (0:昨日, 1:今日5日, 2:1日, 3:增幅)
+            if (percentParts.length >= 4) {
+                const today5 = parseFloat(percentParts[1]);
+                const today1 = parseFloat(percentParts[2]);
+                
+                // 核心濾網：如果 1日集中度 > 5日集中度，代表今日出現短線大戶急買，給予星星標記！
+                const spark = today1 > today5 ? '🌟' : '';
+                
+                // 版面配置：volume 顯示 5日狀態，change 顯示 1日與增幅
+                volume = `5日:${percentParts[1]}`;
+                change = `${spark}1日:${percentParts[2]} / 增:${percentParts[3]}`;
+            } else if (percentParts.length >= 3) {
+                // 相容舊版資料
+                volume = `5日:${percentParts[1]}`;
                 change = `增:${percentParts[2]}`;
-            } else if (percentParts.length > 0) {
-                // 防呆：如果格式不如預期，抓最後一個 % 當作增幅
-                change = percentParts[percentParts.length - 1]; 
             }
 
             newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
