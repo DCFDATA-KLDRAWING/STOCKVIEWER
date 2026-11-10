@@ -5124,8 +5124,7 @@ const handleOpenSectorMomentum = async () => {
                 realSymbol={currentRealSymbol} // ✨ 修正：傳入分離出來的真實股號，防止存檔存到空字串
                 displayCount={displayCount}
                 showFvgIndicator={showFvgIndicator}
-                setShowFvgIndicator={setShowFvgIndicator}
-                setShowFvgIndicator={setShowFvgIndicator}
+                setShowFvgIndicator={setShowFvgIndicator}                
                 showXianRenIndicator={showXianRenIndicator}
                 showMarginCost={showMarginCost}
                 activeIndicators={activeIndicators} // 👈 傳入陣列
