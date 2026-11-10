@@ -3063,23 +3063,30 @@ const parseStockList = (text) => text.split('\n').map(l => l.trim()).filter(Bool
             
             // 👑 修改點 2：因為籌碼表有三個帶有 % 的欄位 (昨日、今日、增幅)
             // 我們把含有 % 的字串都抽出來
+            // 抓出所有帶有 % 的字串
             const percentParts = parts.filter(p => p.includes('%'));
             
-            // 👑 新版解析邏輯：現在有 4 個 % (0:昨日, 1:今日5日, 2:1日, 3:增幅)
             if (percentParts.length >= 4) {
+                // 轉為數字，方便我們重新格式化
                 const today5 = parseFloat(percentParts[1]);
                 const today1 = parseFloat(percentParts[2]);
+                const increase = parseFloat(percentParts[3]);
                 
-                // 核心濾網：如果 1日集中度 > 5日集中度，代表今日出現短線大戶急買，給予星星標記！
+                // 判斷 1日 > 5日 給予星星
                 const spark = today1 > today5 ? '🌟' : '';
                 
-                // 版面配置：volume 顯示 5日狀態，change 顯示 1日與增幅
-                volume = `5日:${percentParts[1]}`;
-                change = `${spark}1日:${percentParts[2]} / 增:${percentParts[3]}`;
+                // 👑 UI 排版優化：極簡化字串，並利用 toFixed(1) 把兩位小數縮減為一位 (例如 9.31% 變成 9.3%)
+                // 放在「漲幅/狀態」欄位：只顯示 星星 + 增幅
+                change = `${spark}增:${increase.toFixed(1)}%`;
+                
+                // 放在「成交量」欄位：只顯示 5日集中度
+                volume = `5日:${today5.toFixed(1)}%`;
+                
             } else if (percentParts.length >= 3) {
-                // 相容舊版資料
-                volume = `5日:${percentParts[1]}`;
-                change = `增:${percentParts[2]}`;
+                const today5 = parseFloat(percentParts[1]);
+                const increase = parseFloat(percentParts[2]);
+                volume = `5日:${today5.toFixed(1)}%`;
+                change = `增:${increase.toFixed(1)}%`;
             }
 
             newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
