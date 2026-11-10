@@ -3029,7 +3029,71 @@ const parseStockList = (text) => text.split('\n').map(l => l.trim()).filter(Bool
       setIsLoadingRanking(false);
     }
   };
+  // ✨ 處理一鍵從 Google Sheets (Colab) 匯入【籌碼集中度增幅排行】
+  const handleFetchChipRanking = async () => {
+    setIsRankingOpen(true);
+    setIsLoadingRanking(true);
+    setRankingTab('ranking'); // 您也可以未來新增一個 'chip' 頁籤，目前先沿用 ranking
 
+    try {
+      // 👑 修改點 1：將 sheet=Rank 改為 sheet=籌碼增幅排行
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/1qXbIbn0wYDZlokHogl5cWUAOLtH613PJb2Akc2kT_Qk/gviz/tq?tqx=out:csv&sheet=籌碼增幅排行';
+      const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error('網路連線異常');
+      
+      const csvText = await response.text();
+      const newRanking = [];
+      const seen = new Set();
+      
+      const lines = csvText.split('\n');
+
+      lines.forEach(line => {
+        const cleanLine = line.replace(/"/g, ' ').replace(/,/g, ' ');
+        const match = cleanLine.match(/([0-9]{4}[a-zA-Z]?)/);
+        
+        if (match) {
+          const symbol = match[1];
+          const stockInfo = STOCKS.find(s => s.id === symbol);
+          
+          if (stockInfo && !seen.has(symbol)) {
+            let change = '熱門'; // 我們將用來顯示「增幅(%)」
+            let volume = '-';    // 我們將用來顯示「今日集中度」
+            
+            const parts = cleanLine.split(/[\s\t]+/);
+            
+            // 👑 修改點 2：因為籌碼表有三個帶有 % 的欄位 (昨日、今日、增幅)
+            // 我們把含有 % 的字串都抽出來
+            const percentParts = parts.filter(p => p.includes('%'));
+            
+            if (percentParts.length >= 3) {
+                // 依據我們寫入的順序，[1] 是今日集中度，[2] 是增幅
+                volume = `集中:${percentParts[1]}`;
+                change = `增:${percentParts[2]}`;
+            } else if (percentParts.length > 0) {
+                // 防呆：如果格式不如預期，抓最後一個 % 當作增幅
+                change = percentParts[percentParts.length - 1]; 
+            }
+
+            newRanking.push({ symbol: stockInfo.id, name: stockInfo.name, change, volume });
+            seen.add(symbol);
+          }
+        }
+      });
+
+      if (newRanking.length > 0) {
+        setRankingList(newRanking);
+        // 👑 修改點 3：專屬的成功提示訊息
+        showAlert(`🔥 成功從雲端同步 ${newRanking.length} 檔籌碼爆發股！`);
+      } else {
+        showAlert('雲端資料解析失敗，今天可能尚未產出增幅排行。');
+      }
+    } catch (error) {
+      console.error('Fetch cloud ranking error:', error);
+      showAlert('無法取得雲端籌碼排行，請確認網路連線！');
+    } finally {
+      setIsLoadingRanking(false);
+    }
+  };
   // ✨ 處理手動貼上文字排行 (玩股網專屬防擠壓 + 富邦黏巴達 雙引擎合體版)
   const handlePasteRanking = () => {
     if (!pasteText.trim()) return showAlert("請先貼上資料！");
@@ -4691,7 +4755,10 @@ const handleOpenSectorMomentum = async () => {
           <button onClick={handleFetchCloudRanking} className="shrink-0 justify-center bg-purple-900/50 border border-purple-700 text-purple-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(168,85,247,0.2)] hover:bg-purple-800 whitespace-nowrap transition-all flex items-center">
             ☁️ 雲端排行
           </button>          
-
+          {/* ✨ 3. [新增] 雲端籌碼增幅排行按鈕 */}
+          <button onClick={handleFetchChipRanking} className="shrink-0 justify-center bg-orange-900/50 border border-orange-700 text-orange-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(249,115,22,0.2)] hover:bg-orange-800 whitespace-nowrap transition-all flex items-center gap-1">
+            🔥 籌碼排行
+          </button>
           {/* ✨ 2.5 手動貼上排行按鈕 */}
           <button onClick={() => setIsPasteModalOpen(true)} className="shrink-0 justify-center bg-emerald-900/40 border border-emerald-700 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center">
             📝 貼上排行
