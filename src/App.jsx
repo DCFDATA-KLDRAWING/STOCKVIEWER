@@ -3067,25 +3067,25 @@ const parseStockList = (text) => text.split('\n').map(l => l.trim()).filter(Bool
             const percentParts = parts.filter(p => p.includes('%'));
             
             if (percentParts.length >= 4) {
-                // 轉為數字，方便我們重新格式化
+                // percentParts 對應: [0]昨日, [1]今日5日, [2]1日, [3]增幅
                 const today5 = parseFloat(percentParts[1]);
                 const today1 = parseFloat(percentParts[2]);
                 const increase = parseFloat(percentParts[3]);
                 
-                // 判斷 1日 > 5日 給予星星
-                const spark = today1 > today5 ? '🌟' : '';
+                // 初動判斷：1日大於5日給予星星
+                const spark = today1 > today5 ? '🌟 ' : '';
                 
-                // 👑 UI 排版優化：極簡化字串，並利用 toFixed(1) 把兩位小數縮減為一位 (例如 9.31% 變成 9.3%)
-                // 放在「漲幅/狀態」欄位：只顯示 星星 + 增幅
+                // 👑 極簡排版：
+                // 狀態欄 (左邊文字): "🌟 增: 9.3%"
                 change = `${spark}增:${increase.toFixed(1)}%`;
                 
-                // 放在「成交量」欄位：只顯示 5日集中度
-                volume = `5日:${today5.toFixed(1)}%`;
+                // 成交量欄 (右邊文字): "集: 36.4%" (用'集'代替'5日'更省空間)
+                volume = `集:${today5.toFixed(1)}%`;
                 
             } else if (percentParts.length >= 3) {
                 const today5 = parseFloat(percentParts[1]);
                 const increase = parseFloat(percentParts[2]);
-                volume = `5日:${today5.toFixed(1)}%`;
+                volume = `集:${today5.toFixed(1)}%`;
                 change = `增:${increase.toFixed(1)}%`;
             }
 
