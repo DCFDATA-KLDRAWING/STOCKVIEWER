@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 
-const ChipChart = ({ stockId, market = 'TWO', onClose }) => {
+const ChipChart = ({ stockId, onClose }) => {
   const [option, setOption] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -10,16 +10,43 @@ const ChipChart = ({ stockId, market = 'TWO', onClose }) => {
     const fetchDataAndDraw = async () => {
       try {
         setLoading(true);
-        // 1. 抓取 Yahoo 歷史資料 (使用 corsproxy 解決前端跨域問題)
-        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${stockId}.${market}?range=3mo&interval=1d`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
-        
-        const res = await fetch(proxyUrl);
-        const data = await res.json();
-        
-        if (!data.chart.result) throw new Error("找不到該檔股票資料");
-        
-        const result = data.chart.result[0];
+        setError(null); // 每次重新抓取前清空錯誤
+
+        // 🌟 升級版：自動判斷 上市(.TW) / 上櫃(.TWO) 且自帶 Proxy 備援機制
+        const fetchYahooData = async (suffix) => {
+          const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${stockId}.${suffix}?range=3mo&interval=1d`;
+          
+          try {
+            // 優先使用 corsproxy
+            const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`);
+            const data = await res.json();
+            // 👑 安全防護：使用 ?. 避免 Cannot read properties of undefined 崩潰
+            if (data?.chart?.result) return data.chart.result[0];
+          } catch (e) {
+            console.warn("corsproxy 失敗，啟用備用線路...", e);
+            try {
+              // 備用線路 allorigins
+              const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`);
+              const data2 = await res2.json();
+              if (data2?.chart?.result) return data2.chart.result[0];
+            } catch (e2) {
+              console.warn("備用線路也失敗", e2);
+            }
+          }
+          return null;
+        };
+
+        // 1. 先嘗試抓「上櫃 TWO」，如果沒資料，再自動嘗試抓「上市 TW」
+        let result = await fetchYahooData('TWO');
+        if (!result) {
+          result = await fetchYahooData('TW');
+        }
+
+        // 如果兩個都抓不到，優雅地顯示錯誤訊息，不再紅底崩潰
+        if (!result) {
+          throw new Error("無法取得股票資料，可能是代碼錯誤或伺服器暫時無回應。");
+        }
+
         const timestamps = result.timestamp;
         const quote = result.indicators.quote[0];
 
@@ -90,7 +117,7 @@ const ChipChart = ({ stockId, market = 'TWO', onClose }) => {
         const concen5 = calculateConcentration(5, calcData);
         const concen20 = calculateConcentration(20, calcData);
 
-        // 只取最後 25 天給圖表顯示 (符合您原本的切片邏輯)
+        // 只取最後 25 天給圖表顯示
         const plotData = calcData.slice(-25);
         const dates = plotData.map(item => item.date.substring(5)); // 取 MM/DD
         
@@ -178,10 +205,10 @@ const ChipChart = ({ stockId, market = 'TWO', onClose }) => {
     };
 
     fetchDataAndDraw();
-  }, [stockId, market]);
+  }, [stockId]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm pointer-events-auto">
       <div className="relative bg-[#121212] rounded-xl shadow-2xl border border-gray-700 w-full max-w-5xl h-[85vh] flex flex-col">
         
         {/* 標題與關閉按鈕 */}
@@ -189,15 +216,18 @@ const ChipChart = ({ stockId, market = 'TWO', onClose }) => {
           <h3 className="text-white font-bold tracking-wider text-lg">
             {stockId} 籌碼集中度分析
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white bg-gray-800 hover:bg-red-600 rounded-full w-8 h-8 flex items-center justify-center">
+          <button onClick={onClose} className="text-gray-400 hover:text-white bg-gray-800 hover:bg-red-600 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
             ✕
           </button>
         </div>
 
         {/* 圖表渲染區 */}
         <div className="flex-1 p-2 w-full h-full relative">
-          {loading && <div className="absolute inset-0 flex justify-center items-center text-white">⏳ 載入與計算中...</div>}
-          {error && <div className="absolute inset-0 flex justify-center items-center text-red-500">❌ {error}</div>}
+          {loading && <div className="absolute inset-0 flex justify-center items-center text-cyan-400 font-bold">⏳ 讀取市場數據中...</div>}
+          {error && <div className="absolute inset-0 flex flex-col justify-center items-center text-red-400 font-bold p-6 text-center">
+            <span className="text-4xl mb-2">⚠️</span>
+            <span>{error}</span>
+          </div>}
           
           {!loading && !error && option && (
             <ReactECharts 
