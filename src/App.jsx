@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import ChipChart from './components/ChipChart';
 
 // === Firebase 初始化設定 ===
 let app, auth, db, appId;
@@ -2570,6 +2571,8 @@ const parseStockList = (text) => text.split('\n').map(l => l.trim()).filter(Bool
     washLookback: 60,   // 洗籌週期：預設 60 根 (約 3 個月)
     activeTab: 1,       // 預設檢視模型 1
   });
+  // 📊 ✨ 新增：籌碼集中度圖表視窗開關 
+  const [showChart, setShowChart] = useState(false);
   // ✨ 新增：解鎖管理者的功能
   const handleUnlockAdmin = () => {
     setAppModal({
@@ -5371,14 +5374,22 @@ const handleOpenSectorMomentum = async () => {
                 </button>
                 
                 {/* 🔮 5. 天機模型深入研發儀表板 (調參/診斷) */}
-                <button 
-                  onClick={() => setIsTianjiLabOpen(true)} 
-                  className="w-full bg-indigo-950/60 border border-cyan-500/80 hover:bg-cyan-900/40 text-cyan-200 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all text-sm text-left px-3 flex items-center gap-2"
-                >
-                  <span>🔮</span> 5. 天機模型研發儀表板 (調參/診斷)
-                </button>
+<button 
+  onClick={() => setIsTianjiLabOpen(true)} 
+  className="w-full bg-indigo-950/60 border border-cyan-500/80 hover:bg-cyan-900/40 text-cyan-200 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all text-sm text-left px-3 flex items-center gap-2"
+>
+  <span>🔮</span> 5. 天機模型研發儀表板 (調參/診斷)
+</button>               
 
-                <div className="w-full h-px bg-slate-700/50 my-2"></div>
+{/* 📊 6. 三竹風格籌碼集中圖 */}
+<button
+  onClick={() => setShowChart(true)}
+  className="w-full mt-2 bg-purple-900/60 border border-purple-500/80 hover:bg-purple-800/40 text-purple-200 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(168,85,247,0.25)] transition-all text-sm text-left px-3 flex items-center gap-2"
+>
+  <span>📊</span> 6. 5日/20日 籌碼集中圖
+</button>
+
+<div className="w-full h-px bg-slate-700/50 my-2"></div>
                 
                 {/* ✨ 重新鎖上的按鈕 */}
                 <button onClick={() => { setIsAdmin(false); localStorage.removeItem('MY_STOCK_ADMIN'); }} className="mt-2 w-full text-xs text-slate-500 hover:text-slate-400 font-bold py-1 transition-colors">
@@ -5687,7 +5698,14 @@ const handleOpenSectorMomentum = async () => {
           </div>
         </div>
       )}
-      
+      {/* ✨ 📊 三竹風格籌碼集中圖彈出視窗 */}
+      {showChart && (
+        <ChipChart 
+          stockId={currentRealSymbol || '6140'} // 💡 幫您對應了您的變數名稱！
+          market="TWO"      
+          onClose={() => setShowChart(false)} 
+        />
+      )}
       {/* ✨ 浮動的策略打造器 (計算機版) */}
 {isBuilderOpen && (
   <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">
