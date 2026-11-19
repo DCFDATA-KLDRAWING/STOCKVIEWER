@@ -2245,6 +2245,10 @@ const parseStockList = (text) => text.split('\n').map(l => l.trim()).filter(Bool
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             const [issuedShares, setIssuedShares] = useState(''); 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               const [displayCount, setDisplayCount] = useState(60);
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 const [timeframe, setTimeframe] = useState('D');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // 👇 5日排行榜快切與已看記錄狀態
+const [openRankDirectly, setOpenRankDirectly] = useState(false);
+const [visitedChipCodes, setVisitedChipCodes] = useState([]);
+const [hasUsedRank, setHasUsedRank] = useState(false);
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       // ✨ 新增// ✨ 替換為多選狀態 (預設開啟 資金動能 與 MACD)
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         const [activeIndicators, setActiveIndicators] = useState(['EdwinMomentum']);
@@ -5386,7 +5390,7 @@ const handleOpenSectorMomentum = async () => {
   onClick={() => setShowChart(true)}
   className="w-full mt-2 bg-purple-900/60 border border-purple-500/80 hover:bg-purple-800/40 text-purple-200 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(168,85,247,0.25)] transition-all text-sm text-left px-3 flex items-center gap-2"
 >
-  <span>📊</span> 6. 5日/20日 籌碼集中圖
+  <span>📊</span> 6. 籌碼集中度
 </button>
 
 <div className="w-full h-px bg-slate-700/50 my-2"></div>
@@ -5700,10 +5704,19 @@ const handleOpenSectorMomentum = async () => {
       )}
       {/* ✨ 📊 三竹風格籌碼集中圖彈出視窗 */}
 {showChart && (
-  <ChipChart 
-    stockId={currentRealSymbol || '6140'} 
-    market="TWO"      
-    onClose={() => setShowChart(false)}
+  <ChipChart
+    stockId={currentRealSymbol || '6140'}
+    market="TWO"
+    initialShowRank={openRankDirectly}
+    visitedCodes={visitedChipCodes}
+    onMarkVisited={(code) => {
+      setHasUsedRank(true);
+      setVisitedChipCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
+    }}
+    onClose={() => {
+      setShowChart(false);
+      setOpenRankDirectly(false);
+    }}
     finmindApiKey={finmindApiKey}
     onSelectStock={(newCode) => {
       // 點擊排行榜股號時，自動切換看該檔股票的 K 線
@@ -5712,6 +5725,28 @@ const handleOpenSectorMomentum = async () => {
       if (typeof setSymbolInput === 'function') setSymbolInput(newCode);
     }}
   />
+)}
+
+{/* 📋 快速回到 5 日排行懸浮鈕（不用時可點 ✕ 隱藏） */}
+{hasUsedRank && !showChart && (
+  <div className="fixed bottom-5 right-4 z-40 flex items-center gap-1">
+    <button
+      onClick={() => {
+        setOpenRankDirectly(true);
+        setShowChart(true);
+      }}
+      className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg border border-cyan-300/40 flex items-center gap-1"
+    >
+      <span>📋 5日排行</span>
+    </button>
+    <button
+      onClick={() => setHasUsedRank(false)}
+      title="隱藏快捷鈕"
+      className="bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 text-xs w-6 h-6 rounded-full flex items-center justify-center border border-zinc-600"
+    >
+      ✕
+    </button>
+  </div>
 )}
       {/* ✨ 浮動的策略打造器 (計算機版) */}
 {isBuilderOpen && (
