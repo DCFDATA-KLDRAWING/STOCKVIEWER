@@ -34,9 +34,10 @@ const REPORT_OPTIONS = [
   { key: 'conc_5d', label: '🔥 5日籌碼集中度' },
   { key: 'conc_1d', label: '⚡ 1日籌碼集中度' },
   { key: 'conc_20d', label: '🌊 20日籌碼集中度' },
-  { key: 'conc_5d_sell', label: '📉 5日籌碼發散(賣超)' },
-  { key: 'single_buyer_big', label: '🎯 單一買盤超大排行' },
-  { key: 'vol_surge', label: '🚀 成交量倍增排行' },
+  { key: 'it_buy_1d', label: '🟢 投信1日買超前20名' },
+  { key: 'it_buy_5d', label: '🟢 投信5日買超前20名' },
+  { key: 'it_sell_1d', label: '🔴 投信1日賣超前20名' },
+  { key: 'it_sell_5d', label: '🔴 投信5日賣超前20名' },
 ];
 
 const ChipChart = ({

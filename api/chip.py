@@ -22,37 +22,119 @@ REPORT_MAP = {
         "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A620%E6%97%A5%E6%8E%92%E8%A1%8C.htm",
         "is_pct": True,
     },
-    "conc_5d_sell": {
-        "title": "5日籌碼發散(賣超)",
-        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E7%99%BC%E6%95%A35%E6%97%A5%E6%8E%92%E8%A1%8C.htm",
-        "is_pct": True,
-    },
-    "single_buyer_big": {
-        "title": "單一買盤超大排行",
-        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E5%96%AE%E4%B8%80%E8%B2%B7%E7%9B%A4%E8%B6%85%E5%A4%A7%E6%8E%92%E8%A1%8C.htm",
-        "is_pct": True,
-    },
-    "vol_surge": {
-        "title": "成交量倍增排行",
-        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E6%88%90%E4%BA%A4%E9%87%8F%E5%80%8D%E5%A2%9E%E6%8E%92%E8%A1%8C.htm",
-        "is_pct": False,
-    },
+    # 🌟 投信買賣超系列（來自 report_r5）
+    "it_buy_1d": {"title": "投信1日買超", "type": "it", "section": "buy", "days": "1d"},
+    "it_buy_5d": {"title": "投信5日買超", "type": "it", "section": "buy", "days": "5d"},
+    "it_sell_1d": {"title": "投信1日賣超", "type": "it", "section": "sell", "days": "1d"},
+    "it_sell_5d": {"title": "投信5日賣超", "type": "it", "section": "sell", "days": "5d"},
 }
 
-def fetch_peicheng_table(url):
+def fetch_peicheng_html(url):
     try:
         res = requests.get(url, impersonate="chrome120", timeout=12)
         if res.status_code != 200:
-            return pd.DataFrame()
-        tables = pd.read_html(io.BytesIO(res.content), encoding='cp950', header=0)
+            return ""
+        # 嘗試 cp950 或 big5 解碼
+        content = res.content
+        try:
+            return content.decode("cp950")
+        except Exception:
+            return content.decode("big5", errors="ignore")
+    except Exception as e:
+        print(f"fetch_peicheng_html error: {e}")
+        return ""
+
+def fetch_peicheng_table(url):
+    html = fetch_peicheng_html(url)
+    if not html:
+        return pd.DataFrame()
+    try:
+        tables = pd.read_html(io.StringIO(html), header=0)
         if not tables:
             return pd.DataFrame()
         df = tables[0].copy()
         df.columns = [str(c).strip() for c in df.columns]
         return df
     except Exception as e:
-        print(f"fetch_peicheng_table error: {e}")
+        print(f"pd.read_html error: {e}")
         return pd.DataFrame()
+
+# 專門解析投信報表 (report_r5.html)
+def parse_it_report(section="buy", days="1d"):
+    url = "https://www.peicheng.com.tw/asp/main/report/report_r5.html"
+    html = fetch_peicheng_html(url)
+    if not html:
+        return []
+
+    try:
+        tables = pd.read_html(io.StringIO(html))
+        if not tables:
+            return []
+        df = tables[0]
+
+        # 找到「投信近日買超」與「投信近日賣超」的行索引
+        buy_row_idx = None
+        sell_row_idx = None
+
+        for idx, row in df.iterrows():
+            row_str = " ".join([str(x) for x in row.values])
+            if "投信近日買超" in row_str:
+                buy_row_idx = idx
+            elif "投信近日賣超" in row_str:
+                sell_row_idx = idx
+
+        # 決定要切哪一段
+        if section == "buy":
+            start_idx = buy_row_idx + 1 if buy_row_idx is not None else 0
+            end_idx = sell_row_idx if sell_row_idx is not None else len(df)
+        else:
+            start_idx = sell_row_idx + 1 if sell_row_idx is not None else 0
+            end_idx = len(df)
+
+        sub_df = df.iloc[start_idx:end_idx].reset_index(drop=True)
+
+        # 欄位對應（一日: 0,1,2；三日: 4,5,6；五日: 8,9,10；十日: 12,13,14）
+        col_map = {
+            "1d": (0, 1, 2),
+            "3d": (4, 5, 6),
+            "5d": (8, 9, 10),
+            "10d": (12, 13, 14),
+        }
+        c_code, c_name, c_vol = col_map.get(days, (0, 1, 2))
+
+        records = []
+        rank = 1
+        for _, row in sub_df.iterrows():
+            code = str(row.iloc[c_code]).strip()
+            name = str(row.iloc[c_name]).strip()
+            vol = str(row.iloc[c_vol]).strip()
+
+            # 只要代碼是 4~6 碼純數字就收錄
+            if re.match(r'^\d{4,6}$', code):
+                # 處理張數格式
+                try:
+                    v_float = float(vol.replace(",", ""))
+                    v_str = f"{v_float:,.1f} 張" if "." in vol else f"{int(v_float):,} 張"
+                except Exception:
+                    v_str = f"{vol} 張"
+
+                records.append({
+                    "rank": rank,
+                    "code": code,
+                    "name": name,
+                    "val1_label": f"{'買超' if section == 'buy' else '賣超'}張數",
+                    "val1": v_str,
+                    "val2_label": "",
+                    "val2": "",
+                })
+                rank += 1
+                if rank > 20: # 該報表只列前 20 名
+                    break
+
+        return records
+    except Exception as e:
+        print(f"parse_it_report error: {e}")
+        return []
 
 def _find_code_col(df):
     for col in df.columns:
@@ -73,7 +155,7 @@ def _format_cell(val, default_pct=False, col_name=""):
     cleaned = s.replace(",", "").replace("倍", "").strip()
     try:
         num = float(cleaned)
-        if default_pct or ("集中度" in str(col_name)) or ("比例" in str(col_name)) or ("率" in str(col_name)):
+        if default_pct or ("集中度" in str(col_name)) or ("比例" in str(col_name)):
             return f"{num:.2f}%"
         return f"{num:.2f}"
     except Exception:
@@ -81,6 +163,11 @@ def _format_cell(val, default_pct=False, col_name=""):
 
 def fetch_rankings(report_key="conc_5d"):
     config = REPORT_MAP.get(report_key, REPORT_MAP["conc_5d"])
+    
+    # 如果是投信報表走專屬解析
+    if config.get("type") == "it":
+        return parse_it_report(config.get("section", "buy"), config.get("days", "1d"))
+
     df = fetch_peicheng_table(config["url"])
     if df.empty or len(df.columns) < 2:
         return []
