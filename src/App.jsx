@@ -5699,13 +5699,20 @@ const handleOpenSectorMomentum = async () => {
         </div>
       )}
       {/* ✨ 📊 三竹風格籌碼集中圖彈出視窗 */}
-      {showChart && (
-        <ChipChart 
-          stockId={currentRealSymbol || '6140'} // 💡 幫您對應了您的變數名稱！
-          market="TWO"      
-          onClose={() => setShowChart(false)} 
-        />
-      )}
+{showChart && (
+  <ChipChart 
+    stockId={currentRealSymbol || '6140'} 
+    market="TWO"      
+    onClose={() => setShowChart(false)}
+    finmindApiKey={finmindApiKey}
+    onSelectStock={(newCode) => {
+      // 點擊排行榜股號時，自動切換看該檔股票的 K 線
+      if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(newCode);
+      if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(newCode);
+      if (typeof setSymbolInput === 'function') setSymbolInput(newCode);
+    }}
+  />
+)}
       {/* ✨ 浮動的策略打造器 (計算機版) */}
 {isBuilderOpen && (
   <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">

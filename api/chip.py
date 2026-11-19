@@ -5,6 +5,35 @@ import re
 import pandas as pd
 from curl_cffi import requests
 
+# 取得北城 5 日集中度原始表格
+def fetch_beicheng_5d_table():
+    url = "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A65%E6%97%A5%E6%8E%92%E8%A1%8C.htm"
+    try:
+        tables = pd.read_html(url, encoding='cp950', header=0)
+        df = tables[0].iloc[:, [1, 2, 3, 4]].copy()
+        df.columns = ['代碼', '名稱', '1日集中度', '5日集中度']
+        df['代碼'] = df['代碼'].astype(str).str.strip()
+        df['名稱'] = df['名稱'].astype(str).str.strip()
+        df['1日集中度'] = pd.to_numeric(df['1日集中度'], errors='coerce')
+        df['5日集中度'] = pd.to_numeric(df['5日集中度'], errors='coerce')
+        df = df.dropna(subset=['5日集中度']).reset_index(drop=True)
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+# 查單檔 5 日集中度
+def get_beicheng_5d(stock_id: str):
+    df = fetch_beicheng_5d_table()
+    if df.empty:
+        return None
+    target = str(stock_id).strip()
+    match = df[df['代碼'] == target]
+    if not match.empty:
+        val = match.iloc[0]['5日集中度']
+        if pd.notnull(val):
+            return round(float(val), 2)
+    return None
+
 def extract_clean_json(text, marker="root.App.main"):
     idx = text.find(marker)
     if idx == -1: return None
@@ -22,33 +51,11 @@ def extract_clean_json(text, marker="root.App.main"):
     clean_str = re.sub(r':\s*undefined\b', ': null', raw_js)
     return json.loads(clean_str)
 
-def get_beicheng_5d(stock_id: str):
-    urls = [
-        "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A65%E6%97%A5%E6%8E%92%E8%A1%8C.htm",
-        "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A61%E6%97%A5%E6%8E%92%E8%A1%8C.htm"
-    ]
-    target = str(stock_id).strip()
-    for url in urls:
-        try:
-            tables = pd.read_html(url, encoding='cp950', header=0)
-            df = tables[0].iloc[:, [1, 2, 3, 4]].copy()
-            df.columns = ['代碼', '名稱', '1日集中度', '5日集中度']
-            df['代碼'] = df['代碼'].astype(str).str.strip()
-            match = df[df['代碼'] == target]
-            if not match.empty:
-                val = pd.to_numeric(match.iloc[0]['5日集中度'], errors='coerce')
-                if pd.notnull(val):
-                    return round(float(val), 2)
-        except Exception:
-            continue
-    return None
-
-def fetch_data(stock_id, market="TWO"):
+def fetch_single_stock(stock_id, market="TWO"):
     target = str(stock_id).strip()
     url = f"https://tw.stock.yahoo.com/quote/{target}.{market}/broker-trading"
     res = requests.get(url, impersonate="chrome120", timeout=12)
 
-    # 上市/上櫃自動容錯
     if res.status_code != 200:
         market = "TW" if market == "TWO" else "TWO"
         url = f"https://tw.stock.yahoo.com/quote/{target}.{market}/broker-trading"
@@ -91,17 +98,40 @@ def fetch_data(stock_id, market="TWO"):
         "sellers_top15": sellers
     }
 
+# 取得 5 日集中度前 200 大排行榜清單
+def fetch_top_rankings():
+    df = fetch_beicheng_5d_table()
+    if df.empty:
+        return []
+    records = []
+    for idx, row in df.iterrows():
+        records.append({
+            "rank": idx + 1,
+            "code": str(row['代碼']),
+            "name": str(row['名稱']),
+            "day1": f"{row['1日集中度']:.2f}%" if pd.notnull(row['1日集中度']) else "-",
+            "day5": f"{row['5日集中度']:.2f}%" if pd.notnull(row['5日集中度']) else "-"
+        })
+    return records
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query = parse_qs(urlparse(self.path).query)
-        stock_id = query.get('stock_id', ['6140'])[0]
-        market = query.get('market', ['TWO'])[0]
+        mode = query.get('mode', ['single'])[0]
 
-        data = fetch_data(stock_id, market)
+        if mode == 'rank5d':
+            # 回傳 5 日排行榜資料
+            rank_list = fetch_top_rankings()
+            result_payload = {"rankings": rank_list}
+        else:
+            # 預設：查詢單檔股票籌碼
+            stock_id = query.get('stock_id', ['6140'])[0]
+            market = query.get('market', ['TWO'])[0]
+            result_payload = fetch_single_stock(stock_id, market)
 
         self.send_response(200)
         self.send_header('Content-type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Cache-Control', 's-maxage=600, stale-while-revalidate')
         self.end_headers()
-        self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+        self.wfile.write(json.dumps(result_payload, ensure_ascii=False).encode('utf-8'))

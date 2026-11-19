@@ -20,7 +20,6 @@ async function fetchFinMindLatestVolumeLots(stockId, apiKey = '') {
   const json = await res.json();
   const rows = Array.isArray(json?.data) ? json.data : [];
 
-  // 從最新一筆往前找大於 0 的成交量（股數轉張數）
   for (let i = rows.length - 1; i >= 0; i--) {
     const rawVol = Number(rows[i]?.Trading_Volume);
     if (!Number.isNaN(rawVol) && rawVol > 0) {
@@ -31,12 +30,17 @@ async function fetchFinMindLatestVolumeLots(stockId, apiKey = '') {
   return null;
 }
 
-const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
+const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
   const [chipData, setChipData] = useState(null);
   const [day1ConcentrationStr, setDay1ConcentrationStr] = useState('-');
   const [volumeLots, setVolumeLots] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // 排行榜狀態
+  const [showRankModal, setShowRankModal] = useState(false);
+  const [rankingList, setRankingList] = useState([]);
+  const [rankLoading, setRankLoading] = useState(false);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -50,7 +54,6 @@ const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
         const effectiveKey =
           finmindApiKey || localStorage.getItem('MY_STOCK_FINMIND_KEY') || '';
 
-        // 同時請求：1. 後端籌碼 API   2. FinMind 最新日成交量
         const [chipRes, lots] = await Promise.all([
           fetch(`/api/chip?stock_id=${encodeURIComponent(cleanId)}`),
           fetchFinMindLatestVolumeLots(cleanId, effectiveKey),
@@ -80,6 +83,35 @@ const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
 
     fetchAll();
   }, [stockId, finmindApiKey]);
+
+  // 開啟並載入 5 日排行榜
+  const handleOpenRankings = async () => {
+    setShowRankModal(true);
+    if (rankingList.length > 0) return; // 已經有快取就不重複抓
+
+    try {
+      setRankLoading(true);
+      const res = await fetch('/api/chip?mode=rank5d');
+      if (!res.ok) throw new Error('讀取排行榜失敗');
+      const data = await res.json();
+      setRankingList(data?.rankings || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRankLoading(false);
+    }
+  };
+
+  // 點擊股號切換 K 線圖
+  const handleStockClick = (targetCode) => {
+    if (onSelectStock) {
+      onSelectStock(targetCode);
+    }
+    setShowRankModal(false);
+    if (onClose) {
+      onClose(); // 切換後關閉籌碼彈窗回到 K 線看圖
+    }
+  };
 
   const day1Num = parseFloat(day1ConcentrationStr);
   const day5Num = parseFloat(chipData?.day5_concentration);
@@ -118,7 +150,7 @@ const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
         <div className="flex-1 p-4 overflow-y-auto">
           {loading && (
             <div className="h-64 flex justify-center items-center text-cyan-400 font-bold">
-              ⏳ 即時分析籌碼與 FinMind 成交量中...
+              ⏳ 即時分析籌碼與成交量中...
             </div>
           )}
 
@@ -133,6 +165,7 @@ const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
             <div className="space-y-4">
               {/* 頂部數據卡片 */}
               <div className="grid grid-cols-3 gap-3">
+                {/* 1日集中度 */}
                 <div className="bg-[#1a1a1a] p-3 rounded-lg border border-zinc-800 text-center">
                   <div className="text-xs text-zinc-400">單日集中度 (前15大)</div>
                   <div
@@ -144,8 +177,9 @@ const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
                   </div>
                 </div>
 
-                <div className="bg-[#1a1a1a] p-3 rounded-lg border border-zinc-800 text-center">
-                  <div className="text-xs text-zinc-400">5日集中度 (北城)</div>
+                {/* 5日集中度（已移除北城字樣，並增加排行榜按鈕） */}
+                <div className="bg-[#1a1a1a] p-3 rounded-lg border border-zinc-800 text-center relative flex flex-col justify-between items-center">
+                  <div className="text-xs text-zinc-400">5日集中度</div>
                   <div
                     className={`text-xl font-bold mt-1 ${
                       !Number.isNaN(day5Num) && day5Num >= 0 ? 'text-red-400' : 'text-emerald-400'
@@ -153,8 +187,16 @@ const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
                   >
                     {chipData.day5_concentration}
                   </div>
+                  {/* 排行榜連結點 */}
+                  <button
+                    onClick={handleOpenRankings}
+                    className="mt-1.5 text-[11px] text-cyan-400 hover:text-cyan-200 underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>📊 點此查看5日排行</span>
+                  </button>
                 </div>
 
+                {/* 主力買賣超 */}
                 <div className="bg-[#1a1a1a] p-3 rounded-lg border border-zinc-800 text-center">
                   <div className="text-xs text-zinc-400">主力買賣超</div>
                   <div
@@ -203,6 +245,72 @@ const ChipChart = ({ stockId, onClose, finmindApiKey }) => {
             </div>
           )}
         </div>
+
+        {/* 5 日集中度排行榜彈窗 */}
+        {showRankModal && (
+          <div className="absolute inset-0 bg-[#161616] z-50 flex flex-col">
+            <div className="flex justify-between items-center p-3 bg-zinc-900 border-b border-zinc-800">
+              <span className="font-bold text-cyan-400 text-sm">
+                📈 5日籌碼集中度排行（前200名）— 點擊股號切換K線
+              </span>
+              <button
+                onClick={() => setShowRankModal(false)}
+                className="text-gray-400 hover:text-white px-2 py-0.5 bg-zinc-800 rounded text-xs"
+              >
+                返回
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2">
+              {rankLoading ? (
+                <div className="h-48 flex items-center justify-center text-cyan-400 text-sm">
+                  ⏳ 正在載入最新 5 日集中度排行榜...
+                </div>
+              ) : (
+                <table className="w-full text-xs text-left">
+                  <thead className="text-zinc-400 bg-zinc-800/60 sticky top-0">
+                    <tr>
+                      <th className="p-2 text-center w-12">名次</th>
+                      <th className="p-2">股號 / 名稱 (點擊看K線)</th>
+                      <th className="p-2 text-right">最新1日</th>
+                      <th className="p-2 text-right">5日集中度</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {rankingList.map((item) => {
+                      const d5 = parseFloat(item.day5);
+                      return (
+                        <tr key={item.code} className="hover:bg-zinc-800/40">
+                          <td className="p-2 text-center text-zinc-500">{item.rank}</td>
+                          <td className="p-2">
+                            <button
+                              onClick={() => handleStockClick(item.code)}
+                              className="text-cyan-400 font-bold hover:underline hover:text-cyan-200 text-left flex items-center gap-1.5"
+                            >
+                              <span className="bg-cyan-950/60 border border-cyan-800 px-1 rounded text-cyan-300">
+                                {item.code}
+                              </span>
+                              <span>{item.name}</span>
+                            </button>
+                          </td>
+                          <td className="p-2 text-right font-mono text-zinc-300">{item.day1}</td>
+                          <td
+                            className={`p-2 text-right font-mono font-bold ${
+                              !Number.isNaN(d5) && d5 >= 0 ? 'text-red-400' : 'text-emerald-400'
+                            }`}
+                          >
+                            {item.day5}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
