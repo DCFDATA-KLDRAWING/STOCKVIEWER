@@ -5727,17 +5727,17 @@ const handleOpenSectorMomentum = async () => {
   />
 )}
 
-{/* 📋 5日排行常駐快捷鈕（拿掉限制、拉高層級至 z-[90]） */}
+{/* 📋 5日排行常駐快捷鈕（半透明，滑鼠/點擊時恢復清晰） */}
 {!showChart && (
-  <div className="fixed bottom-6 right-4 z-[90] flex items-center shadow-2xl">
+  <div className="fixed bottom-6 right-4 z-[90] flex items-center shadow-xl">
     <button
       onClick={() => {
         setOpenRankDirectly(true);
         setShowChart(true);
       }}
-      className="bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white text-xs font-bold px-3 py-2 rounded-full border border-cyan-300/40 flex items-center gap-1 shadow-md transition-all"
+      className="bg-cyan-600/75 hover:bg-cyan-600 active:bg-cyan-600 active:scale-95 text-white/95 hover:text-white text-xs font-bold px-3 py-2 rounded-full border border-cyan-300/30 flex items-center gap-1 shadow-md backdrop-blur-xs transition-all"
     >
-      <span>📋 5日排行</span>
+      <span>📋籌排 </span>
     </button>
   </div>
 )}
