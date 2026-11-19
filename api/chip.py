@@ -6,43 +6,129 @@ import io
 import pandas as pd
 from curl_cffi import requests
 
-# 取得 5 日集中度原始表格（加上 Chrome 指紋偽裝）
-def fetch_beicheng_5d_table():
-    url = "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A65%E6%97%A5%E6%8E%92%E8%A1%8C.htm"
+REPORT_MAP = {
+    "conc_5d": {
+        "title": "5日籌碼集中度",
+        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A65%E6%97%A5%E6%8E%92%E8%A1%8C.htm",
+        "is_pct": True,
+    },
+    "conc_1d": {
+        "title": "1日籌碼集中度",
+        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A61%E6%97%A5%E6%8E%92%E8%A1%8C.htm",
+        "is_pct": True,
+    },
+    "conc_20d": {
+        "title": "20日籌碼集中度",
+        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A620%E6%97%A5%E6%8E%92%E8%A1%8C.htm",
+        "is_pct": True,
+    },
+    "conc_5d_sell": {
+        "title": "5日籌碼發散(賣超)",
+        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E7%99%BC%E6%95%A35%E6%97%A5%E6%8E%92%E8%A1%8C.htm",
+        "is_pct": True,
+    },
+    "single_buyer_big": {
+        "title": "單一買盤超大排行",
+        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E5%96%AE%E4%B8%80%E8%B2%B7%E7%9B%A4%E8%B6%85%E5%A4%A7%E6%8E%92%E8%A1%8C.htm",
+        "is_pct": True,
+    },
+    "vol_surge": {
+        "title": "成交量倍增排行",
+        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E6%88%90%E4%BA%A4%E9%87%8F%E5%80%8D%E5%A2%9E%E6%8E%92%E8%A1%8C.htm",
+        "is_pct": False,
+    },
+}
+
+def fetch_peicheng_table(url):
     try:
-        # 用 curl_cffi 偽裝 Chrome 抓取，防止被網站擋爬蟲
         res = requests.get(url, impersonate="chrome120", timeout=12)
         if res.status_code != 200:
             return pd.DataFrame()
-        
-        # 轉成 BytesIO 檔案流並以 cp950 解析
         tables = pd.read_html(io.BytesIO(res.content), encoding='cp950', header=0)
         if not tables:
             return pd.DataFrame()
-
-        df = tables[0].iloc[:, [1, 2, 3, 4]].copy()
-        df.columns = ['代碼', '名稱', '1日集中度', '5日集中度']
-        df['代碼'] = df['代碼'].astype(str).str.strip()
-        df['名稱'] = df['名稱'].astype(str).str.strip()
-        # 確保只篩選數字代碼
-        df = df[df['代碼'].str.match(r'^\d+$') == True]
-        df['1日集中度'] = pd.to_numeric(df['1日集中度'], errors='coerce')
-        df['5日集中度'] = pd.to_numeric(df['5日集中度'], errors='coerce')
-        df = df.dropna(subset=['5日集中度']).reset_index(drop=True)
+        df = tables[0].copy()
+        df.columns = [str(c).strip() for c in df.columns]
         return df
     except Exception as e:
-        print(f"fetch_beicheng_5d_table error: {e}")
+        print(f"fetch_peicheng_table error: {e}")
         return pd.DataFrame()
 
-# 查單檔 5 日集中度
+def _find_code_col(df):
+    for col in df.columns:
+        series_str = df[col].astype(str).str.strip()
+        match_ratio = series_str.str.match(r'^\d{4,6}[A-Za-z0-9]*$').mean()
+        if match_ratio >= 0.3:
+            return col
+    return df.columns[1] if len(df.columns) > 1 else df.columns[0]
+
+def _format_cell(val, default_pct=False, col_name=""):
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return "-"
+    s = str(val).strip()
+    if not s or s.lower() in ("nan", "none", "-"):
+        return "-"
+    if s.endswith("%"):
+        return s
+    cleaned = s.replace(",", "").replace("倍", "").strip()
+    try:
+        num = float(cleaned)
+        if default_pct or ("集中度" in str(col_name)) or ("比例" in str(col_name)) or ("率" in str(col_name)):
+            return f"{num:.2f}%"
+        return f"{num:.2f}"
+    except Exception:
+        return s
+
+def fetch_rankings(report_key="conc_5d"):
+    config = REPORT_MAP.get(report_key, REPORT_MAP["conc_5d"])
+    df = fetch_peicheng_table(config["url"])
+    if df.empty or len(df.columns) < 2:
+        return []
+
+    code_col = _find_code_col(df)
+    code_idx = list(df.columns).index(code_col)
+
+    name_col = df.columns[code_idx + 1] if code_idx + 1 < len(df.columns) else df.columns[0]
+    val1_col = df.columns[code_idx + 2] if code_idx + 2 < len(df.columns) else None
+    val2_col = df.columns[code_idx + 3] if code_idx + 3 < len(df.columns) else None
+
+    df[code_col] = df[code_col].astype(str).str.strip()
+    valid_df = df[df[code_col].str.match(r'^\d{4,6}[A-Za-z0-9]*$') == True].reset_index(drop=True)
+
+    records = []
+    for idx, row in valid_df.iterrows():
+        v1_str = _format_cell(row[val1_col], config.get("is_pct", False), val1_col) if val1_col else "-"
+        v2_str = _format_cell(row[val2_col], config.get("is_pct", False), val2_col) if val2_col else ""
+
+        records.append({
+            "rank": idx + 1,
+            "code": str(row[code_col]),
+            "name": str(row[name_col]).strip(),
+            "val1_label": str(val1_col) if val1_col else "數值",
+            "val1": v1_str,
+            "val2_label": str(val2_col) if val2_col else "",
+            "val2": v2_str if val2_col else "",
+        })
+    return records
+
 def get_beicheng_5d(stock_id: str):
-    df = fetch_beicheng_5d_table()
+    df = fetch_peicheng_table(REPORT_MAP["conc_5d"]["url"])
     if df.empty:
         return None
     target = str(stock_id).strip()
-    match = df[df['代碼'] == target]
+    code_col = _find_code_col(df)
+    code_idx = list(df.columns).index(code_col)
+    val_col = df.columns[code_idx + 3] if code_idx + 3 < len(df.columns) else (
+        df.columns[code_idx + 2] if code_idx + 2 < len(df.columns) else None
+    )
+    if not val_col:
+        return None
+
+    df[code_col] = df[code_col].astype(str).str.strip()
+    match = df[df[code_col] == target]
     if not match.empty:
-        val = match.iloc[0]['5日集中度']
+        raw_val = str(match.iloc[0][val_col]).replace("%", "").strip()
+        val = pd.to_numeric(raw_val, errors='coerce')
         if pd.notnull(val):
             return round(float(val), 2)
     return None
@@ -111,33 +197,16 @@ def fetch_single_stock(stock_id, market="TWO"):
         "sellers_top15": sellers
     }
 
-# 取得 5 日集中度前 200 大排行榜清單
-def fetch_top_rankings():
-    df = fetch_beicheng_5d_table()
-    if df.empty:
-        return []
-    records = []
-    for idx, row in df.iterrows():
-        records.append({
-            "rank": idx + 1,
-            "code": str(row['代碼']),
-            "name": str(row['名稱']),
-            "day1": f"{row['1日集中度']:.2f}%" if pd.notnull(row['1日集中度']) else "-",
-            "day5": f"{row['5日集中度']:.2f}%" if pd.notnull(row['5日集中度']) else "-"
-        })
-    return records
-
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query = parse_qs(urlparse(self.path).query)
         mode = query.get('mode', ['single'])[0]
 
-        if mode == 'rank5d':
-            # 回傳 5 日排行榜資料
-            rank_list = fetch_top_rankings()
-            result_payload = {"rankings": rank_list}
+        if mode in ('rankings', 'rank5d'):
+            report_type = query.get('type', ['conc_5d'])[0]
+            rank_list = fetch_rankings(report_type)
+            result_payload = {"rankings": rank_list, "type": report_type}
         else:
-            # 預設：查詢單檔股票籌碼
             stock_id = query.get('stock_id', ['6140'])[0]
             market = query.get('market', ['TWO'])[0]
             result_payload = fetch_single_stock(stock_id, market)

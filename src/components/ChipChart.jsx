@@ -30,7 +30,24 @@ async function fetchFinMindLatestVolumeLots(stockId, apiKey = '') {
   return null;
 }
 
-const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
+const REPORT_OPTIONS = [
+  { key: 'conc_5d', label: '🔥 5日籌碼集中度' },
+  { key: 'conc_1d', label: '⚡ 1日籌碼集中度' },
+  { key: 'conc_20d', label: '🌊 20日籌碼集中度' },
+  { key: 'conc_5d_sell', label: '📉 5日籌碼發散(賣超)' },
+  { key: 'single_buyer_big', label: '🎯 單一買盤超大排行' },
+  { key: 'vol_surge', label: '🚀 成交量倍增排行' },
+];
+
+const ChipChart = ({
+  stockId,
+  onClose,
+  finmindApiKey,
+  onSelectStock,
+  initialShowRank = false,
+  visitedCodes = [],
+  onMarkVisited,
+}) => {
   const [chipData, setChipData] = useState(null);
   const [day1ConcentrationStr, setDay1ConcentrationStr] = useState('-');
   const [volumeLots, setVolumeLots] = useState(null);
@@ -38,9 +55,39 @@ const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
   const [error, setError] = useState(null);
 
   // 排行榜狀態
-  const [showRankModal, setShowRankModal] = useState(false);
+  const [showRankModal, setShowRankModal] = useState(initialShowRank);
+  const [currentReportType, setCurrentReportType] = useState('conc_5d');
   const [rankingList, setRankingList] = useState([]);
   const [rankLoading, setRankLoading] = useState(false);
+
+  // 載入指定排行榜
+  const loadRankings = async (typeKey = currentReportType) => {
+    try {
+      setRankLoading(true);
+      const res = await fetch(`/api/chip?mode=rankings&type=${encodeURIComponent(typeKey)}`);
+      if (!res.ok) throw new Error('讀取排行榜失敗');
+      const data = await res.json();
+      setRankingList(data?.rankings || []);
+    } catch (e) {
+      console.error(e);
+      setRankingList([]);
+    } finally {
+      setRankLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (initialShowRank) {
+      setShowRankModal(true);
+      loadRankings(currentReportType);
+    }
+  }, [initialShowRank]);
+
+  // 切換選單類別
+  const handleTypeChange = (newType) => {
+    setCurrentReportType(newType);
+    loadRankings(newType);
+  };
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -84,26 +131,17 @@ const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
     fetchAll();
   }, [stockId, finmindApiKey]);
 
-  // 開啟並載入 5 日排行榜
+  // 開啟並載入排行榜
   const handleOpenRankings = async () => {
     setShowRankModal(true);
-    if (rankingList.length > 0) return; // 已經有快取就不重複抓
-
-    try {
-      setRankLoading(true);
-      const res = await fetch('/api/chip?mode=rank5d');
-      if (!res.ok) throw new Error('讀取排行榜失敗');
-      const data = await res.json();
-      setRankingList(data?.rankings || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRankLoading(false);
-    }
+    await loadRankings(currentReportType);
   };
 
   // 點擊股號切換 K 線圖
   const handleStockClick = (targetCode) => {
+    if (onMarkVisited) {
+      onMarkVisited(targetCode);
+    }
     if (onSelectStock) {
       onSelectStock(targetCode);
     }
@@ -116,6 +154,7 @@ const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
   const day1Num = parseFloat(day1ConcentrationStr);
   const day5Num = parseFloat(chipData?.day5_concentration);
   const netMajorVal = Number(chipData?.net_major_1d ?? 0);
+  const visitedSet = new Set(visitedCodes);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm pointer-events-auto">
@@ -177,7 +216,7 @@ const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
                   </div>
                 </div>
 
-                {/* 5日集中度（已移除北城字樣，並增加排行榜按鈕） */}
+                {/* 5日集中度 */}
                 <div className="bg-[#1a1a1a] p-3 rounded-lg border border-zinc-800 text-center relative flex flex-col justify-between items-center">
                   <div className="text-xs text-zinc-400">5日集中度</div>
                   <div
@@ -192,7 +231,7 @@ const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
                     onClick={handleOpenRankings}
                     className="mt-1.5 text-[11px] text-cyan-400 hover:text-cyan-200 underline flex items-center gap-1 cursor-pointer"
                   >
-                    <span>📊 點此查看5日排行</span>
+                    <span>📊 點此查看排行</span>
                   </button>
                 </div>
 
@@ -246,61 +285,107 @@ const ChipChart = ({ stockId, onClose, finmindApiKey, onSelectStock }) => {
           )}
         </div>
 
-        {/* 5 日集中度排行榜彈窗 */}
+        {/* 🌟 多報表排行榜彈窗（附帶切換選單） */}
         {showRankModal && (
           <div className="absolute inset-0 bg-[#161616] z-50 flex flex-col">
-            <div className="flex justify-between items-center p-3 bg-zinc-900 border-b border-zinc-800">
-              <span className="font-bold text-cyan-400 text-sm">
-                📈 5日籌碼集中度排行（前200名）— 點擊股號切換K線
-              </span>
-              <button
-                onClick={() => setShowRankModal(false)}
-                className="text-gray-400 hover:text-white px-2 py-0.5 bg-zinc-800 rounded text-xs"
-              >
-                返回
-              </button>
+            <div className="p-3 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-400 font-bold hidden sm:inline">排行類別:</span>
+                <select
+                  value={currentReportType}
+                  onChange={(e) => handleTypeChange(e.target.value)}
+                  className="bg-zinc-800 text-cyan-300 border border-zinc-700 text-xs rounded px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 font-bold"
+                >
+                  {REPORT_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-zinc-400 hidden xs:inline">點擊股號切換K線</span>
+                <button
+                  onClick={() => setShowRankModal(false)}
+                  className="text-gray-300 hover:text-white px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-xs border border-zinc-700"
+                >
+                  返回
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2">
               {rankLoading ? (
                 <div className="h-48 flex items-center justify-center text-cyan-400 text-sm">
-                  ⏳ 正在載入最新 5 日集中度排行榜...
+                  ⏳ 正在載入最新排行榜...
+                </div>
+              ) : rankingList.length === 0 ? (
+                <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">
+                  查無該排行資料或外部報表更新中
                 </div>
               ) : (
                 <table className="w-full text-xs text-left">
-                  <thead className="text-zinc-400 bg-zinc-800/60 sticky top-0">
+                  <thead className="text-zinc-400 bg-zinc-800/80 sticky top-0 backdrop-blur-xs">
                     <tr>
-                      <th className="p-2 text-center w-12">名次</th>
+                      <th className="p-2 text-center w-10">#</th>
                       <th className="p-2">股號 / 名稱 (點擊看K線)</th>
-                      <th className="p-2 text-right">最新1日</th>
-                      <th className="p-2 text-right">5日集中度</th>
+                      <th className="p-2 text-right">
+                        {rankingList[0]?.val1_label || '指標1'}
+                      </th>
+                      {rankingList[0]?.val2_label && (
+                        <th className="p-2 text-right">
+                          {rankingList[0]?.val2_label}
+                        </th>
+                      )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-zinc-800/80">
                     {rankingList.map((item) => {
-                      const d5 = parseFloat(item.day5);
+                      const isVisited = visitedSet.has(String(item.code));
+                      const v1Num = parseFloat(item.val1);
+                      const v2Num = parseFloat(item.val2);
+
                       return (
-                        <tr key={item.code} className="hover:bg-zinc-800/40">
-                          <td className="p-2 text-center text-zinc-500">{item.rank}</td>
+                        <tr
+                          key={`${item.code}-${item.rank}`}
+                          className={`hover:bg-zinc-800/40 transition-colors ${
+                            isVisited ? 'bg-zinc-900/60' : ''
+                          }`}
+                        >
+                          <td className="p-2 text-center text-zinc-500 font-mono">{item.rank}</td>
                           <td className="p-2">
                             <button
                               onClick={() => handleStockClick(item.code)}
                               className="text-cyan-400 font-bold hover:underline hover:text-cyan-200 text-left flex items-center gap-1.5"
                             >
-                              <span className="bg-cyan-950/60 border border-cyan-800 px-1 rounded text-cyan-300">
+                              <span className="bg-cyan-950/60 border border-cyan-800 px-1 rounded text-cyan-300 font-mono">
                                 {item.code}
                               </span>
-                              <span>{item.name}</span>
+                              <span className={isVisited ? 'text-zinc-400' : ''}>{item.name}</span>
+                              {isVisited && (
+                                <span className="text-[10px] bg-zinc-800 text-zinc-400 px-1 py-0.5 rounded">
+                                  已看
+                                </span>
+                              )}
                             </button>
                           </td>
-                          <td className="p-2 text-right font-mono text-zinc-300">{item.day1}</td>
                           <td
-                            className={`p-2 text-right font-mono font-bold ${
-                              !Number.isNaN(d5) && d5 >= 0 ? 'text-red-400' : 'text-emerald-400'
+                            className={`p-2 text-right font-mono ${
+                              !Number.isNaN(v1Num) && v1Num >= 0 ? 'text-red-400 font-bold' : 'text-zinc-300'
                             }`}
                           >
-                            {item.day5}
+                            {item.val1}
                           </td>
+                          {item.val2_label && (
+                            <td
+                              className={`p-2 text-right font-mono ${
+                                !Number.isNaN(v2Num) && v2Num >= 0 ? 'text-red-400 font-bold' : 'text-zinc-300'
+                              }`}
+                            >
+                              {item.val2}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
