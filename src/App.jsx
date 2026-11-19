@@ -5727,24 +5727,17 @@ const handleOpenSectorMomentum = async () => {
   />
 )}
 
-{/* 📋 快速回到 5 日排行懸浮鈕（不用時可點 ✕ 隱藏） */}
-{hasUsedRank && !showChart && (
-  <div className="fixed bottom-5 right-4 z-40 flex items-center gap-1">
+{/* 📋 5日排行常駐快捷鈕（拿掉限制、拉高層級至 z-[90]） */}
+{!showChart && (
+  <div className="fixed bottom-6 right-4 z-[90] flex items-center shadow-2xl">
     <button
       onClick={() => {
         setOpenRankDirectly(true);
         setShowChart(true);
       }}
-      className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg border border-cyan-300/40 flex items-center gap-1"
+      className="bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white text-xs font-bold px-3 py-2 rounded-full border border-cyan-300/40 flex items-center gap-1 shadow-md transition-all"
     >
       <span>📋 5日排行</span>
-    </button>
-    <button
-      onClick={() => setHasUsedRank(false)}
-      title="隱藏快捷鈕"
-      className="bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 text-xs w-6 h-6 rounded-full flex items-center justify-center border border-zinc-600"
-    >
-      ✕
     </button>
   </div>
 )}
