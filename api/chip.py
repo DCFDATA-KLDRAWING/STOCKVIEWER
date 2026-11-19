@@ -2,23 +2,36 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import json
 import re
+import io
 import pandas as pd
 from curl_cffi import requests
 
-# 取得北城 5 日集中度原始表格
+# 取得 5 日集中度原始表格（加上 Chrome 指紋偽裝）
 def fetch_beicheng_5d_table():
     url = "https://www.peicheng.com.tw/asp/main/report/dream_report/%E7%B1%8C%E7%A2%BC%E9%9B%86%E4%B8%AD%E5%BA%A65%E6%97%A5%E6%8E%92%E8%A1%8C.htm"
     try:
-        tables = pd.read_html(url, encoding='cp950', header=0)
+        # 用 curl_cffi 偽裝 Chrome 抓取，防止被網站擋爬蟲
+        res = requests.get(url, impersonate="chrome120", timeout=12)
+        if res.status_code != 200:
+            return pd.DataFrame()
+        
+        # 轉成 BytesIO 檔案流並以 cp950 解析
+        tables = pd.read_html(io.BytesIO(res.content), encoding='cp950', header=0)
+        if not tables:
+            return pd.DataFrame()
+
         df = tables[0].iloc[:, [1, 2, 3, 4]].copy()
         df.columns = ['代碼', '名稱', '1日集中度', '5日集中度']
         df['代碼'] = df['代碼'].astype(str).str.strip()
         df['名稱'] = df['名稱'].astype(str).str.strip()
+        # 確保只篩選數字代碼
+        df = df[df['代碼'].str.match(r'^\d+$') == True]
         df['1日集中度'] = pd.to_numeric(df['1日集中度'], errors='coerce')
         df['5日集中度'] = pd.to_numeric(df['5日集中度'], errors='coerce')
         df = df.dropna(subset=['5日集中度']).reset_index(drop=True)
         return df
-    except Exception:
+    except Exception as e:
+        print(f"fetch_beicheng_5d_table error: {e}")
         return pd.DataFrame()
 
 # 查單檔 5 日集中度
