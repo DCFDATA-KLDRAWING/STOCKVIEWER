@@ -55,14 +55,20 @@ def fetch_data(stock_id, market="TWO"):
         res = requests.get(url, impersonate="chrome120", timeout=12)
 
     buyers, sellers = [], []
-    day1_str = "-"
     net_major = 0
     trade_date = ""
 
     if res.status_code == 200:
         app_data = extract_clean_json(res.text)
         if app_data:
-            b_data = app_data.get("context", {}).get("dispatcher", {}).get("stores", {}).get("QuoteChipStore", {}).get("brokerTrades", {}).get("data", {})
+            b_data = (
+                app_data.get("context", {})
+                .get("dispatcher", {})
+                .get("stores", {})
+                .get("QuoteChipStore", {})
+                .get("brokerTrades", {})
+                .get("data", {})
+            )
             raw_b = b_data.get("buyerRankList", [])
             raw_s = b_data.get("sellerRankList", [])
             trade_date = str(b_data.get("date", ""))[:10]
@@ -70,33 +76,6 @@ def fetch_data(stock_id, market="TWO"):
             buy_sum = sum([float(b["volume"]) for b in raw_b])
             sell_sum = sum([abs(float(s["volume"])) for s in raw_s])
             net_major = int(buy_sum - sell_sum)
-
-            # 【修改區塊】從尾端往前找第一個有效的成交量，避免盤中或空值導致分母變成 1
-            chart_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{target}.{market}?range=5d&interval=1d"
-            c_res = requests.get(chart_url, impersonate="chrome120", timeout=10)
-            total_vol = None
-            if c_res.status_code == 200:
-                vols = (
-                    c_res.json()
-                    .get("chart", {})
-                    .get("result", [{}])[0]
-                    .get("indicators", {})
-                    .get("quote", [{}])[0]
-                    .get("volume", [])
-                )
-                if vols:
-                    for v in reversed(vols):
-                        if v is not None and float(v) > 0:
-                            lots = int(round(float(v) / 1000))
-                            if lots > 0:
-                                total_vol = lots
-                                break
-
-            if total_vol and total_vol > 0:
-                day1_conc = round(net_major / total_vol * 100, 2)
-                day1_str = f"{day1_conc}%"
-            else:
-                day1_str = "-"
 
             buyers = [{"rank": b["rank"], "name": b["name"], "volume": b["volume"]} for b in raw_b]
             sellers = [{"rank": s["rank"], "name": s["name"], "volume": s["volume"]} for s in raw_s]
@@ -106,7 +85,6 @@ def fetch_data(stock_id, market="TWO"):
     return {
         "stock_id": target,
         "date": trade_date,
-        "day1_concentration": day1_str,
         "day5_concentration": f"{day5_conc}%" if day5_conc is not None else "未進前200名",
         "net_major_1d": net_major,
         "buyers_top15": buyers,
@@ -124,7 +102,6 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
-        # 快取 10 分鐘，節省頻寬與防止被外部封鎖
         self.send_header('Cache-Control', 's-maxage=600, stale-while-revalidate')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
