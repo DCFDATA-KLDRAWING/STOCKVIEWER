@@ -27,6 +27,12 @@ REPORT_MAP = {
     "it_buy_5d": {"title": "投信5日買超", "type": "it", "section": "buy", "days": "5d"},
     "it_sell_1d": {"title": "投信1日賣超", "type": "it", "section": "sell", "days": "1d"},
     "it_sell_5d": {"title": "投信5日賣超", "type": "it", "section": "sell", "days": "5d"},
+    "prev_strong": {
+        "title": "昨強勢股",
+        "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E6%98%A8%E5%BC%B7%E5%8B%A2%E8%82%A1.htm",
+        "is_pct": False,
+    },
+
 }
 
 def fetch_peicheng_html(url):

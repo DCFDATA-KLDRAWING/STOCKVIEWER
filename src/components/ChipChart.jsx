@@ -38,6 +38,7 @@ const REPORT_OPTIONS = [
   { key: 'it_buy_5d', label: '🟢 投信5日買超前20名' },
   { key: 'it_sell_1d', label: '🔴 投信1日賣超前20名' },
   { key: 'it_sell_5d', label: '🔴 投信5日賣超前20名' },
+  { key: 'prev_strong', label: '📈 昨強勢股' },
 ];
 
 const ChipChart = ({
