@@ -34,11 +34,15 @@ const REPORT_OPTIONS = [
   { key: 'conc_5d', label: '🔥 5日籌碼集中度' },
   { key: 'conc_1d', label: '⚡ 1日籌碼集中度' },
   { key: 'conc_20d', label: '🌊 20日籌碼集中度' },
+  { key: 'prev_strong', label: '📈 多方選股 - 昨強勢股' },
   { key: 'it_buy_1d', label: '🟢 投信1日買超前20名' },
   { key: 'it_buy_5d', label: '🟢 投信5日買超前20名' },
   { key: 'it_sell_1d', label: '🔴 投信1日賣超前20名' },
   { key: 'it_sell_5d', label: '🔴 投信5日賣超前20名' },
-  { key: 'prev_strong', label: '📈 昨強勢股' },
+  { key: 'fund_roe', label: '💎 基本面 - ROE排行' },
+  { key: 'fund_yoy', label: '🚀 基本面 - 高YOY排行' },
+  { key: 'fund_eps', label: '👑 基本面 - 高EPS排行' },
+  { key: 'fund_yield', label: '💰 基本面 - 高殖利率排行' },
 ];
 
 const ChipChart = ({

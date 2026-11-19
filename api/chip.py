@@ -32,6 +32,15 @@ REPORT_MAP = {
         "url": "https://www.peicheng.com.tw/asp/main/report/dream_report/%E6%98%A8%E5%BC%B7%E5%8B%A2%E8%82%A1.htm",
         "is_pct": False,
     },
+    # 🌟 基本面系列（來自 report_r1.html）
+    "fund_roe": {"title": "基本面 - ROE排行", "type": "fundamental", "cat": "fund_roe"},
+    "fund_turnover": {"title": "基本面 - 週轉率排行", "type": "fundamental", "cat": "fund_turnover"},
+    "fund_mom": {"title": "基本面 - 高MOM排行", "type": "fundamental", "cat": "fund_mom"},
+    "fund_yoy": {"title": "基本面 - 高YOY排行", "type": "fundamental", "cat": "fund_yoy"},
+    "fund_yield": {"title": "基本面 - 高殖利率排行", "type": "fundamental", "cat": "fund_yield"},
+    "fund_dividend": {"title": "基本面 - 高配股排行", "type": "fundamental", "cat": "fund_dividend"},
+    "fund_eps": {"title": "基本面 - 高EPS排行", "type": "fundamental", "cat": "fund_eps"},
+    "fund_margin": {"title": "基本面 - 高毛利排行", "type": "fundamental", "cat": "fund_margin"},
 
 }
 
@@ -142,6 +151,55 @@ def parse_it_report(section="buy", days="1d"):
         print(f"parse_it_report error: {e}")
         return []
 
+# 專門解析基本面報表 (report_r1.html)
+def parse_fundamental_report(category="fund_roe"):
+    url = "https://www.peicheng.com.tw/asp/main/report/report_r1.html"
+    html = fetch_peicheng_html(url)
+    if not html:
+        return []
+
+    col_map = {
+        "fund_roe": (0, 1),        # ROE排行
+        "fund_turnover": (3, 4),   # 週轉率排行
+        "fund_mom": (6, 7),        # 高MOM排行
+        "fund_yoy": (9, 10),       # 高YOY排行
+        "fund_yield": (12, 13),    # 高殖利率排行
+        "fund_dividend": (15, 16), # 高配股排行
+        "fund_eps": (18, 19),      # 高EPS排行
+        "fund_margin": (21, 22),   # 高毛利排行
+    }
+    c_code, c_name = col_map.get(category, (0, 1))
+
+    try:
+        tables = pd.read_html(io.StringIO(html))
+        if not tables:
+            return []
+        df = tables[0]
+
+        records = []
+        rank = 1
+        for _, row in df.iterrows():
+            if len(row) <= max(c_code, c_name):
+                continue
+            code = str(row.iloc[c_code]).strip()
+            name = str(row.iloc[c_name]).strip()
+
+            if re.match(r'^\d{4,6}[A-Za-z0-9]*$', code):
+                records.append({
+                    "rank": rank,
+                    "code": code,
+                    "name": name,
+                    "val1_label": "基本面入選",
+                    "val1": "TOP",
+                    "val2_label": "",
+                    "val2": "",
+                })
+                rank += 1
+        return records
+    except Exception as e:
+        print(f"parse_fundamental_report error: {e}")
+        return []
+
 def _find_code_col(df):
     for col in df.columns:
         series_str = df[col].astype(str).str.strip()
@@ -173,7 +231,9 @@ def fetch_rankings(report_key="conc_5d"):
     # 如果是投信報表走專屬解析
     if config.get("type") == "it":
         return parse_it_report(config.get("section", "buy"), config.get("days", "1d"))
-
+    # 如果是基本面報表走專屬解析
+    if config.get("type") == "fundamental":
+        return parse_fundamental_report(config.get("cat", "fund_roe"))
     df = fetch_peicheng_table(config["url"])
     if df.empty or len(df.columns) < 2:
         return []
