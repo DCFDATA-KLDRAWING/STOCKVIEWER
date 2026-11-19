@@ -5737,7 +5737,7 @@ const handleOpenSectorMomentum = async () => {
       }}
       className="bg-cyan-600/75 hover:bg-cyan-600 active:bg-cyan-600 active:scale-95 text-white/95 hover:text-white text-xs font-bold px-3 py-2 rounded-full border border-cyan-300/30 flex items-center gap-1 shadow-md backdrop-blur-xs transition-all"
     >
-      <span>📋籌排 </span>
+      <span>📋排行名單 </span>
     </button>
   </div>
 )}
