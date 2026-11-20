@@ -64,32 +64,11 @@ def fetch_peicheng_table(url):
     if not html:
         return pd.DataFrame()
     try:
-        tables = pd.read_html(io.StringIO(html), header=None)
+        tables = pd.read_html(io.StringIO(html), header=0)
         if not tables:
             return pd.DataFrame()
         df = tables[0].copy()
-
-        # 自動尋找包含「股票代號」或「代號」的表頭列
-        header_idx = None
-        for idx, row in df.iterrows():
-            row_text = " ".join([str(x).strip() for x in row.values if pd.notnull(x)])
-            if "股票代號" in row_text or "代號" in row_text:
-                header_idx = idx
-                break
-
-        if header_idx is not None:
-            new_cols = []
-            for i, val in enumerate(df.iloc[header_idx]):
-                col_str = str(val).strip()
-                if not col_str or col_str.lower() == "nan":
-                    col_str = f"欄位{i}"
-                new_cols.append(col_str)
-            df.columns = new_cols
-            df = df.iloc[header_idx + 1:].reset_index(drop=True)
-        else:
-            df.columns = [str(c).strip() for c in df.iloc[0]]
-            df = df.iloc[1:].reset_index(drop=True)
-
+        df.columns = [str(c).strip() for c in df.columns]
         return df
     except Exception as e:
         print(f"pd.read_html error: {e}")
