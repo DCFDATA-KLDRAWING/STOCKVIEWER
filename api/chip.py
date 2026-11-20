@@ -70,30 +70,39 @@ def fetch_peicheng_table(url):
         df = tables[0].copy()
         df.columns = [str(c).strip() for c in df.columns]
 
-        # 只有當目前欄名沒有「股票代號」或「代號」時，才往下找真正的表頭列
-        has_code_header = any(("股票代號" in c) or (c == "代號") for c in df.columns)
-        if not has_code_header:
-            raw_tables = pd.read_html(io.StringIO(html), header=None)
-            if raw_tables:
-                raw_df = raw_tables[0].copy()
-                for idx, row in raw_df.iterrows():
-                    row_vals = [str(x).strip() for x in row.values if pd.notnull(x)]
-                    if any(("股票代號" in v) or (v == "代號") for v in row_vals):
-                        new_cols = []
-                        for i, val in enumerate(raw_df.iloc[idx]):
-                            col_str = str(val).strip()
-                            if not col_str or col_str.lower() == "nan":
-                                col_str = f"欄位{i}"
-                            new_cols.append(col_str)
-                        df = raw_df.iloc[idx + 1:].copy()
-                        df.columns = new_cols
-                        df = df.reset_index(drop=True)
-                        break
+        # 檢查欄位名稱是否包含「代號」或「股票代號」
+        has_code_col = any("代號" in str(c) for c in df.columns)
+
+        # 如果第一列是像「昨3%強勢股」這種大標題，欄名不會有代號，這時往下找真正的表頭列
+        if not has_code_col:
+            for idx, row in df.iterrows():
+                row_str = " ".join([str(x).strip() for x in row.values if pd.notnull(x)])
+                if "代號" in row_str:
+                    new_cols = [str(x).strip() for x in row.values]
+                    df = df.iloc[idx + 1:].copy()
+                    df.columns = new_cols
+                    df = df.reset_index(drop=True)
+                    break
 
         return df
     except Exception as e:
         print(f"pd.read_html error: {e}")
         return pd.DataFrame()
+
+def _find_code_col(df):
+    # 優先找欄位名稱包含「代號」的欄位
+    for col in df.columns:
+        if "代號" in str(col):
+            return col
+
+    # 次選：尋找內容含有 4~6 碼數字股票代號的欄位（只要有 match 就選中，不再用 >= 0.3 的比例卡死）
+    for col in df.columns:
+        series_str = df[col].astype(str).str.strip().str.replace('\u3000', '')
+        matches = series_str.str.match(r'^\d{4,6}[A-Za-z0-9]*$')
+        if matches.sum() >= 1:  # 只要有股票代碼就認定是代碼欄
+            return col
+
+    return df.columns[0]
 
 # 專門解析投信報表 (report_r5.html)
 def parse_it_report(section="buy", days="1d"):
