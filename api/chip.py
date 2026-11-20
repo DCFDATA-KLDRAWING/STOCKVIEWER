@@ -41,7 +41,6 @@ REPORT_MAP = {
     "fund_dividend": {"title": "基本面 - 高配股排行", "type": "fundamental", "cat": "fund_dividend"},
     "fund_eps": {"title": "基本面 - 高EPS排行", "type": "fundamental", "cat": "fund_eps"},
     "fund_margin": {"title": "基本面 - 高毛利排行", "type": "fundamental", "cat": "fund_margin"},
-
 }
 
 def fetch_peicheng_html(url):
@@ -49,7 +48,6 @@ def fetch_peicheng_html(url):
         res = requests.get(url, impersonate="chrome120", timeout=12)
         if res.status_code != 200:
             return ""
-        # 嘗試 cp950 或 big5 解碼
         content = res.content
         try:
             return content.decode("cp950")
@@ -70,10 +68,7 @@ def fetch_peicheng_table(url):
         df = tables[0].copy()
         df.columns = [str(c).strip() for c in df.columns]
 
-        # 檢查欄位名稱是否包含「代號」或「股票代號」
         has_code_col = any("代號" in str(c) for c in df.columns)
-
-        # 如果第一列是像「昨3%強勢股」這種大標題，欄名不會有代號，這時往下找真正的表頭列
         if not has_code_col:
             for idx, row in df.iterrows():
                 row_str = " ".join([str(x).strip() for x in row.values if pd.notnull(x)])
@@ -90,19 +85,90 @@ def fetch_peicheng_table(url):
         return pd.DataFrame()
 
 def _find_code_col(df):
-    # 優先找欄位名稱包含「代號」的欄位
     for col in df.columns:
         if "代號" in str(col):
             return col
 
-    # 次選：尋找內容含有 4~6 碼數字股票代號的欄位（只要有 match 就選中，不再用 >= 0.3 的比例卡死）
     for col in df.columns:
-        series_str = df[col].astype(str).str.strip().str.replace('\u3000', '')
+        series_str = df[col].astype(str).str.strip().str.replace('\u3000', '', regex=False)
         matches = series_str.str.match(r'^\d{4,6}[A-Za-z0-9]*$')
-        if matches.sum() >= 1:  # 只要有股票代碼就認定是代碼欄
+        if matches.sum() >= 1:
             return col
 
-    return df.columns[0]
+    return df.columns[1] if len(df.columns) > 1 else df.columns[0]
+
+# 專門解析昨強勢股 (dream_report/昨強勢股.htm)
+def parse_prev_strong_report():
+    candidate_urls = [
+        "https://www.peicheng.com.tw/asp/main/report/dream_report/%E6%98%A8%E5%BC%B7%E5%8B%A2%E8%82%A1.htm",
+        "http://www.peicheng.com.tw/asp/main/report/dream_report/%E6%98%A8%E5%BC%B7%E5%8B%A2%E8%82%A1.htm",
+        "http://asp.peicheng.com.tw/asp/main/report/dream_report/%E6%98%A8%E5%BC%B7%E5%8B%A2%E8%82%A1.htm",
+    ]
+
+    for url in candidate_urls:
+        html = fetch_peicheng_html(url)
+        if not html or "股票代號" not in html:
+            continue
+        try:
+            tables = pd.read_html(io.StringIO(html), header=None)
+            for tbl in tables:
+                df = tbl.copy()
+                header_idx = None
+                for idx, row in df.iterrows():
+                    vals = [str(x).replace("\u3000", "").strip() for x in row.values if pd.notnull(x)]
+                    if "股票代號" in vals:
+                        header_idx = idx
+                        break
+
+                if header_idx is None:
+                    continue
+
+                headers = [str(x).replace("\u3000", "").strip() for x in df.iloc[header_idx]]
+                data_df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+                code_col_idx = next((i for i, h in enumerate(headers) if "股票代號" in h), 0)
+                name_col_idx = next((i for i, h in enumerate(headers) if "股票名稱" in h), code_col_idx + 1)
+                chg_col_idx = next((i for i, h in enumerate(headers) if "漲幅" in h), None)
+                conc5_col_idx = next((i for i, h in enumerate(headers) if "5日集中度" in h), None)
+
+                records = []
+                rank = 1
+                for _, row in data_df.iterrows():
+                    if len(row) <= max(code_col_idx, name_col_idx):
+                        continue
+                    code = str(row.iloc[code_col_idx]).replace("\u3000", "").strip()
+                    name = str(row.iloc[name_col_idx]).replace("\u3000", "").strip()
+                    if not re.match(r"^\d{4,6}[A-Za-z0-9]*$", code):
+                        continue
+
+                    v1_label = "漲幅"
+                    v1_val = "-"
+                    if chg_col_idx is not None and len(row) > chg_col_idx:
+                        v1_val = _format_cell(row.iloc[chg_col_idx], True, "漲幅")
+
+                    v2_label = ""
+                    v2_val = ""
+                    if conc5_col_idx is not None and len(row) > conc5_col_idx:
+                        v2_label = "5日集中度"
+                        v2_val = _format_cell(row.iloc[conc5_col_idx], True, "5日集中度")
+
+                    records.append({
+                        "rank": rank,
+                        "code": code,
+                        "name": name,
+                        "val1_label": v1_label,
+                        "val1": v1_val,
+                        "val2_label": v2_label,
+                        "val2": v2_val,
+                    })
+                    rank += 1
+
+                if records:
+                    return records
+        except Exception as e:
+            print(f"parse_prev_strong_report error ({url}): {e}")
+
+    return []
 
 # 專門解析投信報表 (report_r5.html)
 def parse_it_report(section="buy", days="1d"):
@@ -117,7 +183,6 @@ def parse_it_report(section="buy", days="1d"):
             return []
         df = tables[0]
 
-        # 找到「投信近日買超」與「投信近日賣超」的行索引
         buy_row_idx = None
         sell_row_idx = None
 
@@ -128,7 +193,6 @@ def parse_it_report(section="buy", days="1d"):
             elif "投信近日賣超" in row_str:
                 sell_row_idx = idx
 
-        # 決定要切哪一段
         if section == "buy":
             start_idx = buy_row_idx + 1 if buy_row_idx is not None else 0
             end_idx = sell_row_idx if sell_row_idx is not None else len(df)
@@ -138,7 +202,6 @@ def parse_it_report(section="buy", days="1d"):
 
         sub_df = df.iloc[start_idx:end_idx].reset_index(drop=True)
 
-        # 欄位對應（一日: 0,1,2；三日: 4,5,6；五日: 8,9,10；十日: 12,13,14）
         col_map = {
             "1d": (0, 1, 2),
             "3d": (4, 5, 6),
@@ -154,9 +217,7 @@ def parse_it_report(section="buy", days="1d"):
             name = str(row.iloc[c_name]).strip()
             vol = str(row.iloc[c_vol]).strip()
 
-            # 只要代碼是 4~6 碼純數字就收錄
             if re.match(r'^\d{4,6}$', code):
-                # 處理張數格式
                 try:
                     v_float = float(vol.replace(",", ""))
                     v_str = f"{v_float:,.1f} 張" if "." in vol else f"{int(v_float):,} 張"
@@ -173,7 +234,7 @@ def parse_it_report(section="buy", days="1d"):
                     "val2": "",
                 })
                 rank += 1
-                if rank > 20: # 該報表只列前 20 名
+                if rank > 20:
                     break
 
         return records
@@ -189,14 +250,14 @@ def parse_fundamental_report(category="fund_roe"):
         return []
 
     col_map = {
-        "fund_roe": (0, 1),        # ROE排行
-        "fund_turnover": (3, 4),   # 週轉率排行
-        "fund_mom": (6, 7),        # 高MOM排行
-        "fund_yoy": (9, 10),       # 高YOY排行
-        "fund_yield": (12, 13),    # 高殖利率排行
-        "fund_dividend": (15, 16), # 高配股排行
-        "fund_eps": (18, 19),      # 高EPS排行
-        "fund_margin": (21, 22),   # 高毛利排行
+        "fund_roe": (0, 1),
+        "fund_turnover": (3, 4),
+        "fund_mom": (6, 7),
+        "fund_yoy": (9, 10),
+        "fund_yield": (12, 13),
+        "fund_dividend": (15, 16),
+        "fund_eps": (18, 19),
+        "fund_margin": (21, 22),
     }
     c_code, c_name = col_map.get(category, (0, 1))
 
@@ -230,14 +291,6 @@ def parse_fundamental_report(category="fund_roe"):
         print(f"parse_fundamental_report error: {e}")
         return []
 
-def _find_code_col(df):
-    for col in df.columns:
-        series_str = df[col].astype(str).str.strip()
-        match_ratio = series_str.str.match(r'^\d{4,6}[A-Za-z0-9]*$').mean()
-        if match_ratio >= 0.3:
-            return col
-    return df.columns[1] if len(df.columns) > 1 else df.columns[0]
-
 def _format_cell(val, default_pct=False, col_name=""):
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return "-"
@@ -256,14 +309,16 @@ def _format_cell(val, default_pct=False, col_name=""):
         return s
 
 def fetch_rankings(report_key="conc_5d"):
+    if report_key == "prev_strong":
+        return parse_prev_strong_report()
+
     config = REPORT_MAP.get(report_key, REPORT_MAP["conc_5d"])
-    
-    # 如果是投信報表走專屬解析
+
     if config.get("type") == "it":
         return parse_it_report(config.get("section", "buy"), config.get("days", "1d"))
-    # 如果是基本面報表走專屬解析
     if config.get("type") == "fundamental":
         return parse_fundamental_report(config.get("cat", "fund_roe"))
+
     df = fetch_peicheng_table(config["url"])
     if df.empty or len(df.columns) < 2:
         return []
@@ -275,7 +330,7 @@ def fetch_rankings(report_key="conc_5d"):
     val1_col = df.columns[code_idx + 2] if code_idx + 2 < len(df.columns) else None
     val2_col = df.columns[code_idx + 3] if code_idx + 3 < len(df.columns) else None
 
-    df[code_col] = df[code_col].astype(str).str.strip()
+    df[code_col] = df[code_col].astype(str).str.replace('\u3000', '', regex=False).str.strip()
     valid_df = df[df[code_col].str.match(r'^\d{4,6}[A-Za-z0-9]*$') == True].reset_index(drop=True)
 
     records = []
