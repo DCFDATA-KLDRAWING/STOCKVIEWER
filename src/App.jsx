@@ -5394,7 +5394,7 @@ const handleOpenSectorMomentum = async () => {
   onClick={() => setShowChart(true)}
   className="w-full mt-2 bg-purple-900/60 border border-purple-500/80 hover:bg-purple-800/40 text-purple-200 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(168,85,247,0.25)] transition-all text-sm text-left px-3 flex items-center gap-2"
 >
-  <span>📊</span> 6. 籌碼集中度
+  <span>📊</span> 5. 籌碼集中度
 </button>
 
 <div className="w-full h-px bg-slate-700/50 my-2"></div>
