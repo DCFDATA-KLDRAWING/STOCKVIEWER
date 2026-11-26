@@ -5376,20 +5376,17 @@ const handleOpenSectorMomentum = async () => {
                 </button>
                 <button onClick={() => setShowInventoryModal(true)} className="w-full bg-slate-800 border border-slate-600 hover:border-pink-500 text-pink-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>📊</span> 2. 財報分析
-                </button>
-                <button onClick={() => window.open('https://gemini.google.com/share/d38ef70d1847?skid=81d870f0-5bde-484f-a640-7f0e37136e3f?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-blue-500 text-blue-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
-                  <span>🌍</span> 3. 產業規模
-                </button>
+                </button>                
                 <button onClick={() => setShowRevenueModal(true)} className="w-full bg-slate-800 border border-slate-600 hover:border-amber-500 text-amber-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
-                  <span>📈</span> 4. 營收觀察
+                  <span>📈</span> 3. 營收觀察
                 </button>
                 
-                {/* 🔮 5. 天機模型深入研發儀表板 (調參/診斷) */}
+                {/* 🔮 4. 天機模型深入研發儀表板 (調參/診斷) */}
 <button 
   onClick={() => setIsTianjiLabOpen(true)} 
   className="w-full bg-indigo-950/60 border border-cyan-500/80 hover:bg-cyan-900/40 text-cyan-200 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all text-sm text-left px-3 flex items-center gap-2"
 >
-  <span>🔮</span> 5. 天機模型研發儀表板 (調參/診斷)
+  <span>🔮</span> 4. 天機模型研發儀表板 (調參/診斷)
 </button>               
 
 {/* 📊 6. 三竹風格籌碼集中圖 */}
@@ -5726,10 +5723,22 @@ const handleOpenSectorMomentum = async () => {
     }}
     finmindApiKey={finmindApiKey}
     onSelectStock={(newCode) => {
-      // 點擊排行榜股號時，自動切換看該檔股票的 K 線
-      if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(newCode);
-      if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(newCode);
-      if (typeof setSymbolInput === 'function') setSymbolInput(newCode);
+      const cleanCode = String(newCode || '').trim();
+      if (!cleanCode) return;
+
+      // 1. 同步更新三個股號 state
+      if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(cleanCode);
+      if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(cleanCode);
+      if (typeof setSymbolInput === 'function') setSymbolInput(cleanCode);
+
+      // 2. 關鍵：直接叫主畫面去抓並繪製這檔股票的 K 線
+      if (typeof fetchStockData === 'function') {
+        fetchStockData(cleanCode);
+      }
+
+      // 3. 關閉籌碼集中圖彈窗，直接回主畫面看 K 線
+      setShowChart(false);
+      setOpenRankDirectly(false);
     }}
   />
 )}
@@ -5765,15 +5774,22 @@ const handleOpenSectorMomentum = async () => {
   }
   finmindApiKey={finmindApiKey}
 />
-{/* 📈 營收與 EPS 排行觀察彈出視窗 */}
 <RevenueRankingModal
   isOpen={showRevenueModal}
   onClose={() => setShowRevenueModal(false)}
   onSelectStock={(code, name) => {
-    // 與 ChipChart 保持一致，傳入純代號 (code) 更新主畫面 K 線
-    if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(code);
-    if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(code);
-    if (typeof setSymbolInput === 'function') setSymbolInput(code);
+    const cleanCode = String(code || '').trim();
+    if (!cleanCode) return;
+
+    if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(cleanCode);
+    if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(cleanCode);
+    if (typeof setSymbolInput === 'function') setSymbolInput(cleanCode);
+
+    // 關鍵：直接呼叫主畫面抓 K 線資料的函式，不用再多按一次 K
+    if (typeof fetchStockData === 'function') {
+      fetchStockData(cleanCode);
+    }
+
     setShowRevenueModal(false);
   }}
 />
