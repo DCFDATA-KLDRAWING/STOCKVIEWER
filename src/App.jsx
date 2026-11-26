@@ -5747,7 +5747,8 @@ const handleOpenSectorMomentum = async () => {
 <InventoryAnalysisModal
   isOpen={showInventoryModal}
   onClose={() => setShowInventoryModal(false)}
-  initialSymbol={currentRealSymbol || '4958'} // 自動帶入目前看盤的個股
+  initialSymbol={currentRealSymbol || '4958'}
+  finmindApiKey={finmindApiKey} // 👈 帶入您既有的 FinMind Key
 />
       {/* ✨ 浮動的策略打造器 (計算機版) */}
 {isBuilderOpen && (

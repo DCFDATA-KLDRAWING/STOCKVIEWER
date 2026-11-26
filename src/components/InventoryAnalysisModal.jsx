@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-// --- 高階 SVG 雙軸圖表元件 ---
+// --- 高階 SVG 雙軸圖表元件 (存銷比與營收) ---
 const AdvancedInventoryRatioChart = ({ monthlyData, quarterlyData, currencyUnit }) => {
   if (!monthlyData || monthlyData.length === 0) return null;
 
@@ -26,8 +26,8 @@ const AdvancedInventoryRatioChart = ({ monthlyData, quarterlyData, currencyUnit 
     
     if (index >= 2) {
       const r0 = Number(arr[index].revenue) || 0;
-      const r1 = Number(arr[index-1].revenue) || 0;
-      const r2 = Number(arr[index-2].revenue) || 0;
+      const r1 = Number(arr[index - 1].revenue) || 0;
+      const r2 = Number(arr[index - 2].revenue) || 0;
       rev3MSum = r0 + r1 + r2;
       
       if (inventory !== null && rev3MSum > 0) {
@@ -49,7 +49,7 @@ const AdvancedInventoryRatioChart = ({ monthlyData, quarterlyData, currencyUnit 
   const padding = { top: 60, bottom: 60, left: 45, right: 45 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const spacing = chartWidth / processedData.length;
+  const spacing = chartWidth / (processedData.length || 1);
 
   const allAbsValues = processedData.flatMap(d => [d.revenue, d.inventory].filter(v => v !== null && !isNaN(v)));
   const maxAbsValue = Math.max(...allAbsValues, 1) * 1.2;
@@ -108,7 +108,7 @@ const AdvancedInventoryRatioChart = ({ monthlyData, quarterlyData, currencyUnit 
 
             return (
               <g key={`bar-${i}`} className="group cursor-pointer">
-                <rect x={xCenter - spacing/2} y={padding.top} width={spacing} height={chartHeight} fill="transparent" className="hover:fill-zinc-700/40 transition-colors" />
+                <rect x={xCenter - spacing / 2} y={padding.top} width={spacing} height={chartHeight} fill="transparent" className="hover:fill-zinc-700/40 transition-colors" />
                 
                 {d.inventory !== null && !isNaN(d.inventory) && (
                   <rect x={barX} y={invY} width={barWidth} height={invHeight} fill="#60a5fa" rx="1" className="opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -134,8 +134,8 @@ const AdvancedInventoryRatioChart = ({ monthlyData, quarterlyData, currencyUnit 
                   </text>
                 )}
                 
-                {(i === 0 || d.quarterLabel !== processedData[i-1].quarterLabel) && (
-                  <line x1={xCenter - spacing/2} y1={height - 40} x2={xCenter - spacing/2} y2={height - 10} stroke="#52525b" strokeDasharray="2 2" />
+                {(i === 0 || d.quarterLabel !== processedData[i - 1].quarterLabel) && (
+                  <line x1={xCenter - spacing / 2} y1={height - 40} x2={xCenter - spacing / 2} y2={height - 10} stroke="#52525b" strokeDasharray="2 2" />
                 )}
               </g>
             );
@@ -163,7 +163,7 @@ const AdvancedInventoryRatioChart = ({ monthlyData, quarterlyData, currencyUnit 
   );
 };
 
-// --- EBITDA 資本回報率 (ROIC) 圖表 ---
+// --- EBITDA 資本回報率 (改良版 ROIC) 圖表 ---
 const AdvancedEbitdaROICChart = ({ quarterlyData }) => {
   if (!quarterlyData || quarterlyData.length === 0) return null;
 
@@ -173,7 +173,7 @@ const AdvancedEbitdaROICChart = ({ quarterlyData }) => {
   const padding = { top: 40, bottom: 40, left: 45, right: 45 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const spacing = chartWidth / sortedData.length;
+  const spacing = chartWidth / (sortedData.length || 1);
 
   const validRatios = sortedData.map(d => d.roic).filter(v => v !== null && !isNaN(v));
   if (validRatios.length === 0) return null; 
@@ -181,7 +181,7 @@ const AdvancedEbitdaROICChart = ({ quarterlyData }) => {
   const maxVal = Math.max(...validRatios, 5) * 1.2;
   const minValRaw = Math.min(...validRatios, 0);
   const minVal = minValRaw < 0 ? minValRaw * 1.2 : 0;
-  const range = maxVal - minVal;
+  const range = maxVal - minVal || 1;
 
   const getY = (val) => padding.top + chartHeight - ((val - minVal) / range) * chartHeight;
   const zeroY = getY(0);
@@ -223,7 +223,7 @@ const AdvancedEbitdaROICChart = ({ quarterlyData }) => {
             const hasData = d.roic !== null && !isNaN(d.roic);
             return (
               <g key={`roic-bar-${i}`} className="group cursor-pointer">
-                <rect x={xCenter - spacing/2} y={padding.top} width={spacing} height={chartHeight} fill="transparent" className="hover:fill-zinc-700/40 transition-colors" />
+                <rect x={xCenter - spacing / 2} y={padding.top} width={spacing} height={chartHeight} fill="transparent" className="hover:fill-zinc-700/40 transition-colors" />
                 
                 {hasData && (
                   <g className="opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
@@ -285,8 +285,176 @@ const CycleWaveMap = ({ activeStage }) => {
   );
 };
 
+// --- FinMind 資料抓取與財報邏輯運算核心 ---
+const fetchFinMindInventoryData = async (stockCode, finmindToken = '') => {
+  const token = finmindToken || localStorage.getItem('MY_STOCK_FINMIND_KEY') || '';
+  const now = new Date();
+  
+  // 抓取近 3 年資料以涵蓋 24 個月營收與 8 季財報
+  const startDate = new Date(now.getFullYear() - 3, 0, 1).toISOString().split('T')[0];
+
+  const buildUrl = (dataset) => {
+    let u = `https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${stockCode}&start_date=${startDate}`;
+    if (token) u += `&token=${token}`;
+    return u;
+  };
+
+  // 同步抓取：月營收、資產負債表、損益表
+  const [revRes, bsRes, isRes] = await Promise.all([
+    fetch(buildUrl('TaiwanStockMonthRevenue')).then(r => r.json()),
+    fetch(buildUrl('TaiwanStockBalanceSheet')).then(r => r.json()),
+    fetch(buildUrl('TaiwanStockFinancialStatements')).then(r => r.json())
+  ]);
+
+  if (!revRes.data || revRes.data.length === 0) {
+    throw new Error(`找不到股票代號 ${stockCode} 的月營收資料`);
+  }
+
+  // 1. 整理單月營收 (單位換算成「百萬元」)
+  const monthlyData = revRes.data
+    .map(item => {
+      const d = item.date || '';
+      const monthStr = d.substring(0, 7); // YYYY-MM
+      const revInMillions = (Number(item.revenue) || 0) / 1000000;
+      return {
+        month: monthStr,
+        revenue: Math.round(revInMillions * 10) / 10
+      };
+    })
+    .filter((v, i, a) => a.findIndex(t => t.month === v.month) === i)
+    .sort((a, b) => b.month.localeCompare(a.month))
+    .slice(0, 24)
+    .reverse();
+
+  // 2. 整理資產負債表 (依季度歸戶：存貨、總資產、流動負債、短期借款)
+  const bsMap = {};
+  (bsRes.data || []).forEach(row => {
+    const d = row.date; // 格式如 2024-03-31, 2024-06-30
+    if (!d) return;
+    const year = d.substring(0, 4);
+    const m = parseInt(d.substring(5, 7), 10);
+    const q = Math.ceil(m / 3);
+    const qKey = `${year}Q${q}`;
+
+    if (!bsMap[qKey]) {
+      bsMap[qKey] = { quarter: qKey, inventory: 0, totalAssets: 0, currentLiab: 0, shortDebt: 0 };
+    }
+
+    const val = (Number(row.value) || 0) / 1000000; // 統一百萬元
+    const typeStr = (row.type || row.origin_name || '').toLowerCase();
+
+    if (typeStr.includes('inventory') || typeStr.includes('存貨')) {
+      bsMap[qKey].inventory = val;
+    } else if (typeStr === 'totalassets' || typeStr.includes('資產總額') || typeStr.includes('資產總計')) {
+      bsMap[qKey].totalAssets = val;
+    } else if (typeStr === 'totalcurrentliabilities' || typeStr.includes('流動負債合計') || typeStr.includes('流動負債總額')) {
+      bsMap[qKey].currentLiab = val;
+    } else if (typeStr.includes('shorttermborrowings') || typeStr.includes('短期借款')) {
+      bsMap[qKey].shortDebt = val;
+    }
+  });
+
+  // 3. 整理損益表 (計算營業利益與折舊，取得 EBITDA)
+  const isMap = {};
+  (isRes.data || []).forEach(row => {
+    const d = row.date;
+    if (!d) return;
+    const year = d.substring(0, 4);
+    const m = parseInt(d.substring(5, 7), 10);
+    const q = Math.ceil(m / 3);
+    const qKey = `${year}Q${q}`;
+
+    if (!isMap[qKey]) {
+      isMap[qKey] = { operatingIncome: 0, depreciation: 0 };
+    }
+
+    const val = (Number(row.value) || 0) / 1000000;
+    const typeStr = (row.type || row.origin_name || '').toLowerCase();
+
+    if (typeStr.includes('operatingincome') || typeStr.includes('營業利益') || typeStr.includes('營業淨利')) {
+      isMap[qKey].operatingIncome = val;
+    } else if (typeStr.includes('depreciation') || typeStr.includes('折舊')) {
+      isMap[qKey].depreciation = val;
+    }
+  });
+
+  // 4. 計算每季的改良版 ROIC
+  const quarterlyData = Object.keys(bsMap)
+    .sort()
+    .slice(-8) // 取最近 8 季
+    .map(qKey => {
+      const bs = bsMap[qKey];
+      const is = isMap[qKey] || { operatingIncome: 0, depreciation: 0 };
+      
+      const ebitda = (is.operatingIncome || 0) + (is.depreciation || 0);
+      const nonInterestLiab = Math.max(0, (bs.currentLiab || 0) - (bs.shortDebt || 0));
+      const investedCapital = Math.max(1, (bs.totalAssets || 0) - nonInterestLiab);
+
+      let roic = 0;
+      if (investedCapital > 1 && ebitda !== 0) {
+        roic = Math.round(((ebitda * 4) / investedCapital) * 10000) / 100; // 年化 ROIC(%)
+      }
+
+      return {
+        quarter: qKey,
+        inventory: Math.round(bs.inventory * 10) / 10,
+        roic: roic || 0
+      };
+    });
+
+  // 5. 景氣位階自動推演演算法
+  let cycleStage = 2; // 預設景氣擴張
+  let cycleAnalysis = '';
+  let dcfAdvice = '';
+
+  const validQuarters = quarterlyData.filter(q => q.inventory > 0);
+  if (validQuarters.length >= 2 && monthlyData.length >= 6) {
+    const latestQ = validQuarters[validQuarters.length - 1];
+    const prevQ = validQuarters[validQuarters.length - 2];
+    
+    // 計算近 3 個月營收合計
+    const revRecent3 = monthlyData.slice(-3).reduce((acc, cur) => acc + cur.revenue, 0);
+    const revPrev3 = monthlyData.slice(-6, -3).reduce((acc, cur) => acc + cur.revenue, 0);
+    
+    const latestRatio = revRecent3 > 0 ? (latestQ.inventory / revRecent3) * 100 : 0;
+    const prevRatio = revPrev3 > 0 ? (prevQ.inventory / revPrev3) * 100 : 0;
+    const revGrowth = revPrev3 > 0 ? ((revRecent3 - revPrev3) / revPrev3) * 100 : 0;
+
+    if (latestRatio < prevRatio && revGrowth >= 0) {
+      cycleStage = 1; // 谷底復甦
+      cycleAnalysis = `存銷比從前期 ${prevRatio.toFixed(1)}% 降至 ${latestRatio.toFixed(1)}%，庫存去化良好且營收季增 ${revGrowth.toFixed(1)}%，進入谷底復甦。`;
+      dcfAdvice = `此階段可採取積極逢低佈局思維。DCF 折現模型之「前三年成長率」可給予由負轉正之均值修復預期。`;
+    } else if (latestRatio <= prevRatio * 1.05 && revGrowth > 5) {
+      cycleStage = 2; // 景氣擴張
+      cycleAnalysis = `營收動能持續放大 (季增 ${revGrowth.toFixed(1)}%)，存銷比維持健康低檔 (${latestRatio.toFixed(1)}%)，供不應求。`;
+      dcfAdvice = `主升段估值擴張期。市場常給予較高本益比乘數，DCF 現金流充沛，可給予相對樂觀成長率。`;
+    } else if (latestRatio > prevRatio && revGrowth < 0) {
+      cycleStage = 4; // 收縮衰退
+      cycleAnalysis = `營收動能放緩 (季增 ${revGrowth.toFixed(1)}%) 且存銷比急遽竄升至 ${latestRatio.toFixed(1)}%，存貨滯銷風險高。`;
+      dcfAdvice = `景氣衰退收縮期，宜保守避開。DCF 模型應大幅下調永續成長率，並墊高折現率以反映評價下修風險。`;
+    } else {
+      cycleStage = 3; // 景氣高峰
+      cycleAnalysis = `存銷比向上交叉走高至 ${latestRatio.toFixed(1)}%，雖然營收仍在歷史相對高檔，但下游拉貨已有放緩跡象。`;
+      dcfAdvice = `居高思危。此時切勿用歷史最高獲利給予過度樂觀的 DCF 估值，市場反推隱含成長率若過高需慎防估值修正。`;
+    }
+  } else {
+    cycleAnalysis = '資料筆數回溯計算中，目前呈現基礎財務指標。';
+    dcfAdvice = '建議參考最新一季存貨週轉速度與營業現金流進行估值。';
+  }
+
+  return {
+    companyName: `${stockCode}`,
+    currencyUnit: '百萬元',
+    monthlyData,
+    quarterlyData,
+    cycleStage,
+    cycleAnalysis,
+    dcfAdvice
+  };
+};
+
 // --- Modal 主體 ---
-export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol = '4958' }) {
+export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol = '4958', finmindApiKey = '' }) {
   const [query, setQuery] = useState(initialSymbol);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -301,166 +469,28 @@ export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol 
 
   if (!isOpen) return null;
 
-  const fetchWithRetry = async (prompt, retries = 3) => {
-    // 優先讀取環境變數或 localStorage，若有全域設定即可直接共用
-    const apiKey =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) ||
-  localStorage.getItem('MY_STOCK_API_KEY') ||
-  localStorage.getItem('MY_GEMINI_API_KEY') ||
-  ''; 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-    
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ google_search: {} }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            companyName: { type: "STRING" },
-            currencyUnit: { type: "STRING" },
-            monthlyData: {
-              type: "ARRAY",
-              items: { type: "OBJECT", properties: { month: { type: "STRING" }, revenue: { type: "NUMBER" } }, required: ["month", "revenue"] }
-            },
-            quarterlyData: {
-              type: "ARRAY",
-              items: { 
-                type: "OBJECT", 
-                properties: { 
-                  quarter: { type: "STRING" }, 
-                  inventory: { type: "NUMBER" },
-                  roic: { type: "NUMBER" } 
-                }, 
-                required: ["quarter", "inventory", "roic"] 
-              }
-            },
-            cycleStage: { type: "INTEGER" },
-            cycleAnalysis: { type: "STRING" },
-            dcfAdvice: { type: "STRING" }
-          },
-          required: ["companyName", "currencyUnit", "monthlyData", "quarterlyData", "cycleStage", "cycleAnalysis", "dcfAdvice"]
-        }
-      }
-    };
-
-    let delay = 1000;
-    for (let i = 0; i < retries; i++) {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!textResult) throw new Error("無效的 API 回應");
-        
-        return JSON.parse(textResult);
-      } catch (err) {
-        if (i === retries - 1) throw err;
-        await new Promise(res => setTimeout(res, delay));
-        delay *= 2;
-      }
-    }
-  };
-
-  const cleanQuarterString = (str) => {
-    if (!str) return "";
-    const s = String(str);
-    const yMatch = s.match(/(20\d{2})/);
-    const qMatch = s.match(/[Qq第]\s*([1-4])/i) || s.match(/([1-4])$/); 
-    if (yMatch && qMatch) return `${yMatch[1]}Q${qMatch[1]}`;
-    return s.trim();
-  };
-
-  const cleanMonthString = (str) => {
-    if (!str) return "";
-    const s = String(str).trim();
-    const yMatch = s.match(/^(20\d{2})/);
-    if (yMatch) {
-      const remainder = s.substring(4).replace(/[^0-9]/g, '');
-      if (remainder) return `${yMatch[1]}-${remainder.padStart(2, '0')}`;
-    }
-    return s;
+  const extractStockCode = (str) => {
+    const match = str.match(/\d{4}/);
+    return match ? match[0] : str.trim();
   };
 
   const handleSearch = async () => {
-    if (!query.trim()) return;
+    const code = extractStockCode(query);
+    if (!code) return;
     setLoading(true);
     setError('');
     setResult(null);
-    setShowRawData(false); 
-
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
-
-    const prompt = `請扮演高階財務分析師。現在時間是 ${currentYear} 年 ${currentMonth} 月。
-    請使用 Google 搜尋尋找台股/美股公司「${query}」的財報資料。
-
-    【精準搜尋與計算指引】：
-1. 存貨與營收：請搜尋「${query} 富邦證券 每月營收」、「${query} 富邦證券 資產負債表 存貨」。
-2. 高階 ROIC 計算 (嚴格執行算法 B)：
-  - 請搜尋「${query} 富邦證券 資產負債表」獲取季度的：【總資產】、【流動負債】。如果有【短期借款】或【一年內到期長期負債】，也請獲取。
-  - 請搜尋「${query} 富邦證券 財務比率」獲取季度的：【ROA(C)稅前息前折舊前】百分比。
-  - 【步驟 1】：計算無息流動負債 = 流動負債 - (短期借款 + 一年內到期長期負債)。若無借款資料，直接用流動負債亦可。
-  - 【步驟 2】：計算分母 (投入資本) = 總資產 - 無息流動負債。
-  - 【步驟 3】：計算分子 (EBITDA) = 總資產 × (ROA(C)稅前息前折舊前 / 100)。
-  - 【步驟 4】：計算改良版 ROIC = (分子 / 分母) × 100。請以百分比數字回傳。若資料不足無法計算，請回傳 0。
-
-    【數據擷取要求】：
-1. 單月營業收入 (格式 YYYY-MM)：往前回推最多 24 期。
-2. 季末存貨金額 (格式 YYYYQ1)：往前回推最多 8 期 (單位統一)。
-3. 改良版 ROIC (%, 格式 YYYYQ1)：請填入您剛才依照步驟 1-4 算出來的數字。
-    ⚠️ 容錯原則：絕不編造假數字。
-    
-    【分析任務】：觀察「存貨金額」與「單月營收」變化判定循環位階：
-    【1】谷底復甦：存銷比從高點下滑。
-    【2】景氣擴張：營收與存貨同步成長，存銷比低檔。
-    【3】景氣高峰：存銷比向上飆高黃金交叉 (營收停滯，存貨堆積)。
-    【4】收縮衰退：營收急劇衰退，存銷比高。
-    
-    請以 JSON 回傳結果。`;
+    setShowRawData(false);
 
     try {
-      const parsedData = await fetchWithRetry(prompt, 3);
-      if (parsedData.monthlyData && parsedData.monthlyData.length > 0) {
-        const sanitizedData = {
-          ...parsedData,
-          monthlyData: (parsedData.monthlyData || [])
-            .map(d => ({ ...d, month: cleanMonthString(d.month), revenue: Number(d.revenue) || 0 }))
-            .filter(d => d.month.includes('-'))
-            .sort((a,b) => new Date(b.month) - new Date(a.month)), 
-          quarterlyData: (parsedData.quarterlyData || [])
-            .map(d => ({ 
-              ...d, 
-              quarter: cleanQuarterString(d.quarter), 
-              inventory: Number(d.inventory) || 0,
-              roic: d.roic !== undefined ? Number(d.roic) : 0 
-            }))
-            .filter(d => d.quarter.includes('Q'))
-            .sort((a,b) => b.quarter.localeCompare(a.quarter)) 
-        };
-
-        setResult(sanitizedData);
-      } else {
-        throw new Error("未能獲取足夠的最新數據");
-      }
+      const data = await fetchFinMindInventoryData(code, finmindApiKey);
+      setResult(data);
     } catch (err) {
       console.error(err);
-      setError('獲取數據失敗，請確認 API Key 與公司名稱是否正確。');
+      setError(`獲取數據失敗: ${err.message || '請確認股號是否正確'}`);
     } finally {
       setLoading(false);
     }
-  };
-
-  const extractStockCode = (str) => {
-    const match = str.match(/\d{4}/);
-    return match ? match[0] : null;
   };
 
   return (
@@ -471,7 +501,7 @@ export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol 
         <div className="flex justify-between items-center px-4 py-3 bg-[#18181b] border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <span className="text-pink-400 text-lg">📊</span>
-            <h3 className="font-bold text-white text-base">存銷週期 & 改良版 ROIC 導航</h3>
+            <h3 className="font-bold text-white text-base">存銷週期 & 改良版 ROIC 導航 (FinMind 官方數據引擎)</h3>
           </div>
           <button
             onClick={onClose}
@@ -481,14 +511,14 @@ export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol 
           </button>
         </div>
 
-        {/* Search Bar */}
+        {/* 搜尋列 */}
         <div className="p-4 bg-zinc-900 border-b border-zinc-800 flex gap-2">
           <input 
             type="text" 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="輸入股號/股名 (如: 4958 臻鼎)" 
+            placeholder="輸入股號 (如: 4958 或 2449)" 
             className="flex-1 bg-zinc-800 border border-zinc-700 px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:border-pink-500 font-mono"
           />
           <button 
@@ -496,11 +526,11 @@ export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol 
             disabled={loading}
             className="bg-pink-600 hover:bg-pink-500 disabled:bg-zinc-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center gap-1.5"
           >
-            {loading ? '分析中...' : '生成研判'}
+            {loading ? '財報運算中...' : '生成研判'}
           </button>
         </div>
 
-        {/* Content Area */}
+        {/* 內容區 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {error && (
             <div className="bg-red-950/40 border border-red-800 text-red-300 p-3 rounded-lg text-xs">
@@ -511,7 +541,7 @@ export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol 
           {result && (
             <div className="space-y-4">
               <div className="flex justify-between items-center flex-wrap gap-2">
-                <span className="text-lg font-bold text-white">{result.companyName}</span>
+                <span className="text-lg font-bold text-white">{result.companyName} - 存銷比動能 (單位: {result.currencyUnit})</span>
                 <div className="flex gap-2">
                   <button 
                     onClick={() => {
@@ -534,18 +564,19 @@ export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol 
                 </div>
               </div>
 
-              {/* 圖表 */}
+              {/* 存銷比雙軸圖 */}
               <AdvancedInventoryRatioChart 
                 monthlyData={result.monthlyData} 
                 quarterlyData={result.quarterlyData} 
                 currencyUnit={result.currencyUnit} 
               />
 
+              {/* 改良版 ROIC 圖 */}
               <AdvancedEbitdaROICChart 
                 quarterlyData={result.quarterlyData} 
               />
 
-              {/* 循環波浪與 DCF 指引 */}
+              {/* 景氣波浪圖與 DCF 指引 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                   <div className="text-xs font-bold text-zinc-300 mb-2">當前循環位階</div>
@@ -563,7 +594,7 @@ export default function InventoryAnalysisModal({ isOpen, onClose, initialSymbol 
                     </p>
                   </div>
                   <div className="mt-3 text-[11px] text-amber-300/80 bg-amber-950/20 p-2 rounded border border-amber-800/40">
-                    提示：若市場隱含成長率極高但桃紅線(存銷比)急升，宜避開過度樂觀標的。
+                    提示：存銷比桃紅線高檔急升代表庫存堆積，此時反推隱含成長率若過高宜居高思危。
                   </div>
                 </div>
               </div>
