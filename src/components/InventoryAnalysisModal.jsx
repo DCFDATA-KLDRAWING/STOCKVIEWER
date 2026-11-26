@@ -331,7 +331,7 @@ const fetchFinMindInventoryData = async (stockCode, finmindToken = '') => {
   // 2. 整理資產負債表 (依季度歸戶：存貨、總資產、流動負債、短期借款)
   const bsMap = {};
   (bsRes.data || []).forEach(row => {
-    const d = row.date; // 格式如 2024-03-31, 2024-06-30
+    const d = row.date;
     if (!d) return;
     const year = d.substring(0, 4);
     const m = parseInt(d.substring(5, 7), 10);
@@ -342,16 +342,35 @@ const fetchFinMindInventoryData = async (stockCode, finmindToken = '') => {
       bsMap[qKey] = { quarter: qKey, inventory: 0, totalAssets: 0, currentLiab: 0, shortDebt: 0 };
     }
 
-    const val = (Number(row.value) || 0) / 1000000; // 統一百萬元
-    const typeStr = (row.type || row.origin_name || '').toLowerCase();
+    const rawVal = Number(row.value);
+    if (isNaN(rawVal)) return;
+    const val = rawVal / 1000000; // 統一換算成「百萬元」
 
-    if (typeStr.includes('inventory') || typeStr.includes('存貨')) {
-      bsMap[qKey].inventory = val;
-    } else if (typeStr === 'totalassets' || typeStr.includes('資產總額') || typeStr.includes('資產總計')) {
+    const typeLower = String(row.type || '').toLowerCase();
+    const originName = String(row.origin_name || '');
+
+    if (
+      typeLower.includes('inventor') ||
+      originName.includes('存貨')
+    ) {
+      // 若同一季有多筆存貨相關科目，取較大值或累加（視財報結構而定，一般「存貨」為單一主科目）
+      if (val > 0) bsMap[qKey].inventory = Math.max(bsMap[qKey].inventory, val);
+    } else if (
+      typeLower === 'totalassets' ||
+      originName.includes('資產總額') ||
+      originName.includes('資產總計')
+    ) {
       bsMap[qKey].totalAssets = val;
-    } else if (typeStr === 'totalcurrentliabilities' || typeStr.includes('流動負債合計') || typeStr.includes('流動負債總額')) {
+    } else if (
+      typeLower.includes('currentliabilities') ||
+      originName.includes('流動負債合計') ||
+      originName.includes('流動負債總額')
+    ) {
       bsMap[qKey].currentLiab = val;
-    } else if (typeStr.includes('shorttermborrowings') || typeStr.includes('短期借款')) {
+    } else if (
+      typeLower.includes('shorttermborrowings') ||
+      originName.includes('短期借款')
+    ) {
       bsMap[qKey].shortDebt = val;
     }
   });
