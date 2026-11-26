@@ -149,7 +149,12 @@ const ChipChart = ({
       onMarkVisited(targetCode);
     }
     if (onSelectStock) {
-      onSelectStock(targetCode);
+      const rankCodes = Array.isArray(rankingList)
+        ? rankingList
+            .map((item) => String(item?.code || item?.stockId || item?.symbol || '').trim())
+            .filter(Boolean)
+        : [];
+      onSelectStock(targetCode, rankCodes);
     }
     setShowRankModal(false);
     if (onClose) {

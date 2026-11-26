@@ -234,7 +234,9 @@ const RevenueRankingModal = ({ isOpen, onClose, onSelectStock }) => {
 
   const handlePickStock = (row) => {
     if (typeof onSelectStock === 'function') {
-      onSelectStock(row.code, row.name);
+      // 🌟 把當前這個分頁（營收 40 檔或 EPS 20 檔）的所有代號打包成陣列一起傳出去
+      const allCodesInTab = currentRows.map(r => String(r.code).trim()).filter(Boolean);
+      onSelectStock(row.code, row.name, allCodesInTab);
     }
     onClose();
   };

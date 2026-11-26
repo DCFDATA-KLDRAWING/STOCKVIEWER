@@ -3038,6 +3038,7 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
 
       if (newRanking.length > 0) {
         setRankingList(newRanking);
+        setActiveNavList(newRanking.map(item => String(item.symbol).trim()).filter(Boolean));
         showAlert(`🎉 成功從雲端同步 ${newRanking.length} 檔股票！`);
       } else {
         showAlert('雲端資料解析失敗，請確認表格內是否有包含股號。');
@@ -3117,6 +3118,8 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
 
       if (newRanking.length > 0) {
         setRankingList(newRanking);
+        // 🌟 關鍵補上這行：將雲端籌碼排行設為當前鍵盤左右鍵 / ▶ 按鈕的切換名單
+        setActiveNavList(newRanking.map(item => String(item.symbol).trim()).filter(Boolean));
         // 👑 修改點 3：專屬的成功提示訊息
         showAlert(`🔥 成功從雲端同步 ${newRanking.length} 檔籌碼爆發股！`);
       } else {
@@ -5811,9 +5814,9 @@ const handleOpenSectorMomentum = async () => {
     const cleanCode = String(code || '').trim();
     if (!cleanCode) return;
 
-    // 🌟 設定營收/EPS 排行榜為目前導航清單
+    // 🌟 關鍵：把傳出來的清單陣列存入 activeNavList
     if (Array.isArray(listCodes) && listCodes.length > 0) {
-      setActiveNavList(listCodes.map(c => String(c).trim()).filter(Boolean));
+      setActiveNavList(listCodes);
     }
 
     if (typeof setSymbolInput === 'function') setSymbolInput(cleanCode);
