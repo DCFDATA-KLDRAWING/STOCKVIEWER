@@ -46,7 +46,7 @@ const AdvancedInventoryRatioChart = ({ monthlyData, quarterlyData, currencyUnit 
 
   const width = 600; 
   const height = 450; 
-  const padding = { top: 60, bottom: 60, left: 45, right: 45 };
+  const padding = { top: 60, bottom: 60, left: 60, right: 50 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const spacing = chartWidth / (processedData.length || 1);
