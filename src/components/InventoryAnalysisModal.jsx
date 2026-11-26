@@ -287,7 +287,9 @@ const CycleWaveMap = ({ activeStage }) => {
 
 // --- FinMind 資料抓取與財報邏輯運算核心 ---
 const fetchFinMindInventoryData = async (stockCode, finmindToken = '') => {
-  const token = finmindToken || localStorage.getItem('MY_STOCK_FINMIND_KEY') || '';
+  const cleanStockCode = String(stockCode || '').trim().replace(/[^\x20-\x7E]/g, '');
+  const rawToken = finmindToken || localStorage.getItem('MY_STOCK_FINMIND_KEY') || '';
+  const token = String(rawToken).trim().replace(/[^\x20-\x7E]/g, '');
   const now = new Date();
   
   // 抓取近 3 年資料以涵蓋 24 個月營收與 8 季財報
