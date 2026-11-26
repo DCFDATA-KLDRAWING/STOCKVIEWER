@@ -5765,17 +5765,16 @@ const handleOpenSectorMomentum = async () => {
   }
   finmindApiKey={finmindApiKey}
 />
-{/* 📈 營收觀察彈出視窗 */}
+{/* 📈 營收與 EPS 排行觀察彈出視窗 */}
 <RevenueRankingModal
   isOpen={showRevenueModal}
   onClose={() => setShowRevenueModal(false)}
   onSelectStock={(code, name) => {
-    const label = `${code} ${name}`.trim();
-    if (typeof handleSelectStock === 'function') {
-      handleSelectStock(label);
-    } else if (typeof setStockInput === 'function') {
-      setStockInput(label);
-    }
+    // 與 ChipChart 保持一致，傳入純代號 (code) 更新主畫面 K 線
+    if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(code);
+    if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(code);
+    if (typeof setSymbolInput === 'function') setSymbolInput(code);
+    setShowRevenueModal(false);
   }}
 />
       {/* ✨ 浮動的策略打造器 (計算機版) */}
