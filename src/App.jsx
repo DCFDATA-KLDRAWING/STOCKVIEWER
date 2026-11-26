@@ -2542,6 +2542,12 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
   useEffect(() => {
     localStorage.setItem('MY_STOCK_RANKING_LIST', JSON.stringify(rankingList));
   }, [rankingList]);
+  // 🌟 新增：記錄目前鍵盤左右鍵／下一檔要走的名單（純股號陣列，例如 ['2530', '4416', ...]）
+  const [activeNavList, setActiveNavList] = useState([]);
+  const activeNavListRef = useRef([]);
+  useEffect(() => {
+    activeNavListRef.current = activeNavList;
+  }, [activeNavList]);
 
   // ✨ 新增：自選股狀態記憶 (Watchlist)
   const [watchlist, setWatchlist] = useState(() => {
@@ -3272,8 +3278,30 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
     });
   };
      
-  // ✨ 邏輯 4：快速切換上一檔/下一檔 (無縫排行榜導航)
+  // ✨ 邏輯 4：快速切換上一檔/下一檔 (支援各排行榜獨立導航)
   const handleNavigateList = (direction) => {
+    const customList = activeNavListRef.current;
+
+    if (Array.isArray(customList) && customList.length > 0) {
+      const currentReal = String(getRealSymbol(currentViewedSymbol) || '').trim();
+      const currentIndex = customList.findIndex(code => String(code).trim() === currentReal);
+
+      let nextIndex;
+      if (currentIndex === -1) {
+        nextIndex = direction === 1 ? 0 : customList.length - 1;
+      } else {
+        nextIndex = currentIndex + direction;
+        if (nextIndex < 0) nextIndex = customList.length - 1;
+        if (nextIndex >= customList.length) nextIndex = 0;
+      }
+
+      const nextCode = customList[nextIndex];
+      if (nextCode) {
+        fetchStockData(nextCode);
+      }
+      return;
+    }
+
     // 1. 決定目前要看的是「排行榜」還是「自選名單」
     const currentList = rankingTab === 'ranking' ? rankingList : watchlist;
     if (currentList.length === 0) return showAlert(`目前的${rankingTab === 'ranking' ? '排行榜' : '自選'}名單是空的喔！`);
@@ -3287,11 +3315,9 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
 
     let nextIndex;
     if (currentIndex === -1) {
-      // 如果現在看的股票不在名單內（例如手動輸入的），預設跳到名單的第一檔或最後一檔
       nextIndex = direction === 1 ? 0 : sortedList.length - 1;
     } else {
       nextIndex = currentIndex + direction;
-      // ✨ 無縫循環：看到最後一檔再按下一檔，會自動繞回第一檔！
       if (nextIndex < 0) nextIndex = sortedList.length - 1;
       if (nextIndex >= sortedList.length) nextIndex = 0;
     }
@@ -5272,7 +5298,7 @@ const handleOpenSectorMomentum = async () => {
                                     return (
                                       <div 
                                         key={stock.symbol + idx}
-                                        onClick={() => { fetchStockData(stock.symbol); setIsRankingOpen(false); }}
+                                        onClick={() => { setActiveNavList(displayData.map(s => s.symbol)); fetchStockData(stock.symbol); setIsRankingOpen(false);}}
                                         className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 hover:border-slate-600 cursor-pointer transition-all active:scale-[0.98]"
                                       >
                                         <div className="col-span-5 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 overflow-hidden">
@@ -5324,8 +5350,7 @@ const handleOpenSectorMomentum = async () => {
                     );
                   })()
                 }
-                // 👇 請在這最後面補上這兩行 👇
-                hasListData={(rankingTab === 'ranking' ? rankingList.length : watchlist.length) > 0}
+                hasListData={activeNavList.length > 0 || (rankingTab === 'ranking' ? rankingList.length : watchlist.length) > 0}
                 onNavigateList={handleNavigateList}
                 
                 // ✨ 第一步：請在這裡補上這段「切換自選股」的邏輯 ✨
@@ -5722,21 +5747,26 @@ const handleOpenSectorMomentum = async () => {
       setOpenRankDirectly(false);
     }}
     finmindApiKey={finmindApiKey}
-    onSelectStock={(newCode) => {
+    onSelectStock={(newCode, chipRankList) => {
       const cleanCode = String(newCode || '').trim();
       if (!cleanCode) return;
 
-      // 1. 同步更新三個股號 state
-      if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(cleanCode);
-      if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(cleanCode);
-      if (typeof setSymbolInput === 'function') setSymbolInput(cleanCode);
+      // 🌟 1. 關鍵：如果 ChipChart 有傳回當前名單，就設定 activeNavList
+      if (Array.isArray(chipRankList) && chipRankList.length > 0) {
+        const codes = chipRankList
+          .map(item => (typeof item === 'string' ? item : (item?.code || item?.stockId || item?.symbol || '')))
+          .map(c => String(c).trim())
+          .filter(Boolean);
+        if (codes.length > 0) setActiveNavList(codes);
+      }
 
-      // 2. 關鍵：直接叫主畫面去抓並繪製這檔股票的 K 線
+      // 🌟 2. 更新輸入框與直接抓取 K 線
+      if (typeof setSymbolInput === 'function') setSymbolInput(cleanCode);
       if (typeof fetchStockData === 'function') {
         fetchStockData(cleanCode);
       }
 
-      // 3. 關閉籌碼集中圖彈窗，直接回主畫面看 K 線
+      // 🌟 3. 關閉籌碼集中圖彈窗，回到主畫面看 K 線
       setShowChart(false);
       setOpenRankDirectly(false);
     }}
@@ -5777,15 +5807,16 @@ const handleOpenSectorMomentum = async () => {
 <RevenueRankingModal
   isOpen={showRevenueModal}
   onClose={() => setShowRevenueModal(false)}
-  onSelectStock={(code, name) => {
+  onSelectStock={(code, name, listCodes) => {
     const cleanCode = String(code || '').trim();
     if (!cleanCode) return;
 
-    if (typeof setCurrentRealSymbol === 'function') setCurrentRealSymbol(cleanCode);
-    if (typeof setCurrentViewedSymbol === 'function') setCurrentViewedSymbol(cleanCode);
-    if (typeof setSymbolInput === 'function') setSymbolInput(cleanCode);
+    // 🌟 設定營收/EPS 排行榜為目前導航清單
+    if (Array.isArray(listCodes) && listCodes.length > 0) {
+      setActiveNavList(listCodes.map(c => String(c).trim()).filter(Boolean));
+    }
 
-    // 關鍵：直接呼叫主畫面抓 K 線資料的函式，不用再多按一次 K
+    if (typeof setSymbolInput === 'function') setSymbolInput(cleanCode);
     if (typeof fetchStockData === 'function') {
       fetchStockData(cleanCode);
     }
