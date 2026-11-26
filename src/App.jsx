@@ -3319,7 +3319,7 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
           fromDate.setDate(toDate.getDate() - (isIntra ? 30 : 360));
           const apiTf = isIntra ? currentTf : 'D';
           const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${targetSymbol}?timeframe=${apiTf}&from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
-          const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
+          const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': toSafeHeader(userApiKey) } });
           if (histRes.status === 401 || histRes.status === 403) throw new Error("⚠️ 金鑰無效或沒有權限，請點擊右上角重新設定 API 金鑰！");
           if (!histRes.ok) throw new Error(`無法取得歷史資料 (HTTP ${histRes.status})`);
           
@@ -4324,7 +4324,7 @@ const handleOpenSectorMomentum = async () => {
     try {
       // ⚠️ 這裡補上了反引號 (Template literals)
       const url = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${sector.id}?timeframe=D&from=${fromStr}&to=${toStr}`;
-      const res = await fetch(url, { headers: { 'X-API-KEY': userApiKey } });
+      const res = await fetch(url, { headers: { 'X-API-KEY': toSafeHeader(userApiKey) } });
       
       if (res.ok) {
         const json = await res.json();
@@ -4332,7 +4332,7 @@ const handleOpenSectorMomentum = async () => {
         
         // 🌟 盤中即時報價與當前實際成交量直接縫合 (不作預估量時間放大)
         try {
-          const quoteRes = await fetch(`https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${sector.id}`, { headers: { 'X-API-KEY': userApiKey } });
+          const quoteRes = await fetch(`https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${sector.id}`, { headers: { 'X-API-KEY': toSafeHeader(userApiKey) } });
           if (quoteRes.ok) {
              const quote = await quoteRes.json();
              
@@ -4462,7 +4462,7 @@ const handleOpenSectorMomentum = async () => {
       try {
         // 1. 抓取富果 K 線
         const histUrl = `https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/${stock.symbol}?timeframe=D&from=${fromDateStr}&to=${toDateStr}`;
-        const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': userApiKey } });
+        const histRes = await fetch(histUrl, { headers: { 'X-API-KEY': toSafeHeader(userApiKey) } });
         if (!histRes.ok) throw new Error('Fugle API 異常');
         const histData = await histRes.json();
         let candles = histData.data.reverse().map(d => ({ date: d.date, open: d.open, high: d.high, low: d.low, close: d.close, volume: Math.round(d.volume / 1000) }));
@@ -4470,7 +4470,7 @@ const handleOpenSectorMomentum = async () => {
         // ✨ [新增] 抓取盤中即時資料，確保在交易時間掃描時，用的是「當下」的最新即時價格！
         try {
           const intraUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/${stock.symbol}`;
-          const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': userApiKey } });
+          const intraRes = await fetch(intraUrl, { headers: { 'X-API-KEY': toSafeHeader(userApiKey) } });
           if (intraRes.ok) {
             const quote = await intraRes.json();
             if (quote) {
