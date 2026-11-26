@@ -16,7 +16,8 @@ try {
 } catch (e) {
   console.error("Firebase init error", e);
 }
-
+// 確保 Header 絕不包含非 ISO-8859-1 字元
+const toSafeHeader = (val) => String(val || '').trim().replace(/[^\x20-\x7E]/g, '');
 // === 股票清單 (完整載入 1700+ 檔) ===
 const RAW_STOCK_LIST = `IX0001 加權指數(大盤)
 IX0043 櫃買綜合股價指數
@@ -8077,9 +8078,7 @@ const evaluateBuyConditionsWithTianji = evaluateBuyConditions;
     if (drawObj.type === 'rect') {
        return ( <g key={idKey}>{pts.length === 2 && (() => { const rx = Math.min(pts[0].x, pts[1].x), ry = Math.min(pts[0].y, pts[1].y), rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y); return <rect x={rx} y={ry} width={rw} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill={drawObj.color} fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />; })()}{renderDots()}</g> );
     }
-    if (drawObj.type === 'rect') {
-       return ( <g key={idKey}>{pts.length === 2 && (() => { const rx = Math.min(pts[0].x, pts[1].x), ry = Math.min(pts[0].y, pts[1].y), rw = Math.abs(pts[1].x - pts[0].x), rh = Math.abs(pts[1].y - pts[0].y); return <rect x={rx} y={ry} width={rw} height={rh} stroke={drawObj.color} strokeWidth={drawObj.width} fill={drawObj.color} fillOpacity={0.15} opacity={isDraft ? baseOpacity * 0.6 : baseOpacity} pointerEvents="none" />; })()}{renderDots()}</g> );
-    }
+    
     if (drawObj.type === 'text' && pts.length === 1) {
        // ✨ 智慧文字換行演算法 (中文字算2格，英數字算1格)
        const rawLines = (drawObj.text || '').split('\n');
