@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import ChipChart from './components/ChipChart';
+import InventoryAnalysisModal from './components/InventoryAnalysisModal';
 
 // === Firebase 初始化設定 ===
 let app, auth, db, appId;
@@ -2365,6 +2366,7 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
 
   const [panelsOpen, setPanelsOpen] = useState({ config: false }); // ✨ 補回這行：控制面板收合狀態
   // ✨ 狀態開關管理
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [toggles, setToggles] = useState({
     showMA: true, showVolume: true, showVolSignal: false, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
     showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
@@ -5367,7 +5369,7 @@ const handleOpenSectorMomentum = async () => {
                 <button onClick={() => window.open('https://gemini.google.com/share/5dc98f62e00c?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-indigo-500 text-indigo-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>🧮</span> 1. DCF 估值
                 </button>
-                <button onClick={() => window.open('https://gemini.google.com/share/fc1361ef0f25?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-pink-500 text-pink-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                <button onClick={() => setShowInventoryModal(true)} className="w-full bg-slate-800 border border-slate-600 hover:border-pink-500 text-pink-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>📊</span> 2. 財報分析
                 </button>
                 <button onClick={() => window.open('https://gemini.google.com/share/d38ef70d1847?skid=81d870f0-5bde-484f-a640-7f0e37136e3f?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-blue-500 text-blue-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
@@ -5741,6 +5743,12 @@ const handleOpenSectorMomentum = async () => {
     </button>
   </div>
 )}
+{/* 📊 存銷比與改良版 ROIC 財報分析彈出視窗 */}
+<InventoryAnalysisModal
+  isOpen={showInventoryModal}
+  onClose={() => setShowInventoryModal(false)}
+  initialSymbol={currentRealSymbol || '4958'} // 自動帶入目前看盤的個股
+/>
       {/* ✨ 浮動的策略打造器 (計算機版) */}
 {isBuilderOpen && (
   <div className="fixed inset-0 z-[200] flex justify-center items-center bg-black/80 backdrop-blur-md p-2 sm:p-4 pointer-events-auto">
