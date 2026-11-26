@@ -41,6 +41,9 @@ REPORT_MAP = {
     "fund_dividend": {"title": "基本面 - 高配股排行", "type": "fundamental", "cat": "fund_dividend"},
     "fund_eps": {"title": "基本面 - 高EPS排行", "type": "fundamental", "cat": "fund_eps"},
     "fund_margin": {"title": "基本面 - 高毛利排行", "type": "fundamental", "cat": "fund_margin"},
+    # 🌟 Tendy 營收與 EPS 排行
+    "tendy_rev": {"title": "Tendy 營收排行", "type": "tendy", "tab": "rev"},
+    "tendy_eps": {"title": "Tendy EPS 排行", "type": "tendy", "tab": "eps"},
 }
 
 def fetch_peicheng_html(url):
@@ -96,6 +99,149 @@ def _find_code_col(df):
             return col
 
     return df.columns[1] if len(df.columns) > 1 else df.columns[0]
+
+def _fetch_tendy_html():
+    candidate_urls = [
+        "http://tendy.net/sort/",
+        "https://tendy.net/sort/",
+    ]
+    for url in candidate_urls:
+        try:
+            res = requests.get(url, impersonate="chrome120", timeout=12)
+            if res.status_code != 200 or not res.content:
+                continue
+            raw = res.content
+            for enc in ("utf-8", "cp950", "big5"):
+                try:
+                    text = raw.decode(enc)
+                    if "公司名稱" in text or "每股盈餘" in text or "排行" in text:
+                        return text
+                except Exception:
+                    continue
+            return raw.decode("utf-8", errors="ignore")
+        except Exception as e:
+            print(f"_fetch_tendy_html error ({url}): {e}")
+    return ""
+
+def _parse_tendy_eps_rows(tbl):
+    records = []
+    for _, r in tbl.iterrows():
+        cells = [
+            re.sub(r"\s+", " ", "" if pd.isna(x) else str(x)).strip()
+            for x in r.values
+        ]
+        if len(cells) < 8:
+            continue
+        rank_str, code, name = cells[0], cells[1], cells[2]
+        if not (re.match(r"^\d+$", rank_str) and re.match(r"^[0-9A-Za-z*]+$", code)):
+            continue
+
+        op_profit = cells[5] if len(cells) > 5 else "-"
+        net_profit = cells[6] if len(cells) > 6 else "-"
+        eps_val = cells[7] if len(cells) > 7 else "-"
+        pe_raw = cells[8] if len(cells) > 8 else ""
+        m_price = re.search(r"\(([\d.]+)\)", pe_raw)
+        price_val = f"{m_price.group(1)}元" if m_price else "-"
+
+        records.append({
+            "rank": int(rank_str),
+            "code": code,
+            "name": name,
+            "val1_label": "EPS",
+            "val1": eps_val,
+            "val2_label": "淨利",
+            "val2": net_profit,
+            "price": price_val,
+            "capital": "-",
+            "note": f"營益 {op_profit}｜{pe_raw}".strip("｜"),
+        })
+    return records
+
+def _parse_tendy_rev_rows(tbl):
+    rows = []
+    for _, r in tbl.iterrows():
+        cells = [
+            re.sub(r"\s+", " ", "" if pd.isna(x) else str(x)).strip()
+            for x in r.values
+        ]
+        if any(cells):
+            rows.append(cells)
+
+    records = []
+    i = 0
+    while i < len(rows):
+        row = rows[i]
+        rank_str = row[0] if len(row) > 0 else ""
+        name_cell = row[1] if len(row) > 1 else ""
+        m_code = re.search(r"\(([^()]+)\)\s*$", name_cell)
+
+        if re.match(r"^\d+$", rank_str) and m_code:
+            code = m_code.group(1).strip()
+            name = re.sub(r"\s*\([^()]+\)\s*$", "", name_cell).strip()
+            metric_cell = row[2] if len(row) > 2 else ""
+            price_cell = row[3] if len(row) > 3 else ""
+            cap_cell = row[4] if len(row) > 4 else ""
+
+            m_rate = re.search(r"\(([-+]?\d+(?:\.\d+)?%)\)", metric_cell)
+            rate_val = m_rate.group(1) if m_rate else "-"
+            main_val = re.sub(r"\s*\([^()]*\)\s*$", "", metric_cell).strip() or "-"
+
+            m_price = re.search(r"([\d.]+)\s*元", price_cell)
+            price_val = f"{m_price.group(1)}元" if m_price else (price_cell.replace("K線圖", "").strip() or "-")
+
+            cap_val = cap_cell.strip() or "-"
+
+            note_str = ""
+            if i + 1 < len(rows):
+                next_row = rows[i + 1]
+                next_first = next_row[0] if len(next_row) > 0 else ""
+                if not re.match(r"^\d+$", next_first):
+                    note_str = " ".join([c for c in next_row if c]).strip()
+                    i += 1
+
+            records.append({
+                "rank": int(rank_str),
+                "code": code,
+                "name": name,
+                "val1_label": "營收",
+                "val1": main_val,
+                "val2_label": "增減率",
+                "val2": rate_val,
+                "price": price_val,
+                "capital": cap_val,
+                "note": note_str,
+            })
+        i += 1
+
+    return records
+
+def parse_tendy_report(tab="rev"):
+    html = _fetch_tendy_html()
+    if not html:
+        return []
+
+    try:
+        tables = pd.read_html(io.StringIO(html), header=None)
+    except Exception as e:
+        print(f"parse_tendy_report read_html error: {e}")
+        return []
+
+    for tbl in tables:
+        if tab == "eps":
+            recs = _parse_tendy_eps_rows(tbl)
+            if recs:
+                return recs
+        else:
+            recs = _parse_tendy_rev_rows(tbl)
+            if recs:
+                return recs
+
+    for tbl in tables:
+        recs = _parse_tendy_rev_rows(tbl) if tab == "eps" else _parse_tendy_eps_rows(tbl)
+        if recs:
+            return recs
+
+    return []
 
 # 專門解析昨強勢股 (dream_report/昨強勢股.htm)
 def parse_prev_strong_report():
@@ -309,6 +455,10 @@ def _format_cell(val, default_pct=False, col_name=""):
         return s
 
 def fetch_rankings(report_key="conc_5d"):
+    if report_key == "tendy_rev":
+        return parse_tendy_report("rev")
+    if report_key == "tendy_eps":
+        return parse_tendy_report("eps")
     if report_key == "prev_strong":
         return parse_prev_strong_report()
 

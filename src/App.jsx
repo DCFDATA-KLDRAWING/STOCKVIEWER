@@ -5,6 +5,7 @@ import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import ChipChart from './components/ChipChart';
 import InventoryAnalysisModal from './components/InventoryAnalysisModal';
 import DcfValuationModal from './components/DcfValuationModal';
+import RevenueRankingModal from './components/RevenueRankingModal';
 
 // === Firebase 初始化設定 ===
 let app, auth, db, appId;
@@ -2370,6 +2371,7 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
   // ✨ 狀態開關管理
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [showDcfModal, setShowDcfModal] = useState(false);
+  const [showRevenueModal, setShowRevenueModal] = useState(false);
   const [toggles, setToggles] = useState({
     showMA: true, showVolume: true, showVolSignal: false, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
     showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
@@ -5378,7 +5380,7 @@ const handleOpenSectorMomentum = async () => {
                 <button onClick={() => window.open('https://gemini.google.com/share/d38ef70d1847?skid=81d870f0-5bde-484f-a640-7f0e37136e3f?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-blue-500 text-blue-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>🌍</span> 3. 產業規模
                 </button>
-                <button onClick={() => window.open('https://gemini.google.com/share/cbe5a830f8a7?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-amber-500 text-amber-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                <button onClick={() => setShowRevenueModal(true)} className="w-full bg-slate-800 border border-slate-600 hover:border-amber-500 text-amber-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>📈</span> 4. 營收觀察
                 </button>
                 
@@ -5762,6 +5764,19 @@ const handleOpenSectorMomentum = async () => {
     /^\d{4}$/.test(currentRealSymbol || '') ? currentRealSymbol : '2330'
   }
   finmindApiKey={finmindApiKey}
+/>
+{/* 📈 營收觀察彈出視窗 */}
+<RevenueRankingModal
+  isOpen={showRevenueModal}
+  onClose={() => setShowRevenueModal(false)}
+  onSelectStock={(code, name) => {
+    const label = `${code} ${name}`.trim();
+    if (typeof handleSelectStock === 'function') {
+      handleSelectStock(label);
+    } else if (typeof setStockInput === 'function') {
+      setStockInput(label);
+    }
+  }}
 />
       {/* ✨ 浮動的策略打造器 (計算機版) */}
 {isBuilderOpen && (
