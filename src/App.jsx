@@ -4,6 +4,7 @@ import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged }
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import ChipChart from './components/ChipChart';
 import InventoryAnalysisModal from './components/InventoryAnalysisModal';
+import DcfValuationModal from './components/DcfValuationModal';
 
 // === Firebase 初始化設定 ===
 let app, auth, db, appId;
@@ -2368,6 +2369,7 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
   const [panelsOpen, setPanelsOpen] = useState({ config: false }); // ✨ 補回這行：控制面板收合狀態
   // ✨ 狀態開關管理
   const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [showDcfModal, setShowDcfModal] = useState(false);
   const [toggles, setToggles] = useState({
     showMA: true, showVolume: true, showVolSignal: false, showTrend: true, showHeidun: false, showCrosshair: false, showBBands: false,
     showBBands3: false,// ✨ 新增：高布林(3.0) 獨立開關
@@ -5367,7 +5369,7 @@ const handleOpenSectorMomentum = async () => {
           {isAdmin ? (
             <TechCard title="產業資訊 (已解鎖)" icon="🌍" glow="purple">
               <div className="flex flex-col gap-3">
-                <button onClick={() => window.open('https://gemini.google.com/share/5dc98f62e00c?openExternalBrowser=1', '_blank')} className="w-full bg-slate-800 border border-slate-600 hover:border-indigo-500 text-indigo-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
+                <button onClick={() => setShowDcfModal(true)} className="w-full bg-slate-800 border border-slate-600 hover:border-indigo-500 text-indigo-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
                   <span>🧮</span> 1. DCF 估值
                 </button>
                 <button onClick={() => setShowInventoryModal(true)} className="w-full bg-slate-800 border border-slate-600 hover:border-pink-500 text-pink-300 py-2.5 rounded-lg font-bold shadow-sm transition-all text-sm text-left px-3 flex items-center gap-2">
@@ -5744,6 +5746,14 @@ const handleOpenSectorMomentum = async () => {
     </button>
   </div>
 )}
+{/* 🧮 DCF 估值模型彈出視窗 */}
+<DcfValuationModal
+  isOpen={showDcfModal}
+  onClose={() => setShowDcfModal(false)}
+  initialSymbol={displayFullname}
+  initialPrice={klineData.length > 0 ? klineData[klineData.length - 1]?.close : ''}
+  finmindApiKey={finmindApiKey}
+/>
 {/* 📊 存銷比與改良版 ROIC 財報分析彈出視窗 */}
 <InventoryAnalysisModal
   isOpen={showInventoryModal}
