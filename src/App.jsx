@@ -3314,13 +3314,67 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
     });
   };
 
-  // ✨ 邏輯 2：處理點擊標題排序
+  // 輔助函式：從帶前綴/符號的字串中抽取數值（支援 YoY:+123%、🌟 增:9.3%、+1.5%）
+  const extractChangeValue = (val) => {
+    if (typeof val === 'number') return val;
+    if (!val) return -Infinity;
+    const match = String(val).replace(/,/g, '').match(/[-+]?[0-9]*\.?[0-9]+/);
+    if (!match) return -Infinity;
+    const num = parseFloat(match[0]);
+    return Number.isNaN(num) ? -Infinity : num;
+  };
+
+  // 輔助函式：解析成交量或營收規模（支援 1.55億、99萬、12,345、-）
+  const extractVolumeValue = (val) => {
+    if (typeof val === 'number') return val;
+    if (!val || val === '-') return 0;
+    const str = String(val).replace(/,/g, '').trim();
+
+    if (str.includes('億')) {
+      const match = str.match(/[-+]?[0-9]*\.?[0-9]+/);
+      return match ? parseFloat(match[0]) * 100000000 : 0;
+    }
+    if (str.includes('萬')) {
+      const match = str.match(/[-+]?[0-9]*\.?[0-9]+/);
+      return match ? parseFloat(match[0]) * 10000 : 0;
+    }
+
+    const match = str.match(/[-+]?[0-9]+/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
+  // ✨ 邏輯 2：處理點擊標題排序（並同步更新 K 線圖切換名單順序）
   const handleSort = (key) => {
     setSortConfig(prev => {
-      if (prev.key === key) {
-        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }; // 同一個欄位切換正反向
+      const nextConfig = prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'desc' };
+
+      const baseList = rankingTab === 'ranking' ? rankingList : watchlist;
+      if (Array.isArray(baseList) && baseList.length > 0) {
+        const sortedPreview = [...baseList].sort((a, b) => {
+          const valA = a[nextConfig.key];
+          const valB = b[nextConfig.key];
+          if (nextConfig.key === 'change') {
+            const numA = extractChangeValue(valA);
+            const numB = extractChangeValue(valB);
+            return nextConfig.direction === 'asc' ? numA - numB : numB - numA;
+          }
+          if (nextConfig.key === 'volume') {
+            const numA = extractVolumeValue(valA);
+            const numB = extractVolumeValue(valB);
+            return nextConfig.direction === 'asc' ? numA - numB : numB - numA;
+          }
+          const strA = String(valA || '');
+          const strB = String(valB || '');
+          return nextConfig.direction === 'asc'
+            ? strA.localeCompare(strB, 'zh-Hant', { numeric: true })
+            : strB.localeCompare(strA, 'zh-Hant', { numeric: true });
+        });
+        setActiveNavList(sortedPreview.map(item => String(item.symbol).trim()).filter(Boolean));
       }
-      return { key, direction: 'desc' }; // 點擊新欄位，預設由大到小
+
+      return nextConfig;
     });
   };
 
@@ -3328,27 +3382,26 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
   const getSortedData = (list) => {
     if (!sortConfig.key) return list;
     return [...list].sort((a, b) => {
-      let valA = a[sortConfig.key] || '';
-      let valB = b[sortConfig.key] || '';
+      const valA = a[sortConfig.key];
+      const valB = b[sortConfig.key];
 
-      // 處理漲跌幅 (把 "+1.5%" 轉成數字 1.5 比較)
       if (sortConfig.key === 'change') {
-        const numA = parseFloat(valA.toString().replace(/[+%]/g, '')) || 0;
-        const numB = parseFloat(valB.toString().replace(/[+%]/g, '')) || 0;
+        const numA = extractChangeValue(valA);
+        const numB = extractChangeValue(valB);
         return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
       }
-      
-      // ✨ 升級版：處理成交量 (把 "12,345" 轉成純數字 12345 比較，如果是 '-' 則視為 0)
+
       if (sortConfig.key === 'volume') {
-        const numA = parseInt(valA.toString().replace(/,/g, '')) || 0;
-        const numB = parseInt(valB.toString().replace(/,/g, '')) || 0;
+        const numA = extractVolumeValue(valA);
+        const numB = extractVolumeValue(valB);
         return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
       }
-      
-      // 處理文字排序 (股號/股名)
-      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
+
+      const strA = String(valA || '');
+      const strB = String(valB || '');
+      return sortConfig.direction === 'asc'
+        ? strA.localeCompare(strB, 'zh-Hant', { numeric: true })
+        : strB.localeCompare(strA, 'zh-Hant', { numeric: true });
     });
   };
      
@@ -3376,15 +3429,12 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
       return;
     }
 
-    // 1. 決定目前要看的是「排行榜」還是「自選名單」
     const currentList = rankingTab === 'ranking' ? rankingList : watchlist;
     if (currentList.length === 0) return showAlert(`目前的${rankingTab === 'ranking' ? '排行榜' : '自選'}名單是空的喔！`);
     
-    // 2. 取得已經套用「排序」的完整名單
     const sortedList = getSortedData(currentList);
     const currentReal = getRealSymbol(currentViewedSymbol);
     
-    // 3. 找出目前觀看的股票在名單中的第幾個位置
     const currentIndex = sortedList.findIndex(s => s.symbol === currentReal);
 
     let nextIndex;
@@ -3396,7 +3446,6 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
       if (nextIndex >= sortedList.length) nextIndex = 0;
     }
 
-    // 4. 觸發抓取 K 線資料！
     fetchStockData(sortedList[nextIndex].symbol);
   };
   // ✨ 修改 fetchStockData 讓它支援從畫板載入指定的股號與動態週期切換
