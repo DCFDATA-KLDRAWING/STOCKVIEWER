@@ -3132,6 +3132,77 @@ const [hasUsedRank, setHasUsedRank] = useState(false);
       setIsLoadingRanking(false);
     }
   };
+  // ✨ 處理一鍵從同一份 Google Sheets (Colab) 匯入【營收年增排行】
+  const handleFetchRevenueSheetRanking = async () => {
+    setIsRankingOpen(true);
+    setIsLoadingRanking(true);
+    setRankingTab('ranking');
+
+    try {
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/1qXbIbn0wYDZlokHogl5cWUAOLtH613PJb2Akc2kT_Qk/gviz/tq?tqx=out:csv&sheet=營收年增排行';
+      const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error('網路連線異常');
+
+      const csvText = await response.text();
+      const newRanking = [];
+      const seen = new Set();
+
+      const lines = csvText.split('\n').slice(1); // 跳過標題列
+
+      lines.forEach((rawLine) => {
+        const line = rawLine.trim();
+        if (!line) return;
+
+        const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+        const cleanCols = cols.map((c) => c.replace(/^"|"$/g, '').trim());
+
+        // 欄位對應：[0]排名, [1]市場, [2]股號, [3]股名, [4]當月營收(千元), [5]去年同月增減(%)
+        const symbolMatch = cleanCols.join(' ').match(/\b([0-9]{4}[a-zA-Z]?)\b/);
+        if (!symbolMatch) return;
+
+        const symbol = symbolMatch[1];
+        if (seen.has(symbol)) return;
+
+        const stockInfo = STOCKS.find((s) => s.id === symbol);
+        const name = stockInfo?.name || cleanCols[3] || symbol;
+
+        const revThousand = parseFloat((cleanCols[4] || '').replace(/,/g, ''));
+        const yoyVal = parseFloat((cleanCols[5] || '').replace(/,|%/g, ''));
+
+        const volumeText = Number.isNaN(revThousand)
+          ? '-'
+          : revThousand >= 100000
+            ? `${(revThousand / 100000).toFixed(2)}億`
+            : `${Math.round(revThousand / 10)}萬`;
+
+        const changeText = Number.isNaN(yoyVal)
+          ? '營收'
+          : `YoY:+${yoyVal.toFixed(1)}%`;
+
+        newRanking.push({
+          symbol,
+          name,
+          change: changeText,
+          volume: volumeText,
+        });
+        seen.add(symbol);
+      });
+
+      if (newRanking.length > 0) {
+        setRankingList(newRanking);
+        // 🌟 將這 100 檔設為當前 K 線圖右鍵 / ▶ 切換名單
+        setActiveNavList(newRanking.map((item) => String(item.symbol).trim()).filter(Boolean));
+        showAlert(`📈 成功從雲端同步 ${newRanking.length} 檔營收年增股！`);
+      } else {
+        showAlert('雲端營收排行尚無資料，請先於 Colab 執行更新。');
+      }
+    } catch (error) {
+      console.error('Fetch revenue sheet ranking error:', error);
+      showAlert('無法取得雲端營收排行，請確認分頁名稱與共用權限！');
+    } finally {
+      setIsLoadingRanking(false);
+    }
+  };
   // ✨ 處理手動貼上文字排行 (玩股網專屬防擠壓 + 富邦黏巴達 雙引擎合體版)
   const handlePasteRanking = () => {
     if (!pasteText.trim()) return showAlert("請先貼上資料！");
@@ -4817,6 +4888,13 @@ const handleOpenSectorMomentum = async () => {
           <button onClick={handleFetchChipRanking} className="shrink-0 justify-center bg-orange-900/50 border border-orange-700 text-orange-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(249,115,22,0.2)] hover:bg-orange-800 whitespace-nowrap transition-all flex items-center gap-1">
             🔥 籌碼排行
           </button>
+          <button
+  type="button"
+  onClick={handleFetchRevenueSheetRanking}
+  className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-colors"
+>
+  📈 營收年增
+</button>
           {/* ✨ 2.5 手動貼上排行按鈕 */}
           <button onClick={() => setIsPasteModalOpen(true)} className="shrink-0 justify-center bg-emerald-900/40 border border-emerald-700 text-emerald-300 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:bg-emerald-800 whitespace-nowrap transition-all flex items-center">
             📝 貼上排行
