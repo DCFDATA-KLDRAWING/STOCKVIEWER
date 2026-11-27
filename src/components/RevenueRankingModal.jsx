@@ -120,13 +120,41 @@ const INITIAL_EPS_ROWS = [
   { rank: 20, code: '1498', name: '強冠企業', metricText: 'EPS 1.41', rateText: '淨利 7055萬', price: '—', capital: '—', note: '營益 7847萬｜0()' }
 ];
 
+function formatPctValue(rawVal) {
+  if (rawVal === null || rawVal === undefined || rawVal === '' || rawVal === '—') return '—';
+  const str = String(rawVal).trim();
+  if (str.includes('%')) return str;
+  const num = Number(str.replace(/,/g, ''));
+  if (Number.isNaN(num)) return str;
+  return `${num > 0 ? '+' : ''}${num.toFixed(2)}%`;
+}
+
 function normalizeApiRow(item, idx) {
+  const rawRate =
+    item.val2 ??
+    item.rateText ??
+    item.yoy ??
+    item.revYoY ??
+    item.yoyPct ??
+    item.growthPct ??
+    item.changePct ??
+    item.momPct ??
+    '—';
+
+  const rawMetric =
+    item.val1 ??
+    item.metricText ??
+    item.revenueText ??
+    item.epsText ??
+    item.revenue ??
+    '—';
+
   return {
     rank: Number(item.rank) || idx + 1,
-    code: String(item.code || '').trim(),
-    name: String(item.name || '').trim(),
-    metricText: item.val1 || item.revenueText || item.epsText || '—',
-    rateText: item.val2 || (item.momPct != null ? `${item.momPct}%` : '—'),
+    code: String(item.code || item.stockId || item.symbol || '').trim(),
+    name: String(item.name || item.stockName || '').trim(),
+    metricText: String(rawMetric),
+    rateText: formatPctValue(rawRate),
     price: item.price || '—',
     capital: item.capital || '—',
     note: item.note || ''
@@ -163,7 +191,6 @@ function parsePastedRanking(rawText) {
     })
     .filter(Boolean);
 }
-
 const RevenueRankingModal = ({ isOpen, onClose, onSelectStock }) => {
   const [tab, setTab] = useState('revenue'); // 'revenue' | 'eps'
   const [revenueRows, setRevenueRows] = useState(INITIAL_REVENUE_ROWS);
